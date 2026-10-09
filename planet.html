@@ -1,0 +1,4382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Galactic Front - Planet</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="supabase.js"></script>
+    <script src="gamecontrol.js"></script>
+    <script src="ships.js"></script>
+
+    <style>
+
+        /* =====================================================
+           FLEET PANEL
+        ===================================================== */
+
+        #fleet-panel {
+
+            display: none;
+
+            position: absolute;
+
+            top: 110px;
+            left: 35px;
+
+            width: 330px;
+            max-height: 65vh;
+
+            overflow-y: auto;
+
+            padding: 20px;
+
+            background: rgba(8, 10, 13, 0.96);
+
+            border: 1px solid rgba(255,255,255,0.2);
+
+            z-index: 40;
+
+        }
+
+        #fleet-panel h2 {
+
+            margin: 0 0 15px;
+
+            font-size: 16px;
+
+            letter-spacing: 3px;
+
+        }
+
+        #create-fleet-button {
+
+            width: 100%;
+
+            padding: 12px;
+
+            background: transparent;
+
+            color: white;
+
+            border: 1px solid #666;
+
+            font-size: 12px;
+
+            font-weight: bold;
+
+            letter-spacing: 2px;
+
+            cursor: pointer;
+
+        }
+
+        #create-fleet-button:hover {
+
+            background: white;
+
+            color: black;
+
+        }
+
+
+        /* =====================================================
+           FLEET LIST
+        ===================================================== */
+
+        #planet-fleet-list {
+
+            margin-top: 15px;
+
+        }
+
+        .fleet-entry {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 12px;
+
+            padding: 12px;
+
+            margin-bottom: 8px;
+
+            background: rgba(255,255,255,0.035);
+
+            border: 1px solid rgba(255,255,255,0.12);
+
+        }
+
+        .fleet-icon {
+
+            width: 34px;
+            height: 34px;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            flex-shrink: 0;
+
+        }
+
+        .fleet-icon svg {
+
+            width: 28px;
+            height: 28px;
+
+        }
+
+        .fleet-details {
+
+            min-width: 0;
+
+        }
+
+        .fleet-name {
+
+            color: white;
+
+            font-size: 12px;
+
+            font-weight: bold;
+
+            letter-spacing: 1px;
+
+            word-break: break-word;
+
+        }
+
+        .fleet-route {
+
+            margin-top: 5px;
+
+            color: #888;
+
+            font-size: 10px;
+
+        }
+
+        .fleet-status {
+
+            margin-top: 5px;
+
+            font-size: 9px;
+
+            font-weight: bold;
+
+            letter-spacing: 1px;
+
+        }
+
+        .fleet-arrived {
+
+            color: #65d681;
+
+        }
+
+        .fleet-travelling {
+
+            color: #5da9ff;
+
+        }
+
+        .fleet-building {
+
+            color: #e0b45a;
+
+        }
+
+        .no-fleets {
+
+            padding: 15px 5px;
+
+            color: #777;
+
+            font-size: 11px;
+
+            line-height: 1.5;
+
+        }
+
+
+        /* =====================================================
+           CREATE FLEET MENU
+        ===================================================== */
+
+        #fleet-menu {
+
+            display: none;
+
+            position: absolute;
+
+            top: 50%;
+            left: 50%;
+
+            transform: translate(-50%, -50%);
+
+            width: 420px;
+            max-width: calc(100vw - 30px);
+
+            padding: 25px;
+
+            background: rgba(8,10,13,0.98);
+
+            border: 1px solid rgba(255,255,255,0.3);
+
+            z-index: 100;
+
+        }
+
+        #fleet-menu h2 {
+
+            margin: 0 0 20px;
+
+            font-size: 20px;
+
+            letter-spacing: 4px;
+
+        }
+
+        #fleet-name {
+
+            width: 100%;
+
+            box-sizing: border-box;
+
+            padding: 12px;
+
+            background: #111;
+
+            color: white;
+
+            border: 1px solid #555;
+
+            outline: none;
+
+            font-family: Arial, sans-serif;
+
+            font-size: 13px;
+
+        }
+
+        #fleet-name:focus {
+
+            border-color: white;
+
+        }
+
+        .fleet-menu-buttons {
+
+            display: flex;
+
+            gap: 10px;
+
+            margin-top: 18px;
+
+        }
+
+        .fleet-menu-buttons button {
+
+            flex: 1;
+
+            padding: 12px;
+
+            background: transparent;
+
+            color: white;
+
+            border: 1px solid #555;
+
+            font-size: 11px;
+
+            font-weight: bold;
+
+            letter-spacing: 2px;
+
+            cursor: pointer;
+
+        }
+
+        .fleet-menu-buttons button:hover {
+
+            background: white;
+
+            color: black;
+
+        }
+
+        #fleet-message {
+
+            min-height: 18px;
+
+            margin-top: 12px;
+
+            color: #d22b2b;
+
+            font-size: 11px;
+
+        }
+
+
+        /* =====================================================
+           MOBILE
+        ===================================================== */
+
+        @media (max-width: 800px) {
+
+            #fleet-panel {
+
+                top: 90px;
+                left: 15px;
+
+                width: 290px;
+
+            }
+
+            #fleet-menu {
+
+                width: calc(100vw - 30px);
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="planet-page">
+
+
+    <!-- =====================================================
+         HEADER
+    ===================================================== -->
+
+    <div class="planet-top">
+
+        <h1 id="planet-name">
+            PLANET
+        </h1>
+
+        <p>
+            PLANETARY MAP
+        </p>
+
+    </div>
+
+
+    <!-- =====================================================
+         PLANET
+    ===================================================== -->
+
+    <div class="planet-world">
+
+        <div class="planet-system">
+
+            <div
+                id="planet-globe"
+                class="planet-globe normal"
+            >
+
+                <div id="cities"></div>
+
+                <div class="planet-light"></div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         FLEETS
+    ===================================================== -->
+
+    <div id="fleet-panel">
+
+        <h2>FLEETS</h2>
+
+        <button
+            id="create-fleet-button"
+            type="button"
+        >
+            CREATE FLEET
+        </button>
+
+        <div id="planet-fleet-list">
+
+            <div class="no-fleets">
+                No fleets are currently stationed
+                at this planet.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         CREATE FLEET
+    ===================================================== -->
+
+    <div id="fleet-menu">
+
+        <h2>CREATE FLEET</h2>
+
+        <p
+            style="
+                margin:0 0 15px;
+                color:#888;
+                font-size:11px;
+                line-height:1.5;
+            "
+        >
+            Fleet cost: <span id="fleet-price">500</span> credits<br>
+            Construction time: 1 minute<br>
+            Initial force: 5 Rifle Squads + 1 MG Squad
+        </p>
+
+        <p
+            style="
+                margin:0 0 15px;
+                color:#aaa;
+                font-size:12px;
+            "
+        >
+            This fleet will be constructed at
+            <strong id="fleet-origin-display">
+                this planet
+            </strong>.
+            <br>
+            After construction, it will be
+            stationed here until you order it
+            to move from the Galactic Map.
+        </p>
+
+        <input
+            id="fleet-name"
+            type="text"
+            maxlength="40"
+            placeholder="Fleet name"
+        >
+
+        <div class="fleet-menu-buttons">
+
+            <button
+                id="confirm-create-fleet"
+                type="button"
+            >
+                CREATE
+            </button>
+
+            <button
+                id="cancel-create-fleet"
+                type="button"
+            >
+                CANCEL
+            </button>
+
+        </div>
+
+        <div id="fleet-message"></div>
+
+    </div>
+
+
+    <!-- =====================================================
+         BACK
+    ===================================================== -->
+
+    <button
+        class="planet-back"
+        id="planet-back"
+        type="button"
+    >
+        BACK TO GALACTIC MAP
+    </button>
+
+
+</div>
+
+
+<script>
+
+/* =========================================================
+   PLANET
+========================================================= */
+
+const params =
+    new URLSearchParams(
+        window.location.search
+    );
+
+const planetName =
+    params.get("name") || "Veyrona";
+
+const playerFaction =
+    localStorage.getItem(
+        "playerFaction"
+    ) || "Independents";
+
+
+/* =========================================================
+   PLANET TYPES
+========================================================= */
+
+const planetTypes = {
+
+    "Ultramars": "industrial",
+    "Veyrona": "temperate",
+    "Kharos": "desert",
+    "Novera": "ocean",
+    "Asteron": "temperate",
+    "Veltrix": "industrial",
+    "Orphion": "frozen",
+    "Caldris": "temperate",
+    "Elyra": "ocean",
+    "Dravon": "desert",
+    "Meridia": "temperate",
+    "Tarsis": "desert",
+    "Vandros": "industrial",
+    "Kestara": "frozen",
+    "Rhyll": "ocean",
+    "Solvara": "desert",
+    "Demeris": "temperate",
+    "Voralis": "industrial",
+    "Aurelis": "temperate",
+    "Zeraphon": "desert",
+    "Mystral": "frozen",
+    "Korvax": "industrial",
+    "Eryndor": "temperate",
+    "Talvera": "ocean",
+    "Ossara": "desert",
+    "Brineth": "temperate",
+    "Valcor": "industrial",
+    "Nythara": "frozen",
+    "Caelus": "ocean",
+    "Ravena": "temperate",
+    "Thessara": "desert",
+    "Morvane": "industrial",
+    "Iskaron": "frozen",
+    "Lunaris": "ocean",
+    "Draxia": "desert",
+    "Seraphis": "temperate",
+    "Oryxen": "industrial",
+    "Virelia": "ocean",
+    "Arctyra": "frozen",
+    "Free Earth": "earth",
+    "Krieg": "industrial",
+    "Vraks": "desert"
+};
+
+
+/* =========================================================
+   CITY POSITIONS
+========================================================= */
+
+const positions = [
+
+    [[22,38],[58,23],[67,67]],
+    [[30,25],[68,39],[43,70]],
+    [[20,60],[53,27],[72,62]],
+    [[28,30],[73,42],[48,73]],
+    [[23,45],[61,24],[68,70]],
+    [[35,24],[70,52],[42,70]],
+    [[25,29],[58,65],[75,42]],
+    [[32,58],[67,27],[48,72]],
+    [[20,35],[72,35],[52,68]],
+    [[28,24],[62,56],[72,72]],
+    [[21,52],[48,25],[72,47]],
+    [[30,28],[68,62],[48,72]],
+    [[24,31],[57,67],[74,42]],
+    [[34,23],[70,38],[48,72]],
+    [[23,62],[62,28],[73,53]],
+    [[28,36],[67,24],[55,70]],
+    [[20,45],[52,28],[75,65]],
+    [[35,30],[72,48],[45,70]],
+    [[25,25],[65,57],[70,72]],
+    [[30,55],[55,22],[75,40]],
+    [[22,35],[68,28],[55,72]],
+    [[35,24],[72,48],[42,67]],
+    [[24,52],[58,25],[70,65]],
+    [[31,30],[73,55],[45,72]],
+    [[20,40],[55,70],[75,32]],
+    [[34,25],[63,60],[46,73]],
+    [[25,60],[70,32],[55,25]],
+    [[30,27],[73,45],[43,70]],
+    [[22,48],[60,28],[72,65]],
+    [[34,35],[68,65],[45,23]],
+    [[24,28],[70,42],[52,70]],
+    [[32,55],[62,25],[73,68]],
+    [[21,40],[55,72],[70,28]],
+    [[29,25],[72,52],[48,70]],
+    [[35,45],[62,27],[23,67]],
+    [[25,30],[68,62],[48,72]],
+    [[22,55],[58,24],[75,42]],
+    [[30,42],[70,28],[52,70]],
+    [[24,27],[62,55],[73,68]],
+    [[29,35],[64,25],[70,65]]
+
+];
+
+
+/* =========================================================
+   STATE
+========================================================= */
+
+let playerID = null;
+
+let planetCities = [];
+
+let planetFleets = [];
+
+
+/* =========================================================
+   ELEMENTS
+========================================================= */
+
+const planetTitle =
+    document.getElementById(
+        "planet-name"
+    );
+
+const planetGlobe =
+    document.getElementById(
+        "planet-globe"
+    );
+
+const cityContainer =
+    document.getElementById(
+        "cities"
+    );
+
+const fleetPanel =
+    document.getElementById(
+        "fleet-panel"
+    );
+
+const fleetList =
+    document.getElementById(
+        "planet-fleet-list"
+    );
+
+const fleetMenu =
+    document.getElementById(
+        "fleet-menu"
+    );
+
+const fleetNameInput =
+    document.getElementById(
+        "fleet-name"
+    );
+
+const fleetMessage =
+    document.getElementById(
+        "fleet-message"
+    );
+
+const createFleetButton =
+    document.getElementById(
+        "create-fleet-button"
+    );
+
+const confirmFleetButton =
+    document.getElementById(
+        "confirm-create-fleet"
+    );
+
+const cancelFleetButton =
+    document.getElementById(
+        "cancel-create-fleet"
+    );
+
+const fleetOriginDisplay =
+    document.getElementById(
+        "fleet-origin-display"
+    );
+
+const backButton =
+    document.getElementById(
+        "planet-back"
+    );
+
+
+/* =========================================================
+   AUTHENTICATION
+========================================================= */
+
+async function loadPlayer() {
+
+    const {
+        data,
+        error
+    } =
+        await supabaseClient.auth.getUser();
+
+    if (
+        error ||
+        !data ||
+        !data.user
+    ) {
+
+        console.error(
+            "Authentication error:",
+            error
+        );
+
+        return false;
+    }
+
+    playerID =
+        data.user.id;
+
+    localStorage.setItem(
+        "playerID",
+        playerID
+    );
+
+    return true;
+}
+
+
+/* =========================================================
+   ESCAPE TEXT
+========================================================= */
+
+function escapeText(value) {
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+}
+
+
+/* =========================================================
+   FACTION CLASS
+========================================================= */
+
+function factionClass(faction) {
+
+    if (faction === "Combine") {
+
+        return "combine";
+
+    }
+
+    if (
+        faction ===
+        "Freedom Authority"
+    ) {
+
+        return "freedom";
+
+    }
+
+    return "independent";
+
+}
+
+
+/* =========================================================
+   LOAD CITIES
+========================================================= */
+
+async function loadCities() {
+
+    let { data, error } = await supabaseClient
+        .from("cities")
+        .select("id,name,faction,garrison_level")
+        .eq("planet_id", planetName);
+
+    if (error) {
+
+        /* garrison_level missing (batch1.sql not run yet): retry without it */
+        const retry = await supabaseClient
+            .from("cities")
+            .select("id,name,faction")
+            .eq("planet_id", planetName);
+
+        data = retry.data;
+        error = retry.error;
+
+    }
+
+    if (error) {
+        console.error("Could not load cities:", error);
+        return false;
+    }
+
+    planetCities = (data || []).map(c => ({ ...c, faction: (c.faction || "").trim() }));
+
+    await loadBuildings();
+    await loadWar();
+
+    return true;
+
+}
+
+
+/* =========================================================
+   RENDER PLANET
+========================================================= */
+
+function renderPlanet() {
+
+    if (planetTitle) {
+
+        planetTitle.textContent =
+            planetName.toUpperCase();
+
+    }
+
+
+    if (planetGlobe) {
+
+        planetGlobe.className =
+            "planet-globe " +
+            (
+                planetTypes[planetName] ||
+                "temperate"
+            );
+
+    }
+
+
+    if (!cityContainer) {
+
+        return;
+
+    }
+
+
+    cityContainer.innerHTML = "";
+
+
+    const planetIndex =
+        Object.keys(
+            planetTypes
+        ).indexOf(
+            planetName
+        );
+
+
+    const planetPositions =
+        positions[
+            planetIndex
+        ] || positions[0];
+
+
+    planetCities.forEach(
+        function(city, index) {
+
+            const cityPosition = (isWarPlanet && warCityPos[city.id]) || planetPositions[index % 3];
+
+
+            const cityElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            cityElement.className =
+                "city " +
+                factionClass(
+                    city.faction
+                );
+
+
+            cityElement.style.left =
+                cityPosition[0] +
+                "%";
+
+
+            cityElement.style.top =
+                cityPosition[1] +
+                "%";
+
+
+            cityElement.dataset.city =
+                city.name;
+
+
+            cityElement.innerHTML = `
+
+                <div class="city-marker"></div>
+
+                <span>
+                    ${escapeText(city.name)} · G${city.garrison_level || 1}
+                </span>
+
+            `;
+
+
+            cityElement.addEventListener("click", function() {
+                if (isWarPlanet) { showWarCityInfo(city); return; }
+                const running = liveBattles.find(b => b.city === city.name && !b.mine &&
+                    (b.attacker === playerFaction || b.defender === playerFaction));
+                if (running) { joinLiveBattle(running); return; }
+                if (city.faction === playerFaction) {
+                    openCityPanel(city.id);
+                }
+                else {
+                    closeCityPanel();
+                    startAttack(city);
+                }
+            });
+
+
+            appendCityBuildings(cityElement, city);
+            colorWarCity(cityElement, city);
+            cityContainer.appendChild(cityElement);
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   CHECK PLANET OWNERSHIP
+========================================================= */
+
+function playerOwnsPlanet() {
+
+    if (isWarPlanet) { return false; }
+
+
+    if (
+        planetCities.length !== 3
+    ) {
+
+        return false;
+
+    }
+
+
+    return planetCities.every(
+        city =>
+            city.faction ===
+            playerFaction
+    );
+
+}
+
+
+/* =========================================================
+   FLEET ICON
+========================================================= */
+
+function fleetIcon(faction) {
+
+    let color =
+        "#eeeeee";
+
+
+    if (
+        faction ===
+        "Combine"
+    ) {
+
+        color =
+            "#d52b2b";
+
+    }
+
+
+    if (
+        faction ===
+        "Freedom Authority"
+    ) {
+
+        color =
+            "#347cff";
+
+    }
+
+
+    /* the big ship of the fleet reference picture */
+    const art = SHIP_ART_BY_NAME.bigB;
+    return `<svg viewBox="-2 -2 ${art.w + 4} ${art.h + 4}" xmlns="http://www.w3.org/2000/svg" style="color:${color};width:100%;height:100%;"><path d="${art.d}" fill="currentColor" stroke="rgba(255,255,255,.6)" stroke-width="1"/></svg>`;
+
+}
+
+
+/* =========================================================
+   TIME
+========================================================= */
+
+function formatTime(milliseconds) {
+
+    const seconds =
+        Math.max(
+            0,
+            Math.ceil(
+                milliseconds / 1000
+            )
+        );
+
+
+    const minutes =
+        Math.floor(
+            seconds / 60
+        );
+
+
+    const remainingSeconds =
+        seconds % 60;
+
+
+    return (
+        String(minutes)
+            .padStart(2, "0") +
+        ":" +
+        String(
+            remainingSeconds
+        ).padStart(2, "0")
+    );
+
+}
+
+
+/* =========================================================
+   FLEET STATUS
+========================================================= */
+
+function getFleetStatus(fleet) {
+
+    const now =
+        Date.now();
+
+
+    if (
+        fleet.status ===
+        "building"
+    ) {
+
+        if (
+            !fleet.arrival_time
+        ) {
+
+            return {
+
+                name: "BUILDING",
+
+                className:
+                    "fleet-building",
+
+                time: ""
+
+            };
+
+        }
+
+
+        const finishTime =
+            new Date(
+                fleet.arrival_time
+            ).getTime();
+
+
+        if (
+            now < finishTime
+        ) {
+
+            return {
+
+                name: "BUILDING",
+
+                className:
+                    "fleet-building",
+
+                time:
+                    formatTime(
+                        finishTime -
+                        now
+                    )
+
+            };
+
+        }
+
+
+        return {
+
+            name: "STATIONED",
+
+            className:
+                "fleet-arrived",
+
+            time: ""
+
+        };
+
+    }
+
+
+    if (
+        fleet.status ===
+        "travelling"
+    ) {
+
+        if (
+            !fleet.arrival_time
+        ) {
+
+            return {
+
+                name: "TRAVELLING",
+
+                className:
+                    "fleet-travelling",
+
+                time: ""
+
+            };
+
+        }
+
+
+        const arrival =
+            new Date(
+                fleet.arrival_time
+            ).getTime();
+
+
+        if (
+            now < arrival
+        ) {
+
+            return {
+
+                name: "TRAVELLING",
+
+                className:
+                    "fleet-travelling",
+
+                time:
+                    formatTime(
+                        arrival -
+                        now
+                    )
+
+            };
+
+        }
+
+
+        return {
+
+            name: "STATIONED",
+
+            className:
+                "fleet-arrived",
+
+            time: ""
+
+        };
+
+    }
+
+
+    return {
+
+        name: "STATIONED",
+
+        className:
+            "fleet-arrived",
+
+        time: ""
+
+    };
+
+}
+
+
+/* =========================================================
+   LOAD FLEETS
+========================================================= */
+
+/* the next fleet costs 500 more than the last one (per faction) */
+async function refreshFleetPrice() {
+
+    const el = document.getElementById("fleet-price");
+
+    if (!el) { return; }
+
+    const { data, error } = await supabaseClient.rpc("get_fleet_price");
+
+    if (!error && data) { el.textContent = Number(data).toLocaleString(); }
+
+}
+
+/* a fleet built under another faction is dormant until you switch back */
+function isUsableFleet(f) {
+    return !(f.player_id === playerID && f.faction && f.faction !== playerFaction);
+}
+
+async function loadPlanetFleets() {
+    refreshFleetPrice();
+    await supabaseClient.rpc("finalize_recruits");
+    await supabaseClient.rpc("fire_planetary_cannons");
+
+
+    if (!playerID) {
+
+        return;
+
+    }
+
+
+    if (!fleetList) {
+
+        return;
+
+    }
+
+
+    const {
+        data,
+        error
+    } =
+        await supabaseClient
+            .from("fleets")
+            .select(
+                `
+                id,
+                name,
+                faction,
+                origin,
+                destination,
+                status,
+                departure_time,
+                arrival_time,
+                squads,
+                created_at,
+                player_id
+                `
+            )
+            .eq(
+                "player_id",
+                playerID
+            )
+            .order(
+                "created_at",
+                {
+                    ascending: false
+                }
+            );
+
+
+    if (error) {
+
+        console.error(
+            "Could not load fleets:",
+            error
+        );
+
+        fleetList.innerHTML = `
+
+            <div class="no-fleets">
+                Could not load fleets.
+            </div>
+
+        `;
+
+        return;
+
+    }
+
+
+    planetFleets = (data || []).filter(isUsableFleet).filter(
+            function(fleet) {
+
+                /*
+                 * A building fleet belongs to
+                 * its origin.
+                 */
+
+                if (
+                    fleet.status ===
+                    "building"
+                ) {
+
+                    return (
+                        fleet.origin ===
+                        planetName
+                    );
+
+                }
+
+
+                /*
+                 * A stationed fleet is located
+                 * at its origin.
+                 */
+
+                if (
+                    fleet.status ===
+                    "stationed"
+                ) {
+
+                    return (
+                        fleet.origin ===
+                        planetName
+                    );
+
+                }
+
+
+                /*
+                 * A travelling fleet can be
+                 * approaching this planet.
+                 */
+
+                return (
+                    fleet.origin ===
+                    planetName ||
+                    fleet.destination ===
+                    planetName
+                );
+
+            }
+        );
+
+
+    renderPlanetFleets();
+
+}
+
+
+/* =========================================================
+   RENDER FLEETS
+========================================================= */
+
+function renderPlanetFleets() {
+
+    if (!fleetList) {
+
+        return;
+
+    }
+
+
+    if (
+        !planetFleets.length
+    ) {
+
+        fleetList.innerHTML = `
+
+            <div class="no-fleets">
+
+                No fleets are currently
+                stationed at this planet.
+
+            </div>
+
+        `;
+
+        return;
+
+    }
+
+
+    fleetList.innerHTML = "";
+
+
+    planetFleets.forEach(
+        function(fleet) {
+
+            const status =
+                getFleetStatus(
+                    fleet
+                );
+
+
+            const entry =
+                document.createElement(
+                    "div"
+                );
+
+
+            entry.className =
+                "fleet-entry";
+
+
+            let route;
+
+
+            if (
+                fleet.status ===
+                "building"
+            ) {
+
+                route =
+                    "CONSTRUCTING AT " +
+                    fleet.origin;
+
+            }
+
+            else if (
+                fleet.status ===
+                    "stationed" ||
+                !fleet.destination
+            ) {
+
+                route =
+                    "STATIONED AT " +
+                    fleet.origin;
+
+            }
+
+            else {
+
+                route =
+                    fleet.origin +
+                    " → " +
+                    fleet.destination;
+
+            }
+
+
+            entry.innerHTML = `
+
+                <div class="fleet-icon">
+
+                    ${fleetIcon(
+                        fleet.faction
+                    )}
+
+                </div>
+
+                <div class="fleet-details">
+
+                    <div class="fleet-name">
+
+                        ${escapeText(
+                            fleet.name
+                        )}
+
+                    </div>
+
+                    <div class="fleet-route">
+
+                        ${escapeText(
+                            route
+                        )}
+
+                    </div>
+
+                    <div
+                        class="
+                            fleet-status
+                            ${status.className}
+                        "
+                    >
+
+                        ${status.name}
+
+                        ${
+                            status.time
+                                ? " — " +
+                                  status.time
+                                : ""
+                        }
+
+                    </div>
+
+                </div>
+
+            `;
+
+
+            fleetList.appendChild(
+                entry
+            );
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   CREATE MENU
+========================================================= */
+
+if (createFleetButton) {
+
+    createFleetButton.addEventListener(
+        "click",
+        function() {
+
+            fleetMessage.textContent =
+                "";
+
+            fleetMessage.style.color =
+                "#d22b2b";
+
+            fleetNameInput.value =
+                "";
+
+            fleetMenu.style.display =
+                "block";
+
+            setTimeout(
+                function() {
+
+                    fleetNameInput.focus();
+
+                },
+                50
+            );
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   CANCEL
+========================================================= */
+
+if (cancelFleetButton) {
+
+    cancelFleetButton.addEventListener(
+        "click",
+        function() {
+
+            fleetMenu.style.display =
+                "none";
+
+            fleetMessage.textContent =
+                "";
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   CREATE FLEET
+========================================================= */
+
+if (confirmFleetButton) {
+
+    confirmFleetButton.addEventListener(
+        "click",
+        async function() {
+
+            const name =
+                fleetNameInput.value.trim();
+
+
+            if (!name) {
+
+                fleetMessage.textContent =
+                    "ENTER A FLEET NAME.";
+
+                return;
+
+            }
+
+
+            if (!playerID) {
+
+                const authenticated =
+                    await loadPlayer();
+
+                if (!authenticated) {
+
+                    fleetMessage.textContent =
+                        "PLAYER AUTHENTICATION FAILED.";
+
+                    return;
+
+                }
+
+            }
+
+
+            if (!playerOwnsPlanet()) {
+
+                fleetMessage.textContent =
+                    "YOU MUST CONTROL THIS PLANET.";
+
+                return;
+
+            }
+
+
+            const squads = [
+
+                {
+                    type: "Rifle",
+                    amount: 5
+                },
+
+                {
+                    type: "MG",
+                    amount: 1
+                }
+
+            ];
+
+
+            fleetMessage.style.color =
+                "#e0b45a";
+
+            fleetMessage.textContent =
+                "CONSTRUCTING FLEET...";
+
+
+            confirmFleetButton.disabled =
+                true;
+
+
+            const {
+                data,
+                error
+            } =
+                await supabaseClient
+                    .rpc(
+                        "create_fleet",
+                        {
+
+                            fleet_name:
+                                name,
+
+                            fleet_faction:
+                                playerFaction,
+
+                            fleet_origin:
+                                planetName,
+
+                            fleet_squads:
+                                squads
+
+                        }
+                    );
+
+
+            confirmFleetButton.disabled =
+                false;
+
+
+            if (error) {
+
+                console.error(
+                    "Fleet creation failed:",
+                    error
+                );
+
+                fleetMessage.style.color =
+                    "#d22b2b";
+
+                fleetMessage.textContent =
+                    error.message ||
+                    "FLEET CREATION FAILED.";
+
+                return;
+
+            }
+
+
+            console.log(
+                "Fleet successfully created:",
+                data
+            );
+
+
+            fleetMenu.style.display =
+                "none";
+
+            fleetNameInput.value =
+                "";
+
+            fleetMessage.textContent =
+                "";
+
+
+            await loadPlanetFleets();
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   FINALIZE EXPIRED FLEET
+========================================================= */
+
+async function finalizeFleetIfReady(
+    fleet
+) {
+
+    if (!fleet) {
+
+        return false;
+
+    }
+
+
+    /*
+     * Only building fleets need this.
+     */
+
+    if (
+        fleet.status !==
+        "building"
+    ) {
+
+        return (
+            fleet.status ===
+            "stationed"
+        );
+
+    }
+
+
+    if (!fleet.arrival_time) {
+
+        return false;
+
+    }
+
+
+    const arrival =
+        new Date(
+            fleet.arrival_time
+        ).getTime();
+
+
+    if (
+        Date.now() <
+        arrival
+    ) {
+
+        return false;
+
+    }
+
+
+    const {
+        data,
+        error
+    } =
+        await supabaseClient
+            .rpc(
+                "finalize_fleet_arrival",
+                {
+                    fleet_id:
+                        fleet.id
+                }
+            );
+
+
+    if (error) {
+
+        console.error(
+            "Could not finalize fleet:",
+            error
+        );
+
+        return false;
+
+    }
+
+
+    return data === true;
+
+}
+
+
+/* =========================================================
+   ATTACK
+========================================================= */
+
+async function startAttack(city) {
+    await supabaseClient.rpc("finalize_recruits");
+
+
+    /*
+     * Always reload the player's fleets directly
+     * from the database.
+     *
+     * This is important because planetFleets may
+     * not have been loaded on an enemy planet.
+     */
+
+    if (!playerID) {
+
+        const authenticated =
+            await loadPlayer();
+
+        if (!authenticated) {
+
+            gameNotice(
+                "You are not authenticated."
+            );
+
+            return;
+
+        }
+
+    }
+
+
+    const {
+        data: fleets,
+        error
+    } =
+        await supabaseClient
+            .from("fleets")
+            .select(
+                `
+                id,
+                name,
+                faction,
+                origin,
+                destination,
+                status,
+                departure_time,
+                arrival_time,
+                squads
+                `
+            )
+            .eq(
+                "player_id",
+                playerID
+            );
+
+
+    if (error) {
+
+        console.error(
+            "Could not check fleets:",
+            error
+        );
+
+        gameNotice(
+            "Could not check your fleets."
+        );
+
+        return;
+
+    }
+
+
+    /*
+     * Find fleets that are actually associated
+     * with this planet.
+     */
+
+    const fleetsAtPlanet = (fleets || []).filter(isUsableFleet).filter(
+            function(fleet) {
+
+                if (
+                    fleet.status ===
+                    "stationed"
+                ) {
+
+                    return (
+                        fleet.origin ===
+                        planetName
+                    );
+
+                }
+
+
+                /*
+                 * A building fleet is still at
+                 * its construction planet.
+                 */
+
+                if (
+                    fleet.status ===
+                    "building"
+                ) {
+
+                    return (
+                        fleet.origin ===
+                        planetName
+                    );
+
+                }
+
+
+                /*
+                 * A travelling fleet is NOT
+                 * considered stationed yet.
+                 */
+
+                return false;
+
+            }
+        );
+
+
+    /*
+     * Try to complete any fleet whose
+     * construction timer has expired.
+     */
+
+    for (
+        const fleet
+        of fleetsAtPlanet
+    ) {
+
+        if (
+            fleet.status ===
+            "building"
+        ) {
+
+            await finalizeFleetIfReady(
+                fleet
+            );
+
+        }
+
+    }
+
+
+    /*
+     * Reload after finalization so the
+     * database is the source of truth.
+     */
+
+    const {
+        data: updatedFleets,
+        error: reloadError
+    } =
+        await supabaseClient
+            .from("fleets")
+            .select(
+                `
+                id,
+                name,
+                faction,
+                origin,
+                destination,
+                status,
+                departure_time,
+                arrival_time,
+                squads
+                `
+            )
+            .eq(
+                "player_id",
+                playerID
+            );
+
+
+    if (reloadError) {
+
+        console.error(
+            "Could not reload fleets:",
+            reloadError
+        );
+
+        gameNotice(
+            "Could not verify your fleet."
+        );
+
+        return;
+
+    }
+
+
+    /*
+     * Now require a genuinely STATIONED
+     * fleet at this exact planet.
+     */
+
+    const usableFleet =
+        (updatedFleets || []).find(
+            function(fleet) {
+
+                return (
+                    fleet.status ===
+                    "stationed" &&
+
+                    fleet.origin ===
+                    planetName
+                );
+
+            }
+        );
+
+
+    if (!usableFleet) {
+
+        gameNotice(
+            "You need a completed fleet stationed at this planet to attack."
+        );
+
+        return;
+
+    }
+
+
+    /*
+     * Make sure the fleet actually has
+     * units before entering the battle.
+     */
+
+    if (
+        !usableFleet.squads ||
+        !usableFleet.squads.length
+    ) {
+
+        gameNotice(
+            "This fleet has no units."
+        );
+
+        return;
+
+    }
+
+
+    
+    /*
+     * Enemy fleets in orbit must be defeated first:
+     * the attack becomes a space battle.
+     */
+    {
+        const { data: orbitBattle, error: orbitError } = await supabaseClient.rpc(
+            "space_battle_start_orbit",
+            { p_attacker: String(usableFleet.id), p_planet: planetName }
+        );
+
+        if (orbitError && !/could not find the function|does not exist|schema cache/i.test(orbitError.message)) {
+            gameNotice(orbitError.message);
+            return;
+        }
+
+        if (orbitBattle) {
+            window.location.href = "space.html?battle=" + encodeURIComponent(orbitBattle);
+            return;
+        }
+    }
+
+    window.location.href =
+        "battle.html" +
+        "?city=" +
+        encodeURIComponent(
+            city.name
+        ) +
+        "&planet=" +
+        encodeURIComponent(
+            planetName
+        ) +
+        "&attacker=" +
+        encodeURIComponent(
+            playerFaction
+        ) +
+        "&defender=" +
+        encodeURIComponent(
+            city.faction
+        ) +
+        "&fleet=" +
+        encodeURIComponent(
+            usableFleet.id
+        );
+
+}
+
+
+
+/* =========================================================
+   BATTLES IN PROGRESS: reinforce the garrison or the attackers
+========================================================= */
+
+let liveBattles = [];
+
+async function loadLiveBattles() {
+
+    if (isWarPlanet) { return; }
+
+    const { data, error } = await supabaseClient.rpc("live_battles_at", { p_planet: planetName });
+
+    liveBattles = (!error && Array.isArray(data)) ? data : [];
+
+    let box = document.getElementById("live-battles");
+
+    if (!box) {
+        box = document.createElement("div");
+        box.id = "live-battles";
+        box.style.cssText =
+            "position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:915;display:flex;flex-direction:column;gap:6px;align-items:center;";
+        document.body.appendChild(box);
+    }
+
+    box.innerHTML = "";
+
+    for (const b of liveBattles) {
+
+        const side = b.mine ? "" :
+            b.defender === playerFaction ? "defend" :
+            b.attacker === playerFaction ? "reinforce" : "";
+
+        const row = document.createElement("div");
+        row.style.cssText =
+            "padding:7px 14px;background:rgba(20,6,4,.92);border:1px solid #ff7a4a;color:#ffd9c9;font:bold 12px Arial;letter-spacing:1px;";
+        row.textContent = "⚔ BATTLE FOR " + String(b.city).toUpperCase() + ": " + b.attacker + " vs " + b.defender + (b.mine ? "  (you command)" : "");
+
+        if (side) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.textContent = side === "defend" ? "DEFEND THE GARRISON" : "REINFORCE ATTACKERS";
+            btn.style.cssText = "margin-left:12px;padding:4px 10px;background:#2a0f08;color:#fff;border:1px solid #ff7a4a;cursor:pointer;font-weight:bold;";
+            btn.addEventListener("click", function() { joinLiveBattle(b); });
+            row.appendChild(btn);
+        }
+
+        box.appendChild(row);
+
+    }
+
+}
+
+async function joinLiveBattle(b) {
+
+    if (!playerID) {
+        const ok = await loadPlayer();
+        if (!ok) { gameNotice("You are not authenticated."); return; }
+    }
+
+    await supabaseClient.rpc("finalize_recruits");
+
+    const { data: fleets, error } = await supabaseClient
+        .from("fleets")
+        .select("id,status,origin,squads")
+        .eq("player_id", playerID);
+
+    if (error) { gameNotice("Could not check your fleets."); return; }
+
+    const fleet = (fleets || []).find(f =>
+        f.status === "stationed" && f.origin === planetName && f.squads && f.squads.length &&
+        (!f.faction || f.faction === playerFaction));
+
+    if (!fleet) {
+        gameNotice("You need a completed fleet stationed at this planet to join the battle.");
+        return;
+    }
+
+    window.location.href =
+        "battle.html?join=" + encodeURIComponent(b.battle_id) +
+        "&city=" + encodeURIComponent(b.city) +
+        "&planet=" + encodeURIComponent(planetName) +
+        "&attacker=" + encodeURIComponent(b.attacker) +
+        "&defender=" + encodeURIComponent(b.defender) +
+        "&fleet=" + encodeURIComponent(fleet.id);
+
+}
+
+setInterval(loadLiveBattles, 8000);
+setTimeout(loadLiveBattles, 1500);
+
+/* =========================================================
+   BACK
+========================================================= */
+
+if (backButton) {
+
+    backButton.addEventListener(
+        "click",
+        function() {
+
+            window.location.href =
+                "galaxy.html";
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   LIVE COUNTDOWN
+========================================================= */
+
+setInterval(
+    function() {
+
+        renderPlanetFleets();
+
+    },
+    1000
+);
+
+
+/* =========================================================
+   REFRESH DATABASE
+========================================================= */
+
+setInterval(
+    async function() {
+
+        await loadPlanetFleets();
+
+    },
+    5000
+);
+
+
+/* =========================================================
+   INITIALIZE
+========================================================= */
+
+async function initialize() {
+
+    if (!supabaseClient) {
+
+        console.error(
+            "Supabase client is missing."
+        );
+
+        return;
+
+    }
+
+
+    const authenticated =
+        await loadPlayer();
+
+
+    if (!authenticated) {
+
+        return;
+
+    }
+
+
+    const citiesLoaded =
+        await loadCities();
+
+
+    if (!citiesLoaded) {
+
+        return;
+
+    }
+
+
+    renderPlanet();
+
+
+    /*
+     * IMPORTANT:
+     *
+     * Load the player's fleets regardless
+     * of who owns the planet.
+     *
+     * This allows an attacking fleet to
+     * be detected on an enemy planet.
+     */
+
+    await loadPlanetFleets();
+
+
+    /*
+     * Fleet creation controls are only
+     * available on planets the player owns.
+     */
+
+   if (
+    playerOwnsPlanet()
+) {
+
+    fleetPanel.style.display =
+        "block";
+
+    fleetOriginDisplay.textContent =
+        planetName;
+
+}
+
+else {
+
+    /*
+     * Enemy/neutral planets must NEVER
+     * show the fleet creation panel.
+     *
+     * Attacking fleets are still checked
+     * separately by startAttack().
+     */
+
+    fleetPanel.style.display =
+        "none";
+
+}
+
+}
+
+
+/* =========================================================
+   CITY PANEL (click one of your own cities)
+   Garrison upgrades are paid from the faction credit pool.
+   Level 1 -> 5: 300 / 500 / 700 / 1000.
+========================================================= */
+const GARRISON_COSTS = { 1: 300, 2: 500, 3: 700, 4: 1000 };
+
+const GARRISON_INFO = {
+    1: "5 Rifle",
+    2: "7 Rifle",
+    3: "8 Rifle, 1 MG",
+    4: "8 Rifle, 2 MG, 2 Sniper",
+    5: "10 Rifle, 3 MG, 3 Sniper, 2 AT"
+};
+
+/* zoom the globe in on a city (left side stays free for the buildings panel) */
+function zoomToCity(city) {
+
+    const el = Array.from(cityContainer.children).find(c => c.dataset.city === city.name);
+
+    if (!el || !planetGlobe) { return; }
+
+    const px = parseFloat(el.style.left) / 100;
+    const py = parseFloat(el.style.top) / 100;
+
+    const localX = px * planetGlobe.offsetWidth;
+    const localY = py * planetGlobe.offsetHeight;
+
+    const sys = planetGlobe.offsetParent.getBoundingClientRect();
+
+    const cityX = sys.left + planetGlobe.offsetLeft + localX;
+    const cityY = sys.top + planetGlobe.offsetTop + localY;
+
+    const dx = window.innerWidth / 2 - cityX;
+    const dy = window.innerHeight / 2 - cityY;
+
+    planetGlobe.style.transformOrigin = localX + "px " + localY + "px";
+    planetGlobe.style.transform = "translate(" + dx + "px," + dy + "px) scale(2.4)";
+
+    document.body.classList.add("city-zoom");
+
+}
+
+function closeCityPanel() {
+
+    const panel = document.getElementById("city-panel");
+
+    if (panel) { panel.remove(); }
+
+    const bPanel = document.getElementById("buildings-panel");
+
+    if (bPanel) { bPanel.remove(); }
+
+    if (planetGlobe) { planetGlobe.style.transform = ""; }
+
+    document.body.classList.remove("city-zoom");
+
+}
+
+(function() {
+    const style = document.createElement("style");
+    style.textContent =
+        ".planet-globe { transition: transform 0.8s ease; }" +
+        "body.city-zoom #fleet-panel { display: none !important; }" +
+        "@keyframes cityPanelIn { from { opacity: 0; transform: translate(30px,-50%); } " +
+        "to { opacity: 1; transform: translate(0,-50%); } }";
+    document.head.appendChild(style);
+})();
+
+document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape") { closeCityPanel(); }
+});
+
+async function openCityPanel(cityId) {
+
+    const city = planetCities.find(c => c.id === cityId);
+
+    if (!city || city.faction !== playerFaction) {
+        closeCityPanel();
+        return;
+    }
+
+    let panel = document.getElementById("city-panel");
+
+    if (!panel) {
+
+        panel = document.createElement("div");
+        panel.id = "city-panel";
+
+        panel.style.cssText =
+            "position:fixed;top:50%;right:30px;transform:translateY(-50%);" +
+            "animation:cityPanelIn 0.5s ease;" +
+            "width:320px;max-width:92vw;z-index:1200;" +
+            "background:rgba(0,0,0,.93);border:1px solid #666;padding:16px 18px;" +
+            "color:#ddd;font:13px Arial,sans-serif;line-height:1.5;";
+
+        document.body.appendChild(panel);
+
+    }
+
+    zoomToCity(city);
+
+    const { data: credits } = await supabaseClient.rpc("get_faction_credits");
+
+    const level = city.garrison_level || 1;
+    const cost = GARRISON_COSTS[level];
+
+    panel.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<strong style="font-size:16px;letter-spacing:2px;color:#fff;">' +
+                escapeText(city.name).toUpperCase() +
+            "</strong>" +
+            '<button id="city-panel-close" style="background:none;border:none;color:#aaa;' +
+            'font-size:20px;cursor:pointer;">✕</button>' +
+        "</div>" +
+        '<div style="color:#aaa;margin:2px 0 10px;">Faction credits: ' +
+            (credits === null || credits === undefined ? "—" : Number(credits).toLocaleString()) +
+        "</div>" +
+        '<div style="border-top:1px solid #333;padding-top:8px;">' +
+            '<div style="font-weight:bold;letter-spacing:1px;color:#fff;">GARRISON — LEVEL ' + level + "/5</div>" +
+            '<div style="color:#999;margin-bottom:8px;">Defenders: ' + GARRISON_INFO[level] + "</div>" +
+            (cost
+                ? '<button id="garrison-upgrade" style="padding:6px 12px;background:#151515;color:#fff;' +
+                  'border:1px solid #777;cursor:pointer;width:100%;">' +
+                  "UPGRADE TO LEVEL " + (level + 1) + " — " + cost + " CREDITS<br>" +
+                  '<span style="color:#999;font-size:11px;">' + GARRISON_INFO[level + 1] + "</span></button>"
+                : '<div style="color:#6c6;">MAXIMUM LEVEL</div>') +
+        "</div>";
+
+    document.getElementById("city-panel-close").addEventListener("click", closeCityPanel);
+
+    renderBuildingsPanel(city);
+
+    const upgrade = document.getElementById("garrison-upgrade");
+
+    if (upgrade) {
+        upgrade.addEventListener("click", function() {
+            upgradeGarrison(city.id);
+        });
+    }
+
+}
+
+async function upgradeGarrison(cityId) {
+
+    const { error } = await supabaseClient.rpc("upgrade_garrison", { p_city_id: cityId });
+
+    if (error) {
+        gameNotice("Could not upgrade garrison: " + error.message);
+        return;
+    }
+
+    await loadCities();
+    renderPlanet();
+    openCityPanel(cityId);
+
+}
+
+/* =========================================================
+   BUILDINGS (left panel + icons next to the cities)
+========================================================= */
+const BUILDINGS = {
+    heavy_factory: {
+        name: "HEAVY VEHICLE FACTORY", cost: 400,
+        desc: "Fleets stationed on this planet can recruit Tanks (150 credits each)."
+    },
+    vehicle_factory: {
+        name: "VEHICLE FACTORY", cost: 300,
+        desc: "Fleets stationed on this planet can recruit Artillery (100 credits each)."
+    },
+    civilian_factory: {
+        name: "CIVILIAN FACTORY", cost: 300,
+        desc: "Adds 100 credits to this planet's income every 5 minutes."
+    },
+    planetary_cannon: {
+        name: "PLANETARY CANNON", cost: 500,
+        desc: "Every 90 seconds, 50% chance to destroy a division of an enemy fleet in orbit (not in battle)."
+    },
+    knightmare_facility: {
+        name: "KNIGHTMARE FACILITY", cost: 1000,
+        desc: "Unlocks the Knightmare line. With a Speeder Wheel, Frame and Controls built in this city, fleets stationed here can recruit Knightmare squads (3 mechs, 1500 credits)."
+    },
+    speeder_wheel: {
+        name: "SPEEDER WHEEL (LANDSPINNER)", cost: 500, requires: "knightmare_facility",
+        desc: "Knightmare upgrade: +10% speed."
+    },
+    frame: {
+        name: "KNIGHTMARE FRAME", cost: 500, requires: "knightmare_facility",
+        desc: "Knightmare upgrade: +15% health, +1 armor."
+    },
+    controls: {
+        name: "KNIGHTMARE CONTROLS", cost: 500, requires: "knightmare_facility",
+        desc: "Knightmare upgrade: +10% turn rate and attack rate, unlocks the shoulder cannon."
+    }
+};
+
+const KNIGHTMARE_BUILDINGS = ["knightmare_facility", "speeder_wheel", "frame", "controls"];
+
+let planetBuildings = {};
+
+async function loadBuildings() {
+
+    planetBuildings = {};
+
+    const ids = planetCities.map(c => c.id);
+
+    if (ids.length === 0) { return; }
+
+    const { data, error } = await supabaseClient
+        .from("city_buildings")
+        .select("city_id, building_type")
+        .in("city_id", ids);
+
+    if (error) { return; } /* batch3.sql not run yet */
+
+    for (const row of data || []) {
+        (planetBuildings[row.city_id] = planetBuildings[row.city_id] || []).push(row.building_type);
+    }
+
+}
+
+function buildingIconSVG(type) {
+
+    const shapes = {
+        heavy_factory:
+            '<rect x="1" y="7" width="14" height="8" fill="#8a3b3b"/>' +
+            '<rect x="3" y="2" width="3" height="5" fill="#666"/><rect x="9" y="4" width="3" height="3" fill="#666"/>',
+        vehicle_factory:
+            '<rect x="1" y="8" width="14" height="7" fill="#b9772e"/>' +
+            '<path d="M1 8 L4 4 L4 8 L8 4 L8 8 L12 4 L12 8 Z" fill="#7d5220"/>',
+        civilian_factory:
+            '<rect x="2" y="6" width="12" height="9" fill="#3f8a6a"/>' +
+            '<rect x="10" y="2" width="3" height="4" fill="#666"/><circle cx="12" cy="1.4" r="1.4" fill="#ccc"/>' +
+            '<rect x="4" y="8" width="2" height="2" fill="#bfe"/><rect x="8" y="8" width="2" height="2" fill="#bfe"/>',
+        knightmare_facility:
+            '<rect x="1" y="6" width="14" height="9" fill="#4c5d3a"/><rect x="3" y="3" width="4" height="3" fill="#8a9a6a"/>' +
+            '<circle cx="11" cy="4" r="2" fill="#d8a72c"/>',
+        speeder_wheel:
+            '<circle cx="8" cy="8" r="6" fill="#444"/><circle cx="8" cy="8" r="2.4" fill="#aaa"/>',
+        frame:
+            '<rect x="2" y="2" width="12" height="12" fill="none" stroke="#9aa5b1" stroke-width="2"/><path d="M2 2 L14 14 M14 2 L2 14" stroke="#9aa5b1" stroke-width="1"/>',
+        controls:
+            '<rect x="1" y="4" width="14" height="8" fill="#2d3640"/><circle cx="5" cy="8" r="1.6" fill="#7dff9d"/><circle cx="10" cy="8" r="1.6" fill="#ff7a5a"/>',
+        planetary_cannon:
+            '<path d="M2 15 L4 10 L12 10 L14 15 Z" fill="#6f7a86"/>' +
+            '<rect x="7" y="1" width="3" height="9" fill="#9aa5b1" transform="rotate(35 8 10)"/>' +
+            '<circle cx="8" cy="10" r="2.6" fill="#4d5660"/>'
+    };
+
+    return '<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" ' +
+           'stroke="#111" stroke-width="0.7">' + (shapes[type] || "") + "</svg>";
+
+}
+
+function appendCityBuildings(cityElement, city) {
+
+    const list = planetBuildings[city.id];
+
+    if (!list || list.length === 0) { return; }
+
+    const box = document.createElement("div");
+
+    box.style.cssText =
+        "position:absolute;left:50%;top:-24px;transform:translateX(-50%);" +
+        "display:flex;gap:2px;pointer-events:none;";
+
+    for (const type of list) {
+        const icon = document.createElement("div");
+        icon.title = BUILDINGS[type] ? BUILDINGS[type].name : type;
+        icon.innerHTML = buildingIconSVG(type);
+        box.appendChild(icon);
+    }
+
+    cityElement.appendChild(box);
+
+}
+
+async function renderBuildingsPanel(city) {
+
+    let panel = document.getElementById("buildings-panel");
+
+    if (!panel) {
+
+        panel = document.createElement("div");
+        panel.id = "buildings-panel";
+
+        panel.style.cssText =
+            "position:fixed;top:50%;left:30px;transform:translateY(-50%);" +
+            "width:320px;max-width:92vw;max-height:70vh;overflow-y:auto;z-index:1200;" +
+            "background:rgba(0,0,0,.93);border:1px solid #666;padding:16px 18px;" +
+            "color:#ddd;font:13px Arial,sans-serif;line-height:1.5;";
+
+        document.body.appendChild(panel);
+
+    }
+
+    const built = planetBuildings[city.id] || [];
+
+    let html =
+        '<div style="font-weight:bold;letter-spacing:2px;color:#fff;font-size:16px;margin-bottom:8px;">BUILDINGS</div>';
+
+    for (const type of Object.keys(BUILDINGS)) {
+
+        const b = BUILDINGS[type];
+        const has = built.includes(type);
+
+        html +=
+            '<div style="border-top:1px solid #333;padding:8px 0;">' +
+            '<div style="display:flex;gap:8px;align-items:center;">' +
+                buildingIconSVG(type) +
+                '<strong style="color:#fff;">' + b.name + "</strong></div>" +
+            '<div style="color:#999;margin:2px 0 6px;">' + b.desc + "</div>" +
+            (has
+                ? '<div style="color:#6c6;">BUILT ✓</div>'
+                : (b.requires && !built.includes(b.requires))
+                ? '<div style="color:#c96;">Requires the ' + BUILDINGS[b.requires].name + ' in this city.</div>'
+                : '<button data-building="' + type + '" style="padding:5px 12px;background:#151515;' +
+                  'color:#fff;border:1px solid #777;cursor:pointer;width:100%;">' +
+                  "BUILD — " + b.cost + " CREDITS</button>") +
+            "</div>";
+
+    }
+
+    panel.innerHTML = html;
+
+    panel.querySelectorAll("button[data-building]").forEach(function(button) {
+        button.addEventListener("click", function() {
+            constructBuilding(city.id, button.dataset.building);
+        });
+    });
+
+}
+
+async function constructBuilding(cityId, type) {
+
+    const fn = KNIGHTMARE_BUILDINGS.includes(type) ? "build_knightmare_building" : "build_building";
+    const { error } = await supabaseClient.rpc(fn, { p_city_id: cityId, p_type: type });
+
+    if (error) {
+        gameNotice("Could not build: " + error.message);
+        return;
+    }
+
+    await loadCities();
+    renderPlanet();
+    openCityPanel(cityId);
+
+}
+
+/* =========================================================
+   LIVE REFRESH
+   Cities, buildings and planet ownership are re-read every
+   10 seconds (and instantly when the database announces a
+   change), so edits made elsewhere show up here too.
+========================================================= */
+async function refreshPlanetData() {
+
+    if (!playerID) { return; }
+
+    const before = JSON.stringify([planetCities, planetBuildings]);
+
+    await loadCities();
+
+    if (JSON.stringify([planetCities, planetBuildings]) === before) { return; }
+
+    closeCityPanel();
+    renderPlanet();
+
+    if (fleetPanel) {
+        fleetPanel.style.display = playerOwnsPlanet() ? "block" : "none";
+    }
+
+}
+
+setInterval(refreshPlanetData, 10000);
+
+supabaseClient
+    .channel("planet-sync-" + planetName)
+    .on("postgres_changes", { event: "*", schema: "public", table: "cities" }, refreshPlanetData)
+    .on("postgres_changes", { event: "*", schema: "public", table: "city_buildings" }, refreshPlanetData)
+    .subscribe();
+
+/* =========================================================
+   IN-GAME POPUPS (replace the browser's alert boxes)
+========================================================= */
+function gameNotice(message, title) {
+
+    const old = document.getElementById("game-notice");
+    if (old) { old.remove(); }
+
+    const overlay = document.createElement("div");
+    overlay.id = "game-notice";
+    overlay.style.cssText =
+        "position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;";
+
+    const card = document.createElement("div");
+    card.style.cssText =
+        "width:380px;max-width:90vw;background:rgba(8,12,22,.97);border:1px solid #7fdcff;" +
+        "box-shadow:0 0 24px rgba(80,200,255,.35);padding:18px 20px;color:#dfeaf2;" +
+        "font:14px Arial,sans-serif;line-height:1.5;";
+
+    const h = document.createElement("div");
+    h.style.cssText = "font-weight:bold;letter-spacing:2px;color:#7fdcff;margin-bottom:8px;";
+    h.textContent = (title || "NOTICE").toUpperCase();
+
+    const p = document.createElement("div");
+    p.textContent = message;
+
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = "OK";
+    b.style.cssText =
+        "margin-top:14px;padding:7px 26px;background:#10202e;color:#fff;border:1px solid #7fdcff;cursor:pointer;font-weight:bold;";
+
+    const close = function() { overlay.remove(); document.removeEventListener("keydown", onKey); };
+    const onKey = function(e) { if (e.key === "Escape" || e.key === "Enter") { close(); } };
+
+    b.addEventListener("click", close);
+    overlay.addEventListener("click", function(e) { if (e.target === overlay) { close(); } });
+    document.addEventListener("keydown", onKey);
+
+    card.appendChild(h);
+    card.appendChild(p);
+    card.appendChild(b);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    b.focus();
+
+}
+
+function gameToast(message) {
+
+    const t = document.createElement("div");
+    t.style.cssText =
+        "position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:4500;max-width:80vw;" +
+        "background:rgba(8,12,22,.95);border:1px solid #7fdcff;color:#dfeaf2;padding:10px 18px;" +
+        "font:13px Arial,sans-serif;box-shadow:0 0 18px rgba(80,200,255,.3);transition:opacity .5s;";
+    t.textContent = message;
+    document.body.appendChild(t);
+    setTimeout(function() { t.style.opacity = "0"; }, 4200);
+    setTimeout(function() { t.remove(); }, 4800);
+
+}
+
+/* =========================================================
+   WAR PLANETS (Krieg and Vraks)
+   Shared war between minor factions on a map of provinces.
+   It only advances while someone has the game open.
+========================================================= */
+const WAR_PLANETS = ["Krieg", "Vraks"];
+const isWarPlanet = WAR_PLANETS.includes(planetName);
+
+const WAR_COSTS = { weapons: 200, heavy: 500, reinforce: 150, fortify: 300, relief: 400, sabotage: 500, ceasefire: 700 };
+
+let warFactions = [];
+let warRegions = [];
+let warState = null;
+let warBacking = [];
+let warLog = [];
+let warAssault = null;
+let warCredits = null;
+let warCityPos = {};
+let warServerOffset = 0;
+let warGeo = null;
+const warLoss = {};
+let warOpenFaction = null;
+
+let warUnits = [];
+let warAdvances = [];
+const warUnitDisp = {};
+const warChats = {};
+let warChatFaction = null;
+let warChatBusy = false;
+const warChatStanding = {};
+let warRapport = [];
+
+function warHexToRgb(hex) {
+    const h = String(hex || "#888888").replace("#", "");
+    return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+}
+
+function warFaction(id) { return warFactions.find(f => f.id === id); }
+
+/* ---------- geometry: provinces are Voronoi cells, drawn on a sphere ---------- */
+const WAR_MAP_R = 49;
+
+function warClip(poly, d, c) {
+
+    const out = [];
+
+    for (let i = 0; i < poly.length; i++) {
+
+        const a = poly[i];
+        const b = poly[(i + 1) % poly.length];
+        const fa = 2 * (a[0] * d[0] + a[1] * d[1]) - c;
+        const fb = 2 * (b[0] * d[0] + b[1] * d[1]) - c;
+
+        if (fa <= 0) { out.push(a); }
+
+        if ((fa <= 0) !== (fb <= 0)) {
+            const t = fa / (fa - fb);
+            out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+        }
+
+    }
+
+    return out;
+
+}
+
+function warBuildGeometry() {
+
+    const key = warRegions.map(r => r.x + "," + r.y).join("|");
+
+    if (warGeo && warGeo.key === key) { return warGeo; }
+
+    const seeds = warRegions.map(r => [Number(r.x), Number(r.y)]);
+    const circle = [];
+
+    for (let k = 0; k < 96; k++) {
+        const a = k / 96 * Math.PI * 2;
+        circle.push([50 + Math.cos(a) * WAR_MAP_R, 50 + Math.sin(a) * WAR_MAP_R]);
+    }
+
+    const polys = [];
+
+    for (let i = 0; i < seeds.length; i++) {
+
+        let poly = circle;
+
+        for (let j = 0; j < seeds.length && poly.length > 2; j++) {
+            if (j === i) { continue; }
+            const d = [seeds[j][0] - seeds[i][0], seeds[j][1] - seeds[i][1]];
+            const c = seeds[j][0] * seeds[j][0] + seeds[j][1] * seeds[j][1] - seeds[i][0] * seeds[i][0] - seeds[i][1] * seeds[i][1];
+            poly = warClip(poly, d, c);
+        }
+
+        polys.push(poly);
+
+    }
+
+    /* shared borders: the edges of a province that are equally far from a neighbour's seed */
+    const borders = [];
+
+    for (let i = 0; i < polys.length; i++) {
+
+        const poly = polys[i];
+
+        for (let k = 0; k < poly.length; k++) {
+
+            const a = poly[k];
+            const b = poly[(k + 1) % poly.length];
+            const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+
+            if (Math.hypot(m[0] - 50, m[1] - 50) > WAR_MAP_R - 0.4) { continue; }
+
+            const di = Math.hypot(m[0] - seeds[i][0], m[1] - seeds[i][1]);
+            let bestJ = -1, bestE = 0.08;
+
+            for (let j = 0; j < seeds.length; j++) {
+                if (j <= i) { continue; }
+                const e = Math.abs(Math.hypot(m[0] - seeds[j][0], m[1] - seeds[j][1]) - di);
+                if (e < bestE) { bestE = e; bestJ = j; }
+            }
+
+            if (bestJ >= 0) { borders.push({ i: i, j: bestJ, a: a, b: b }); }
+
+        }
+
+    }
+
+    warGeo = { key: key, polys: polys, borders: borders, seeds: seeds };
+
+    return warGeo;
+
+}
+
+/* map point -> position on the globe disc (azimuthal -> orthographic, so provinces curve away at the rim) */
+function warProject(x, y, W, H) {
+
+    const u = (x - 50) / WAR_MAP_R;
+    const v = (y - 50) / WAR_MAP_R;
+    const r = Math.hypot(u, v);
+
+    if (r < 1e-6) { return [W / 2, H / 2]; }
+
+    const rr = Math.sin(Math.min(1, r) * Math.PI / 2);
+    const R = W * 0.485;
+
+    return [W / 2 + u / r * rr * R, H / 2 + v / r * rr * R];
+
+}
+
+function warProjectPct(x, y) {
+
+    const p = warProject(x, y, 100, 100);
+
+    return [p[0], p[1]];
+
+}
+
+function warInverse(px, py, W, H) {
+
+    const R = W * 0.485;
+    const dx = px - W / 2;
+    const dy = py - H / 2;
+    const rr = Math.hypot(dx, dy) / R;
+
+    if (rr > 1) { return null; }
+
+    const r = Math.asin(rr) / (Math.PI / 2);
+
+    if (rr < 1e-6) { return [50, 50]; }
+
+    return [50 + dx / Math.hypot(dx, dy) * r * WAR_MAP_R, 50 + dy / Math.hypot(dx, dy) * r * WAR_MAP_R];
+
+}
+
+function warTrace(ctx, pts, W, H) {
+
+    let first = true;
+
+    for (let i = 0; i < pts.length; i++) {
+
+        const a = pts[i];
+        const b = pts[(i + 1) % pts.length];
+        const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 2.2));
+
+        for (let s = 0; s < steps; s++) {
+
+            const t = s / steps;
+            const p = warProject(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, W, H);
+
+            if (first) { ctx.moveTo(p[0], p[1]); first = false; }
+            else { ctx.lineTo(p[0], p[1]); }
+
+        }
+
+    }
+
+    ctx.closePath();
+
+}
+
+function warTraceSegment(ctx, a, b, W, H) {
+
+    const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 2.2));
+
+    for (let s = 0; s <= steps; s++) {
+
+        const t = s / steps;
+        const p = warProject(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, W, H);
+
+        if (s === 0) { ctx.moveTo(p[0], p[1]); } else { ctx.lineTo(p[0], p[1]); }
+
+    }
+
+}
+
+/* ---------- static hologram layer: redrawn when the war data changes ---------- */
+function warDrawStatic(canvas, W, H) {
+
+    const geo = warBuildGeometry();
+    const dpr = canvas.__dpr || 1;
+    const ctx = canvas.getContext("2d");
+    const cx = W / 2, cy = H / 2, R = W * 0.485;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R + 1, 0, Math.PI * 2);
+    ctx.clip();
+
+    /* dark holographic sphere */
+    let g = ctx.createRadialGradient(cx - R * 0.25, cy - R * 0.3, R * 0.08, cx, cy, R);
+    g.addColorStop(0, "rgba(16,78,104,0.97)");
+    g.addColorStop(0.65, "rgba(6,32,50,0.98)");
+    g.addColorStop(1, "rgba(2,10,20,0.99)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    /* provinces, tinted by their owner; weak provinces fade */
+    for (let i = 0; i < warRegions.length; i++) {
+
+        const reg = warRegions[i];
+        const f = warFaction(reg.owner);
+        const rgb = warHexToRgb(f ? f.color : "#888888");
+        const a = 0.22 + 0.34 * Math.min(100, Number(reg.strength)) / 100;
+
+        ctx.beginPath();
+        warTrace(ctx, geo.polys[i], W, H);
+        ctx.fillStyle = "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + a.toFixed(3) + ")";
+        ctx.fill();
+
+    }
+
+    /* radar-style grid: rings and spokes (same projection as the map) */
+    ctx.strokeStyle = "rgba(110,225,255,0.16)";
+    ctx.lineWidth = 1;
+
+    for (const rr of [0.25, 0.5, 0.75]) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.sin(rr * Math.PI / 2) * R, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    for (let k = 0; k < 12; k++) {
+        const ang = k / 12 * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(ang) * R, cy + Math.sin(ang) * R);
+        ctx.stroke();
+    }
+
+    /* glowing province borders */
+    ctx.shadowColor = "rgba(90,230,255,0.9)";
+    ctx.shadowBlur = 5;
+    ctx.strokeStyle = "rgba(140,238,255,0.5)";
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+
+    for (const poly of geo.polys) { warTrace(ctx, poly, W, H); }
+
+    ctx.stroke();
+
+    /* front lines: where two different owners meet */
+    ctx.shadowColor = "rgba(255,190,80,1)";
+    ctx.shadowBlur = 9;
+    ctx.strokeStyle = "rgba(255,214,130,0.95)";
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+
+    canvas.__fronts = [];
+
+    for (const b of geo.borders) {
+
+        if (warRegions[b.i].owner !== warRegions[b.j].owner) {
+            warTraceSegment(ctx, b.a, b.b, W, H);
+            canvas.__fronts.push(b);
+        }
+
+    }
+
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    /* scanlines */
+    ctx.fillStyle = "rgba(0,0,0,0.13)";
+
+    for (let y = 0; y < H; y += 3) { ctx.fillRect(0, y, W, 1); }
+
+    /* sphere shading: dark rim, soft highlight */
+    g = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(0,8,16,0.72)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, 0, cx - R * 0.35, cy - R * 0.4, R * 0.7);
+    g.addColorStop(0, "rgba(160,240,255,0.16)");
+    g.addColorStop(1, "rgba(160,240,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.restore();
+
+    /* holographic rim */
+    ctx.shadowColor = "rgba(100,235,255,1)";
+    ctx.shadowBlur = 16;
+    ctx.strokeStyle = "rgba(150,240,255,0.9)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+}
+
+/* ---------- animated layer: sweep, pulsing fronts, beacons, sieges, assault reticle ---------- */
+function warDrawFx(canvas, W, H, t) {
+
+    const geo = warBuildGeometry();
+    const dpr = canvas.__dpr || 1;
+    const ctx = canvas.getContext("2d");
+    const cx = W / 2, cy = H / 2, R = W * 0.485;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.globalCompositeOperation = "lighter";
+
+    /* scan sweep */
+    const sy = ((t / 5200) % 1.2 - 0.1) * H;
+    const sg = ctx.createLinearGradient(0, sy - 34, 0, sy + 34);
+    sg.addColorStop(0, "rgba(120,240,255,0)");
+    sg.addColorStop(0.5, "rgba(120,240,255,0.17)");
+    sg.addColorStop(1, "rgba(120,240,255,0)");
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, sy - 34, W, 68);
+
+    /* fronts crackle */
+    const fronts = canvas.__fronts || [];
+
+    ctx.setLineDash([5, 9]);
+    ctx.lineDashOffset = -t / 55;
+    ctx.strokeStyle = "rgba(255,255,255," + (0.55 + 0.35 * Math.sin(t / 380)).toFixed(2) + ")";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+
+    for (const b of fronts) { warTraceSegment(ctx, b.a, b.b, W, H); }
+
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    /* rare glitch bars */
+    if (Math.floor(t / 3100) % 2 === 0 && (t % 3100) < 130) {
+        ctx.fillStyle = "rgba(160,245,255,0.10)";
+        for (let k = 0; k < 3; k++) {
+            ctx.fillRect(0, ((t * 7 + k * 193) % H), W, 2 + k);
+        }
+    }
+
+    ctx.restore();
+
+    /* city beacons, sieges, assault reticle */
+    for (let i = 0; i < warRegions.length; i++) {
+
+        const reg = warRegions[i];
+
+        if (!reg.city_id) { continue; }
+
+        const p = warProject(Number(reg.x), Number(reg.y), W, H);
+        const holder = warFaction(reg.owner);
+        const col = holder ? holder.color : "#ffffff";
+        const ph = ((t / 1800) + i * 0.37) % 1;
+
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = 1 - ph;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], 6 + ph * 22, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        if (reg.siege_by) {
+
+            const bes = warFaction(reg.siege_by);
+            const rr = W * 0.05;
+
+            ctx.strokeStyle = bes ? bes.color : "#fff";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 5]);
+            ctx.lineDashOffset = -t / 80;
+            ctx.beginPath();
+            ctx.arc(p[0], p[1], rr, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(p[0], p[1], rr, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Number(reg.siege_progress) / 100);
+            ctx.stroke();
+
+        }
+
+        if (warAssault && warAssault.region_id === reg.id) {
+
+            const pulse = 0.5 + 0.5 * Math.sin(t / 150);
+            const rr = W * 0.075 + pulse * 4;
+
+            ctx.strokeStyle = "rgba(255,70,70," + (0.6 + 0.4 * pulse).toFixed(2) + ")";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(p[0], p[1], rr, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(p[0] - rr - 8, p[1]); ctx.lineTo(p[0] - rr + 8, p[1]);
+            ctx.moveTo(p[0] + rr - 8, p[1]); ctx.lineTo(p[0] + rr + 8, p[1]);
+            ctx.moveTo(p[0], p[1] - rr - 8); ctx.lineTo(p[0], p[1] - rr + 8);
+            ctx.moveTo(p[0], p[1] + rr - 8); ctx.lineTo(p[0], p[1] + rr + 8);
+            ctx.stroke();
+
+        }
+
+    }
+
+    warDrawUnits(ctx, W, H, t);
+
+}
+
+/* ---------- divisions and advances on the map ---------- */
+function warRegionById(id) { return warRegions.find(r => r.id === id); }
+
+function warServerNow() { return Date.now() + warServerOffset; }
+
+/* where a unit should be drawn right now, in map coordinates (before easing) */
+function warUnitGoal(u, slot, slots) {
+
+    const a = warRegionById(u.region_id);
+
+    if (!a) { return null; }
+
+    const ax = Number(a.x), ay = Number(a.y);
+
+    if (u.target_region_id !== null && u.target_region_id !== undefined && u.arrive_at) {
+
+        const b = warRegionById(u.target_region_id);
+
+        if (b) {
+            const t0 = Date.parse(u.moved_at), t1 = Date.parse(u.arrive_at);
+            const p = Math.max(0, Math.min(1, (warServerNow() - t0) / Math.max(1, t1 - t0)));
+            return [ax + (Number(b.x) - ax) * p, ay + (Number(b.y) - ay) * p];
+        }
+
+    }
+
+    /* idle divisions sit just below the province centre, side by side */
+    return [ax + (slot - (slots - 1) / 2) * 2.6, ay + 2.8];
+
+}
+
+function warDrawUnitSymbol(ctx, x, y, s, kind, col, moving) {
+
+    ctx.save();
+    ctx.shadowColor = col;
+    ctx.shadowBlur = moving ? 10 : 5;
+    ctx.fillStyle = "rgba(4,12,22,0.88)";
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.6;
+
+    if (kind === "tank") {
+        ctx.beginPath();
+        ctx.ellipse(x, y, s * 1.15, s * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(x, y, s * 0.55, s * 0.28, 0, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    else {
+        ctx.beginPath();
+        ctx.rect(x - s * 1.05, y - s * 0.7, s * 2.1, s * 1.4);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x - s * 1.05, y - s * 0.7); ctx.lineTo(x + s * 1.05, y + s * 0.7);
+        ctx.moveTo(x + s * 1.05, y - s * 0.7); ctx.lineTo(x - s * 1.05, y + s * 0.7);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+
+}
+
+function warDrawUnits(ctx, W, H, t) {
+
+    if (!warUnits.length && !warAdvances.length) { return; }
+
+    const geo = warBuildGeometry();
+
+    /* advances: the province being taken glows in the attacker's colour, an arrow shows the march */
+    for (const adv of warAdvances) {
+
+        const to = warRegionById(adv.region_id);
+        const from = warRegionById(adv.from_region);
+        const f = warFaction(adv.attacker);
+
+        if (!to || !from) { continue; }
+
+        const col = f ? f.color : "#ffffff";
+        const rgb = warHexToRgb(col);
+        const t0 = Date.parse(adv.started_at), t1 = Date.parse(adv.resolve_at);
+        const prog = Math.max(0, Math.min(1, (warServerNow() - t0) / Math.max(1, t1 - t0)));
+        const idx = warRegions.indexOf(to);
+        const pulse = 0.5 + 0.5 * Math.sin(t / 260);
+
+        if (idx >= 0 && geo.polys[idx]) {
+            ctx.beginPath();
+            warTrace(ctx, geo.polys[idx], W, H);
+            ctx.fillStyle = "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + (0.08 + 0.26 * prog).toFixed(3) + ")";
+            ctx.fill();
+            ctx.strokeStyle = col;
+            ctx.globalAlpha = 0.45 + 0.4 * pulse;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 5]);
+            ctx.lineDashOffset = -t / 70;
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
+        }
+
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.8;
+        ctx.setLineDash([8, 6]);
+        ctx.lineDashOffset = -t / 45;
+        ctx.beginPath();
+        warTraceSegment(ctx, [Number(from.x), Number(from.y)], [Number(to.x), Number(to.y)], W, H);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+
+    }
+
+    /* group idle divisions per province so they stand side by side */
+    const slotOf = {}, countOf = {};
+
+    for (const u of warUnits) {
+        if (u.target_region_id === null || u.target_region_id === undefined) {
+            const k = u.region_id;
+            slotOf[u.id] = countOf[k] || 0;
+            countOf[k] = (countOf[k] || 0) + 1;
+        }
+    }
+
+    const size = Math.max(4.5, W * 0.0105);
+    const alive = {};
+
+    for (const u of warUnits) {
+
+        alive[u.id] = true;
+
+        const moving = u.target_region_id !== null && u.target_region_id !== undefined;
+        const goal = warUnitGoal(u, slotOf[u.id] || 0, countOf[u.region_id] || 1);
+
+        if (!goal) { continue; }
+
+        let d = warUnitDisp[u.id];
+
+        if (!d) { d = warUnitDisp[u.id] = { x: goal[0], y: goal[1] }; }
+
+        /* glide: divisions never jump, they walk to wherever the database says they are */
+        d.x += (goal[0] - d.x) * 0.05;
+        d.y += (goal[1] - d.y) * 0.05;
+
+        const p = warProject(d.x, d.y, W, H);
+        const f = warFaction(u.faction);
+
+        warDrawUnitSymbol(ctx, p[0], p[1], size, u.kind, f ? f.color : "#ffffff", moving);
+
+    }
+
+    for (const id of Object.keys(warUnitDisp)) {
+        if (!alive[id]) { delete warUnitDisp[id]; }
+    }
+
+}
+
+let warFxStart = 0;
+let warFxLast = 0;
+
+function warFxLoop(now) {
+
+    requestAnimationFrame(warFxLoop);
+
+    if (!isWarPlanet || !planetGlobe || warRegions.length === 0) { return; }
+    if (now - warFxLast < 33) { return; }
+
+    warFxLast = now;
+
+    const fx = document.getElementById("war-fx");
+
+    if (fx) { warDrawFx(fx, fx.__W, fx.__H, now - warFxStart); }
+
+}
+
+function warMakeCanvas(id, z) {
+
+    let c = document.getElementById(id);
+
+    if (!c) {
+        c = document.createElement("canvas");
+        c.id = id;
+        c.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:" + z + ";";
+        planetGlobe.insertBefore(c, planetGlobe.firstChild);
+    }
+
+    const W = planetGlobe.offsetWidth;
+    const H = planetGlobe.offsetHeight;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+
+    c.width = Math.round(W * dpr);
+    c.height = Math.round(H * dpr);
+    c.__dpr = dpr;
+    c.__W = W;
+    c.__H = H;
+
+    return c;
+
+}
+
+function drawWarMap() {
+
+    if (!isWarPlanet || !planetGlobe || warRegions.length === 0 || !planetGlobe.offsetWidth) { return; }
+
+    const base = warMakeCanvas("war-canvas", 0);
+    const fx = document.getElementById("war-fx") || warMakeCanvas("war-fx", 2);
+
+    if (fx.__W !== planetGlobe.offsetWidth) { warMakeCanvas("war-fx", 2); }
+
+    planetGlobe.classList.add("war-holo");
+
+    warDrawStatic(base, base.__W, base.__H);
+
+}
+
+function colorWarCity(cityElement, city) {
+
+    if (!isWarPlanet) { return; }
+
+    const reg = warRegions.find(r => r.city_id === city.id);
+    const f = reg ? warFaction(reg.owner) : null;
+
+    if (!f) { return; }
+
+    const marker = cityElement.querySelector(".city-marker") || cityElement;
+
+    marker.style.background = f.color;
+    marker.style.boxShadow = "0 0 14px " + f.color + ", 0 0 4px #fff";
+    cityElement.title = city.name + " - held by " + f.name;
+
+}
+
+/* ---------- data ---------- */
+async function loadWar() {
+
+    if (!isWarPlanet) { return true; }
+
+    const q = (t) => supabaseClient.from(t).select("*").eq("planet", planetName);
+
+    const [f, r, s, b, l, a, un, ad] = await Promise.all([
+        q("war_factions"),
+        q("war_regions").order("id"),
+        q("war_state").maybeSingle(),
+        q("war_backing"),
+        q("war_log").order("id", { ascending: false }).limit(7),
+        q("war_assaults").eq("status", "pending").limit(1),
+        q("war_units"),
+        q("war_advances").eq("status", "pending")
+    ]);
+
+    if (f.error || r.error) {
+        console.error("War data error:", f.error || r.error);
+        return false;
+    }
+
+    warFactions = f.data || [];
+    warRegions = r.data || [];
+    warState = s.data || null;
+    warBacking = b.data || [];
+    warLog = l.data || [];
+    warAssault = (a.data && a.data[0]) || null;
+warUnits = un.error ? [] : (un.data || []);
+    warAdvances = ad.error ? [] : (ad.data || []);
+    const rp = await q("war_rapport");
+    warRapport = rp.error ? [] : (rp.data || []);
+
+    warCityPos = {};
+
+    for (const reg of warRegions) {
+        if (reg.city_id) { warCityPos[reg.city_id] = warProjectPct(Number(reg.x), Number(reg.y)); }
+    }
+
+    /* losses: the database keeps one continuous counter, we only keep counting from it */
+    const L = await supabaseClient.rpc("get_war_losses", { p_planet: planetName });
+
+    if (!L.error && L.data) {
+
+        const now = performance.now();
+
+        for (const row of L.data) {
+
+            const v = Number(row.current_losses);
+            const s2 = warLoss[row.faction_id];
+
+            if (!s2) { warLoss[row.faction_id] = { base: v, rate: Number(row.loss_rate), t0: now, shown: v }; }
+            else {
+                s2.base = Math.max(v, s2.shown);   /* never show less than we already showed */
+                s2.rate = Number(row.loss_rate);
+                s2.t0 = now;
+            }
+
+        }
+
+        if (L.data[0]) { warServerOffset = Date.parse(L.data[0].server_now) - Date.now(); }
+
+    }
+
+    const c = await supabaseClient.rpc("get_faction_credits");
+    warCredits = c.error ? null : Number(c.data);
+
+    return true;
+
+}
+
+/* ---------- panels ---------- */
+const WAR_PANEL_CSS =
+    "background:rgba(4,12,22,.88);border:1px solid rgba(127,220,255,.45);box-shadow:0 0 14px rgba(80,200,255,.15);" +
+    "padding:12px 14px;color:#cfe6f0;font:12px Arial,sans-serif;line-height:1.5;";
+
+const WAR_BTN_CSS =
+    "padding:5px 8px;background:#0c1a28;color:#e6f6ff;border:1px solid #4fb8d8;cursor:pointer;font-size:11px;margin:2px 2px 2px 0;";
+
+function buildWarPanels() {
+
+    if (!isWarPlanet || document.getElementById("war-left")) { return; }
+
+    const style = document.createElement("style");
+    style.textContent =
+        ".planet-globe.war-holo { background: #030a14 !important; " +
+        "box-shadow: 0 0 50px 8px rgba(80,220,255,.42), inset 0 0 40px rgba(80,220,255,.25) !important; } " +
+        ".planet-globe.war-holo .planet-light { display: none !important; }";
+    document.head.appendChild(style);
+
+    const left = document.createElement("div");
+    left.id = "war-left";
+    left.style.cssText = "position:fixed;left:24px;top:92px;width:262px;max-height:calc(100vh - 190px);overflow-y:auto;z-index:900;display:flex;flex-direction:column;gap:10px;";
+    left.innerHTML =
+        '<div id="war-legend" style="' + WAR_PANEL_CSS + '"></div>' +
+        '<div id="war-losses" style="' + WAR_PANEL_CSS + '"></div>' +
+        '<div id="war-room" style="' + WAR_PANEL_CSS + '"></div>' +
+        '<div id="war-feed" style="' + WAR_PANEL_CSS + '"></div>';
+    document.body.appendChild(left);
+
+    const banner = document.createElement("div");
+    banner.id = "war-banner";
+    banner.style.cssText =
+        "position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:910;display:none;padding:8px 22px;" +
+        "background:rgba(4,12,22,.92);border:1px solid #ffd27a;color:#ffe9b0;font:bold 14px Arial;letter-spacing:2px;";
+    document.body.appendChild(banner);
+
+    const tip = document.createElement("div");
+    tip.id = "war-tip";
+    tip.style.cssText =
+        "position:fixed;z-index:1100;display:none;pointer-events:none;padding:5px 9px;background:rgba(4,12,22,.95);" +
+        "border:1px solid #7fdcff;color:#dff6ff;font:11px Arial;";
+    document.body.appendChild(tip);
+
+    planetGlobe.addEventListener("mousemove", function(e) {
+
+        const rect = planetGlobe.getBoundingClientRect();
+        const m = warInverse(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
+
+        if (!m || warRegions.length === 0) { tip.style.display = "none"; return; }
+
+        const geo = warBuildGeometry();
+        let best = 0, bd = Infinity;
+
+        for (let i = 0; i < geo.seeds.length; i++) {
+            const d = Math.hypot(geo.seeds[i][0] - m[0], geo.seeds[i][1] - m[1]);
+            if (d < bd) { bd = d; best = i; }
+        }
+
+        const reg = warRegions[best];
+        const f = warFaction(reg.owner);
+
+        const adv = warAdvances.find(x => x.region_id === reg.id);
+        const here = warUnits.filter(u => u.region_id === reg.id && (u.target_region_id === null || u.target_region_id === undefined));
+        const nInf = here.filter(u => u.kind === "infantry").length;
+        const nTank = here.filter(u => u.kind === "tank").length;
+
+        tip.innerHTML = "<b>" + reg.name + "</b><br>" + (f ? f.name : reg.owner) + " · strength " + Math.round(Number(reg.strength)) +
+            (nInf || nTank ? "<br>" + (nInf ? nInf + " infantry " : "") + (nTank ? nTank + " tank" : "") : "") +
+            (adv ? "<br><span style=\"color:#ffd27a;\">Being taken by " + ((warFaction(adv.attacker) || {}).name || adv.attacker) +
+                " · " + Math.max(0, Math.ceil((Date.parse(adv.resolve_at) - warServerNow()) / 1000)) + "s</span>" : "");
+        tip.style.left = (e.clientX + 14) + "px";
+        tip.style.top = (e.clientY + 12) + "px";
+        tip.style.display = "block";
+
+    });
+
+    planetGlobe.addEventListener("mouseleave", function() { tip.style.display = "none"; });
+
+    const arrow = document.createElement("button");
+    arrow.id = "war-arrow";
+    arrow.type = "button";
+    arrow.textContent = "◀ FACTIONS";
+    arrow.style.cssText =
+        "position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:950;padding:14px 8px;" +
+        "background:rgba(4,12,22,.92);color:#bfeaff;border:1px solid #4fb8d8;border-right:none;cursor:pointer;" +
+        "font-weight:bold;letter-spacing:1px;writing-mode:vertical-rl;";
+    document.body.appendChild(arrow);
+
+    const panel = document.createElement("div");
+    panel.id = "war-factions";
+    panel.style.cssText =
+        "position:fixed;right:44px;top:92px;width:372px;max-height:78vh;overflow-y:auto;z-index:940;display:none;" + WAR_PANEL_CSS;
+    document.body.appendChild(panel);
+
+    arrow.addEventListener("click", function() {
+        const open = panel.style.display !== "none";
+        panel.style.display = open ? "none" : "block";
+        arrow.textContent = open ? "◀ FACTIONS" : "▶ FACTIONS";
+        arrow.style.right = open ? "0" : "416px";
+    });
+
+    warBuildChat();
+
+    window.addEventListener("resize", drawWarMap);
+
+    warFxStart = performance.now();
+    requestAnimationFrame(warFxLoop);
+    requestAnimationFrame(animateWarLosses);
+    setInterval(updateWarRoom, 1000);
+
+}
+
+function warCityName(cityId) {
+
+    const c = planetCities.find(x => x.id === cityId);
+
+    return c ? c.name : cityId;
+
+}
+
+function warCityRegion(cityId) { return warRegions.find(r => r.city_id === cityId); }
+
+function warEstimate() {
+
+    if (!warAssault) { return null; }
+
+    const city = warRegions.find(r => r.id === warAssault.region_id);
+    const att = warFaction(warAssault.attacker);
+    const def = city ? warFaction(city.owner) : null;
+
+    if (!city || !att || !def) { return null; }
+
+    const diff = Math.max(-0.1, Math.min(0.1, (Number(att.power) - Number(def.power)) / 400));
+    const c = 0.40 + (Number(city.siege_progress) - 60) / 200 + Number(warAssault.attack_bonus) -
+        Number(warAssault.defense_bonus) - Number(city.fortification) * 0.07 + diff;
+
+    return Math.max(0.10, Math.min(0.75, c));
+
+}
+
+function updateWarRoom() {
+
+    const el = document.getElementById("war-room");
+
+    if (!el || !isWarPlanet) { return; }
+
+    let html = '<div style="font-weight:bold;letter-spacing:2px;color:#fff;margin-bottom:6px;">WAR ROOM</div>';
+
+    if (warState && warState.winner) {
+        el.innerHTML = html + '<div style="color:#ffe9b0;">The war is over.</div>';
+        return;
+    }
+
+    if (warAssault) {
+
+        const city = warRegions.find(r => r.id === warAssault.region_id);
+        const att = warFaction(warAssault.attacker);
+        const defOwner = city ? warFaction(city.owner) : null;
+        const left = Math.max(0, Math.ceil((Date.parse(warAssault.resolve_at) - (Date.now() + warServerOffset)) / 1000));
+        const est = warEstimate();
+
+        html +=
+            '<div style="color:#ff8a8a;font-weight:bold;">ASSAULT ON ' + (city ? warCityName(city.city_id).toUpperCase() : "?") + "</div>" +
+            "<div>" + (att ? att.name : "?") + " attacks " + (defOwner ? defOwner.name : "?") + "</div>" +
+            '<div style="font-size:18px;color:#fff;margin:2px 0;">' + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") + "</div>" +
+            '<div style="color:#bbb;">Chance of success: <b style="color:#ffd27a;">' + (est === null ? "?" : Math.round(est * 100) + "%") + "</b>" +
+            "</div>" +
+            '<div style="margin-top:6px;">' +
+            '<button type="button" data-war="relief" style="' + WAR_BTN_CSS + '">Send relief (' + WAR_COSTS.relief + ")</button>" +
+            '<button type="button" data-war="sabotage" style="' + WAR_BTN_CSS + '">Sabotage attacker (' + WAR_COSTS.sabotage + ")</button>" +
+            '<button type="button" data-war="ceasefire" style="' + WAR_BTN_CSS + '">Force ceasefire (' + WAR_COSTS.ceasefire + ")</button></div>";
+
+    }
+    else {
+
+        html += '<div style="color:#9fb8c4;">No assault underway.</div>';
+
+        if (warState && warState.last_assault_at) {
+            const wait = Math.max(0, Math.ceil((Date.parse(warState.last_assault_at) + 15 * 60000 - (Date.now() + warServerOffset)) / 1000));
+            if (wait > 0) { html += '<div style="color:#9fb8c4;">Next assault possible in ' + Math.floor(wait / 60) + ":" + String(wait % 60).padStart(2, "0") + "</div>"; }
+        }
+
+    }
+
+    if (warAdvances.length) {
+
+        html += '<div style="margin-top:8px;color:#fff;font-weight:bold;letter-spacing:1px;">ADVANCES</div>' +
+            warAdvances.map(function(adv) {
+                const f = warFaction(adv.attacker);
+                const to = warRegionById(adv.region_id);
+                const left = Math.max(0, Math.ceil((Date.parse(adv.resolve_at) - warServerNow()) / 1000));
+                return '<div style="margin:2px 0;"><span style="color:' + (f ? f.color : "#fff") + ';">' + (f ? f.name : adv.attacker) +
+                    '</span> → ' + (to ? to.name : "?") + ' <span style="color:#ffd27a;">' + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") + "</span></div>";
+            }).join("");
+
+    }
+
+    el.innerHTML = html;
+
+    el.querySelectorAll("button[data-war]").forEach(function(b) {
+        b.addEventListener("click", function() {
+
+            const kind = b.dataset.war;
+
+            if (!warAssault) { return; }
+
+            if (kind === "relief") {
+                const city = warRegions.find(r => r.id === warAssault.region_id);
+                warDecide(city.owner, "relief");
+            }
+            else { warDecide(warAssault.attacker, kind); }
+
+        });
+    });
+
+}
+
+function updateWarPanels() {
+
+    if (!isWarPlanet) { return; }
+
+    buildWarPanels();
+
+    const counts = {};
+    for (const r of warRegions) { counts[r.owner] = (counts[r.owner] || 0) + 1; }
+
+    document.getElementById("war-legend").innerHTML =
+        '<div style="font-weight:bold;letter-spacing:2px;color:#fff;margin-bottom:6px;">THE WAR FOR ' + planetName.toUpperCase() + "</div>" +
+        warFactions.map(f =>
+            '<div style="display:flex;align-items:center;gap:8px;margin:3px 0;">' +
+            '<span style="width:14px;height:14px;background:' + f.color + ';box-shadow:0 0 8px ' + f.color + ';flex:none;"></span>' +
+            "<span>" + f.name + '</span><span style="margin-left:auto;color:#8fb0c0;">' + (counts[f.id] || 0) + " prov.</span></div>"
+        ).join("") +
+        '<div style="margin-top:8px;color:#9fb8c4;"><span style="color:#ffd27a;">━</span> front line &nbsp; <span style="color:#fff;">◌</span> city under siege<br>▭ infantry &nbsp; ⬭ tank &nbsp; <span style="color:#ffd27a;">⇢</span> advance</div>';
+
+    document.getElementById("war-losses").innerHTML =
+        '<div style="font-weight:bold;letter-spacing:2px;color:#fff;margin-bottom:6px;">LOSSES</div>' +
+        warFactions.map(f =>
+            '<div style="display:flex;gap:8px;margin:3px 0;"><span style="color:' + f.color + ';">' + f.name + "</span>" +
+            '<span id="war-loss-' + f.id + '" style="margin-left:auto;color:#fff;">' +
+            Math.round((warLoss[f.id] || { shown: Number(f.losses) }).shown).toLocaleString() + "</span></div>"
+        ).join("");
+
+    document.getElementById("war-feed").innerHTML =
+        '<div style="font-weight:bold;letter-spacing:2px;color:#fff;margin-bottom:6px;">RECENT DECISIONS</div>' +
+        (warLog.length === 0 ? '<div style="color:#9fb8c4;">None yet.</div>' :
+            warLog.map(l => '<div style="margin:3px 0;color:#bcd3de;"><span style="color:#7fdcff;">' + l.backer + ":</span> " + l.note + "</div>").join(""));
+
+    const banner = document.getElementById("war-banner");
+
+    if (warState && warState.winner) {
+        const w = warFaction(warState.winner);
+        const ally = warState.arstartes_ally ? warFaction(warState.arstartes_ally) : null;
+        banner.style.display = "block";
+        banner.innerHTML = planetName.toUpperCase() + " UNIFIED UNDER " + (w ? w.name.toUpperCase() : warState.winner.toUpperCase()) +
+            (ally && planetName === "Vraks" ? '<div style="font-size:11px;letter-spacing:1px;margin-top:3px;">The Arstartes now serve ' + ally.name + "</div>" : "");
+    }
+    else { banner.style.display = "none"; }
+
+    warRenderFactionPanel(counts);
+    updateWarRoom();
+
+}
+
+function warRenderFactionPanel(counts) {
+
+    const panel = document.getElementById("war-factions");
+    const over = !!(warState && warState.winner);
+    const launched = warState ? Number(warState.assaults_launched) : 0;
+    const assaultCost = 800 + 300 * launched;
+    const maxPower = Math.max(...warFactions.map(x => Number(x.power)), 1);
+    const btn = (f, kind, label, cost, target) =>
+        '<button type="button" data-decide="' + kind + '" data-faction="' + f.id + '"' + (target ? ' data-target="' + target + '"' : "") +
+        ' style="' + WAR_BTN_CSS + '"' + (over ? " disabled" : "") + ">" + label + " (" + cost + ")</button>";
+
+    panel.innerHTML =
+        '<div style="font-weight:bold;letter-spacing:2px;color:#fff;">FACTIONS OF ' + planetName.toUpperCase() + "</div>" +
+        '<div style="color:#9fb8c4;margin:2px 0 8px;">Your faction\'s credits: <b style="color:#ffe9b0;">' +
+        (warCredits === null ? "—" : warCredits.toLocaleString()) + "</b> &nbsp; · decisions are paid from this pool</div>" +
+        warFactions.map(function(f) {
+
+            const open = warOpenFaction === f.id;
+            const cityRegs = warRegions.filter(r => r.city_id && r.owner === f.id);
+            const backers = warBacking.filter(b => b.faction_id === f.id && Number(b.total_spent) > 0)
+                .sort((a, b) => b.total_spent - a.total_spent)
+                .map(b => b.backer + " " + Number(b.total_spent).toLocaleString());
+
+            let body = "";
+
+            if (open) {
+
+                body += '<div style="color:#cfe0e8;margin-bottom:6px;">' + f.blurb + "</div>" +
+                    '<div style="color:#8fb0c0;">Provinces: <b style="color:#fff;">' + (counts[f.id] || 0) + "</b> &nbsp; Cities: <b style=\"color:#fff;\">" +
+                    (cityRegs.length ? cityRegs.map(r => warCityName(r.city_id)).join(", ") : "none") + "</b></div>" +
+                    '<div style="margin-top:5px;color:#8fb0c0;">Strength</div>' +
+                    '<div style="height:6px;background:#10202c;"><div style="height:100%;width:' + Math.round(100 * Number(f.power) / maxPower) +
+                    "%;background:" + f.color + ';"></div></div>' +
+                    '<div style="margin-top:5px;color:#8fb0c0;">Backed by: ' + (backers.length ? '<b style="color:#fff;">' + backers.join(" · ") + "</b>" : "nobody yet") + "</div>";
+
+                if (!f.supportable) {
+
+                    body += '<div style="margin-top:8px;color:#e8c46a;">' +
+                        (f.kind === "elite"
+                            ? "Cannot be influenced. They will side with whoever wins the war on this planet" +
+                              (warState && warState.arstartes_ally ? " (now serving " + (warFaction(warState.arstartes_ally) || {}).name + ")." : ".")
+                            : "Mindless: cannot be supplied or negotiated with.") + "</div>";
+
+                }
+                else {
+
+                    body += '<div style="margin-top:8px;"><button type="button" data-chat="' + f.id + '" style="' + WAR_BTN_CSS + '">📡 Open comms</button></div>';
+
+                    const besieged = warRegions.filter(r => r.city_id && r.siege_by === f.id);
+                    const best = besieged.sort((a, b) => b.siege_progress - a.siege_progress)[0];
+
+                    body += '<div style="margin-top:8px;color:#fff;font-weight:bold;">Help this faction</div>' +
+                        btn(f, "weapons", "Send weapons", WAR_COSTS.weapons) + btn(f, "heavy", "Heavy equipment", WAR_COSTS.heavy) +
+                        btn(f, "reinforce", "Reinforcements", WAR_COSTS.reinforce);
+
+                    if (best) {
+                        const p = Math.round(Number(best.siege_progress));
+                        body += '<div style="margin-top:4px;color:#9fb8c4;">Besieging ' + warCityName(best.city_id) + ": " + p + "%" +
+                            (p >= 60 ? "" : " (an assault needs 60%)") + "</div>" +
+                            (p >= 60 ? btn(f, "assault", "Back the assault", assaultCost) : "");
+                    }
+
+                    for (const r of cityRegs) {
+                        body += '<div style="margin-top:4px;">' + btn(f, "fortify", "Fortify " + warCityName(r.city_id) + " (" +
+                            Math.min(5, Math.round(Number(r.fortification) * 10) / 10) + "/5)", WAR_COSTS.fortify, r.city_id) + "</div>";
+                    }
+
+                    body += '<div style="margin-top:8px;color:#fff;font-weight:bold;">Work against this faction</div>' +
+                        btn(f, "sabotage", "Sabotage supplies", WAR_COSTS.sabotage) + btn(f, "ceasefire", "Force ceasefire", WAR_COSTS.ceasefire);
+
+                }
+
+            }
+
+            return '<div style="border-left:4px solid ' + f.color + ';background:rgba(255,255,255,.04);margin:6px 0;">' +
+                '<button type="button" data-open="' + f.id + '" style="width:100%;text-align:left;padding:8px 10px;background:none;border:none;color:#fff;font-weight:bold;cursor:pointer;">' +
+                (open ? "▼ " : "▶ ") + f.name + "</button>" + (open ? '<div style="padding:0 10px 10px;">' + body + "</div>" : "") + "</div>";
+
+        }).join("");
+
+    panel.querySelectorAll("button[data-open]").forEach(function(b) {
+        b.addEventListener("click", function() {
+            warOpenFaction = warOpenFaction === b.dataset.open ? null : b.dataset.open;
+            warRenderFactionPanel(counts);
+        });
+    });
+
+    panel.querySelectorAll("button[data-decide]").forEach(function(b) {
+        b.addEventListener("click", function() { warDecide(b.dataset.faction, b.dataset.decide, b.dataset.target); });
+    });
+
+    panel.querySelectorAll("button[data-chat]").forEach(function(b) {
+        b.addEventListener("click", function() { warOpenChat(b.dataset.chat); });
+    });
+
+}
+
+/* ---------- faction comms: scripted talks with the leaders of a war faction ---------- */
+const WAR_TOPICS = {
+    respect:  { label: "Show respect",    line: "We respect what you have built here." },
+    pledge:   { label: "Pledge support",  line: "Our faction stands ready to back you." },
+    rivals:   { label: "Slander a rival", line: "Your rivals are treacherous. Do not trust them." },
+    threaten: { label: "Threaten",        line: "Cross us and you will regret it." },
+    ask:      { label: "Ask about the war", line: "What is the situation on your front?" }
+};
+
+/* hi = greeting by standing (hostile, guarded, cordial, warm, trusted); r = reply by outcome score -2..+2 */
+const WAR_SCRIPT = {
+    "Krieg:national_government": {
+        hi: ["State your business, then leave us.", "You have our attention. Briefly.", "Ah. A useful acquaintance, perhaps.", "Welcome. The Government values its friends.", "Our most valued ally. Speak freely."],
+        r: { "-2": ["Insolence. We will remember this.", "You forget whom you address."],
+             "-1": ["That was unwise, and tedious.", "We expected better manners."],
+             "0": ["Noted. Nothing more to say.", "Hm. Proceed, if you must."],
+             "1": ["Sensible. Orros appreciates sense.", "Good. Order recognises order."],
+             "2": ["Splendid. You understand how things ought to be.", "Excellent. We shall not forget this courtesy."] },
+        wait: "We have said all we wish to for now. Return later.",
+        ask: "Since you ask, the situation is as follows."
+    },
+    "Krieg:liberation_army": {
+        hi: ["Say your piece and make it quick, we're at war.", "Speak plainly. We've no time for games.", "Good to hear from you. What do you need?", "Glad you called. The men speak well of you.", "You've stood by us. Whatever you need, ask."],
+        r: { "-2": ["We bled for this land, and you spit on it.", "Get off this channel."],
+             "-1": ["That doesn't sit well with the men.", "Careful. Soldiers remember."],
+             "0": ["Understood. Anything else?", "Right. Back to the front, then."],
+             "1": ["That's what we like to hear.", "Good. Actions matter more, but the words help."],
+             "2": ["That means a lot to the troops. Thank you.", "You've given us hope. We won't waste it."] },
+        wait: "We're busy, the lines won't hold themselves. Later.",
+        ask: "Here's how the front stands."
+    },
+    "Krieg:heretics": {
+        hi: ["You come to us with fear in your voice.", "Another voice in the dark. Interesting.", "The gods have noticed you. We are listening.", "A friend of the faithful. Come closer.", "Brother in all but name. The gods smile on you."],
+        r: { "-2": ["The gods will hear of this insult.", "Foolish. Very foolish."],
+             "-1": ["Such little faith. How sad.", "You mistake our patience for weakness."],
+             "0": ["Perhaps. The gods have not decided.", "We hear you. They are watching."],
+             "1": ["Yes. You begin to see.", "Wise words. We are pleased."],
+             "2": ["The gods laugh with delight. Well met!", "You understand us. Remember that when the sky opens."] },
+        wait: "Silence is also a prayer. Return later.",
+        ask: "Hear what the faithful have seen."
+    },
+    "Krieg:free_republic": {
+        hi: ["We have nothing to say to you.", "Please, be careful what you ask of us.", "Good to talk. We could use friends.", "Friend, the Republic is grateful.", "You are the Republic's truest friend."],
+        r: { "-2": ["This is exactly what the old powers did. Goodbye.", "We won't be bullied by anyone, you included."],
+             "-1": ["That's not the kind of future we're fighting for.", "Please, think about what you're saying."],
+             "0": ["We'll discuss it. Our assembly never agrees quickly.", "Fair enough. Let us think it over."],
+             "1": ["Yes, that's the spirit. Thank you.", "Reasonable. We like reasonable."],
+             "2": ["That's why we fight. Truly, thank you.", "You give us hope for the elections to come."] },
+        wait: "The assembly is in session. Please wait a little.",
+        ask: "Here is where we stand, honestly."
+    },
+    "Vraks:invasion_army": {
+        hi: ["We don't owe you anything.", "Make it short. Rations are thin.", "Heard you were around. What do you want?", "Good to hear a friendly voice out here.", "You're the reason we're still standing. Thanks."],
+        r: { "-2": ["Try that again and we'll stop talking altogether.", "We've survived worse than you. Out."],
+             "-1": ["Not the day for that, friend.", "We've heard enough threats for one war."],
+             "0": ["Right. Fine. Whatever helps us get home.", "Mm. Noted."],
+             "1": ["Aye, that helps. It really does.", "Good. A man needs something to believe in."],
+             "2": ["Spoken like someone worth fighting beside.", "That warms the trenches. Thank you."] },
+        wait: "We've got a perimeter to hold. Call back later.",
+        ask: "Here's the sorry state of things."
+    },
+    "Vraks:heretics": {
+        hi: ["Why do you disturb the quiet?", "Speak. The walls are listening.", "You are not unwelcome here.", "The prophecy has marked you kindly.", "You walk the path with us now."],
+        r: { "-2": ["Mortal arrogance. It will be corrected.", "You will remember this, in time."],
+             "-1": ["A discordant note. Be careful.", "You tempt a patience you do not understand."],
+             "0": ["Interesting. Say more, someday.", "We have heard. We have not decided."],
+             "1": ["Yes. Closer. You hear the song.", "A fitting offering of words."],
+             "2": ["Beautiful. The prophecy hums with approval.", "You will be remembered when the sky opens."] },
+        wait: "Even the faithful rest. Return when the stars shift.",
+        ask: "Observe, then, what we have wrought."
+    }
+};
+
+
+/* ---------- story decisions: the faction leaders put one matter at a time on the table ---------- */
+const warDecisionCache = {};
+let warDecisionTimer = null;
+
+async function warLoadDecision(fid) {
+
+    clearTimeout(warDecisionTimer);
+
+    const { data, error } = await supabaseClient.rpc("faction_decisions", { p_planet: planetName, p_faction: fid });
+
+    if (error || !data) {
+        warDecisionCache[fid] = null;
+        if (warChatFaction === fid) { warRenderDecision(); }
+        return;
+    }
+
+    warDecisionCache[fid] = data;
+
+    const dec = data.decision;
+
+    if (dec) {
+
+        const hist = warChats[fid] = warChats[fid] || [];
+
+        if (!hist.some(m => m.decisionId === dec.id)) {
+            hist.push({ role: "bot", text: dec.title.toUpperCase() + "\n" + dec.prompt, decisionId: dec.id });
+        }
+
+    }
+
+    if (warChatFaction === fid) {
+        warRenderChat();
+        warRenderDecision();
+    }
+
+    /* come back when the leadership is ready for the next matter */
+    if (Number(data.wait) > 0 && Number(data.pending) > 0) {
+        warDecisionTimer = setTimeout(function() {
+            if (warChatFaction === fid) { warLoadDecision(fid); }
+        }, (Number(data.wait) + 1) * 1000);
+    }
+
+}
+
+function warRenderDecision() {
+
+    const box = document.getElementById("war-chat-decision");
+
+    if (!box) { return; }
+
+    const fid = warChatFaction;
+    const st = fid ? warDecisionCache[fid] : null;
+
+    box.innerHTML = "";
+
+    if (!st) { return; }
+
+    if (st.decision) {
+
+        const head = document.createElement("div");
+        head.style.cssText = "color:#ffe9b0;font-weight:bold;letter-spacing:1px;margin-bottom:4px;";
+        head.textContent = "YOUR REPLY" + (Number(st.pending) > 1 ? " (" + (Number(st.pending) - 1) + " more matters waiting)" : "");
+        box.appendChild(head);
+
+        st.decision.choices.forEach(function(c, i) {
+
+            const b = document.createElement("button");
+            b.type = "button";
+            b.style.cssText = WAR_BTN_CSS + "display:block;width:100%;text-align:left;margin:3px 0;white-space:normal;";
+            b.textContent = (i + 1) + ". " + c.t + (Number(c.cost) > 0 ? "  (" + Number(c.cost).toLocaleString() + " credits)" : "");
+            b.disabled = warChatBusy;
+            b.addEventListener("click", function() { warAnswer(fid, st.decision, i + 1); });
+            box.appendChild(b);
+
+        });
+
+    }
+    else if (Number(st.pending) > 0) {
+
+        const w = document.createElement("div");
+        w.style.cssText = "color:#8fb0c0;font-style:italic;";
+        w.textContent = "The leadership needs a moment before the next matter (" + Math.max(1, Number(st.wait)) + "s).";
+        box.appendChild(w);
+
+    }
+
+}
+
+async function warAnswer(fid, dec, index) {
+
+    if (warChatBusy || !dec) { return; }
+
+    const choice = dec.choices[index - 1];
+
+    warChatBusy = true;
+    warRenderChat();
+    warRenderDecision();
+
+    const { data, error } = await supabaseClient.rpc("faction_decide", {
+        p_planet: planetName, p_faction: fid, p_id: dec.id, p_choice: index
+    });
+
+    warChatBusy = false;
+
+    if (error) {
+        gameToast(error.message);
+        await warLoadDecision(fid);
+        return;
+    }
+
+    const hist = warChats[fid] = warChats[fid] || [];
+
+    hist.push({ role: "user", text: choice.t });
+
+    if (data && data.reply) { hist.push({ role: "bot", text: data.reply }); }
+
+    if (data && Number(data.cost) > 0) { gameToast("-" + Number(data.cost).toLocaleString() + " credits"); }
+
+    await warRefresh();
+    await warLoadDecision(fid);
+
+}
+
+function warPick(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+/* credits you backed this faction with + chat rapport */
+function warStanding(fid) {
+
+    const pf = localStorage.getItem("playerFaction");
+    const backed = warBacking.filter(b => b.faction_id === fid && b.backer === pf).reduce((n, b) => n + Number(b.total_spent), 0);
+    const rap = warRapport.filter(r => r.faction_id === fid && r.backer === pf).reduce((n, r) => n + Number(r.rapport), 0);
+
+    return backed + rap;
+
+}
+
+function warStandingTier(n) { return n < 0 ? 0 : n < 100 ? 1 : n < 300 ? 2 : n < 600 ? 3 : 4; }
+
+function warStatusLine(fid) {
+
+    const mine = warRegions.filter(r => r.owner === fid);
+    let t = "We hold " + mine.length + " provinces and " + mine.filter(r => r.city_id).length + " of the 3 cities.";
+
+    for (const r of warRegions) {
+        if (!r.city_id || !r.siege_by) { continue; }
+        const p = Math.round(Number(r.siege_progress));
+        if (r.owner === fid) { t += " " + warCityName(r.city_id) + " is besieged by " + ((warFaction(r.siege_by) || {}).name || r.siege_by) + " (" + p + "%)."; }
+        else if (r.siege_by === fid) { t += " We are besieging " + warCityName(r.city_id) + " (" + p + "%)."; }
+    }
+
+    const n = warAdvances.filter(a => a.attacker === fid).length;
+    if (n) { t += " " + n + (n === 1 ? " division is" : " divisions are") + " advancing right now."; }
+
+    if (warState && warState.winner) { t += " The war is over."; }
+
+    return t;
+
+}
+
+function warBuildChat() {
+
+    if (document.getElementById("war-chat")) { return; }
+
+    const box = document.createElement("div");
+    box.id = "war-chat";
+    box.style.cssText =
+        "position:fixed;left:310px;bottom:24px;width:420px;max-width:calc(100vw - 340px);height:470px;z-index:960;display:none;flex-direction:column;" + WAR_PANEL_CSS;
+    box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+        '<b id="war-chat-title" style="letter-spacing:2px;color:#fff;"></b>' +
+        '<button type="button" id="war-chat-close" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;">✕</button></div>' +
+        '<div id="war-chat-log" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>' +
+        '<div id="war-chat-decision" style="margin-top:8px;border-top:1px solid rgba(127,220,255,.3);padding-top:6px;"></div>' +
+        '<div id="war-chat-topics" style="margin-top:8px;">' +
+        Object.keys(WAR_TOPICS).map(k => '<button type="button" data-topic="' + k + '" style="' + WAR_BTN_CSS + '">' + WAR_TOPICS[k].label + '</button>').join("") +
+        '</div>';
+    document.body.appendChild(box);
+
+    document.getElementById("war-chat-close").addEventListener("click", function() {
+        box.style.display = "none";
+        warChatFaction = null;
+        clearTimeout(warDecisionTimer);
+    });
+
+    box.querySelectorAll("button[data-topic]").forEach(function(b) {
+        b.addEventListener("click", function() { warTalk(b.dataset.topic); });
+    });
+
+}
+
+function warOpenChat(factionId) {
+
+    warBuildChat();
+
+    const f = warFaction(factionId);
+    const sc = WAR_SCRIPT[planetName + ":" + factionId];
+
+    if (!f || !sc) { return; }
+
+    warChatFaction = factionId;
+
+    if (!warChats[factionId] || !warChats[factionId].length) {
+        warChats[factionId] = [{ role: "bot", text: sc.hi[warStandingTier(warStanding(factionId))] }];
+    }
+
+    const box = document.getElementById("war-chat");
+    const title = document.getElementById("war-chat-title");
+
+    box.style.display = "flex";
+    box.style.borderColor = f.color;
+    title.textContent = f.name.toUpperCase();
+    title.style.color = f.color;
+
+    warRenderChat();
+    warRenderDecision();
+    warLoadDecision(factionId);
+
+}
+
+function warRenderChat() {
+
+    const log = document.getElementById("war-chat-log");
+    const f = warChatFaction ? warFaction(warChatFaction) : null;
+
+    if (!log || !f) { return; }
+
+    log.innerHTML = "";
+
+    const line = function(text, css) {
+        const d = document.createElement("div");
+        d.style.cssText = "padding:5px 8px;max-width:88%;white-space:pre-wrap;" + css;
+        d.textContent = text;
+        log.appendChild(d);
+    };
+
+    line("Standing with " + f.name + ": " + warStanding(warChatFaction) + " (600 = trusted ally). Rapport can move " +
+        "once every 3 minutes.", "color:#8fb0c0;font-style:italic;max-width:100%;padding-left:0;");
+
+    for (const m of (warChats[warChatFaction] || [])) {
+        if (m.role === "user") { line(m.text, "align-self:flex-end;background:rgba(127,220,255,.12);color:#e6f6ff;"); }
+        else { line(m.text, "align-self:flex-start;border-left:3px solid " + f.color + ";background:rgba(255,255,255,.05);color:#e8f1f5;"); }
+    }
+
+    if (warChatBusy) { line("…", "align-self:flex-start;color:#8fb0c0;"); }
+
+    document.querySelectorAll("#war-chat-topics button").forEach(function(b) { b.disabled = warChatBusy; });
+
+    log.scrollTop = log.scrollHeight;
+
+}
+
+async function warTalk(topic) {
+
+    if (warChatBusy || !warChatFaction || !WAR_TOPICS[topic]) { return; }
+
+    const fid = warChatFaction;
+    const sc = WAR_SCRIPT[planetName + ":" + fid];
+    const hist = warChats[fid] = warChats[fid] || [];
+
+    hist.push({ role: "user", text: WAR_TOPICS[topic].line });
+
+    if (topic === "ask") {
+        hist.push({ role: "bot", text: sc.ask + " " + warStatusLine(fid) });
+        warRenderChat();
+        return;
+    }
+
+    warChatBusy = true;
+    warRenderChat();
+
+    const { data, error } = await supabaseClient.rpc("faction_talk", { p_planet: planetName, p_faction: fid, p_topic: topic });
+
+    warChatBusy = false;
+
+    if (error || !data) {
+        hist.pop();
+        gameToast((error && error.message) || "No answer came back.");
+        if (warChatFaction === fid) { warRenderChat(); }
+        return;
+    }
+
+    if (data.cooldown) {
+        hist.push({ role: "bot", text: sc.wait + " (" + Math.max(1, Number(data.wait)) + "s)" });
+    }
+    else {
+
+        hist.push({ role: "bot", text: warPick(sc.r[String(data.score)] || sc.r["0"]) });
+
+        if (data.delta) {
+            gameToast((data.delta > 0 ? "+" : "") + data.delta + " standing with " + ((warFaction(fid) || {}).name || fid));
+        }
+
+        const mine = localStorage.getItem("playerFaction");
+        const row = warRapport.find(r => r.faction_id === fid && r.backer === mine);
+
+        if (row) { row.rapport = data.rapport; }
+        else { warRapport.push({ planet: planetName, faction_id: fid, backer: mine, rapport: data.rapport }); }
+
+    }
+
+    if (warChatFaction === fid) { warRenderChat(); }
+
+}
+
+function warLoadRapportSoon() { /* standing is read live by the server; nothing to cache */ }
+
+async function warDecide(factionId, kind, target) {
+
+    const { data, error } = await supabaseClient.rpc("war_decision", {
+        p_planet: planetName, p_faction: factionId, p_kind: kind, p_target: target || null
+    });
+
+    if (error) {
+        gameNotice(error.message, "Decision failed");
+        return;
+    }
+
+    gameToast(data);
+    await warRefresh();
+
+}
+
+/* the losses counter runs continuously from the database's value */
+function animateWarLosses() {
+
+    const now = performance.now();
+
+    for (const id of Object.keys(warLoss)) {
+
+        const s = warLoss[id];
+        const el = document.getElementById("war-loss-" + id);
+
+        s.shown = Math.max(s.shown, s.base + s.rate * (now - s.t0) / 1000);
+
+        if (el) { el.textContent = Math.round(s.shown).toLocaleString(); }
+
+    }
+
+    requestAnimationFrame(animateWarLosses);
+
+}
+
+function showWarCityInfo(city) {
+
+    const reg = warCityRegion(city.id);
+    const holder = reg ? warFaction(reg.owner) : null;
+    const besieger = reg && reg.siege_by ? warFaction(reg.siege_by) : null;
+
+    let panel = document.getElementById("war-city-info");
+
+    if (!panel) {
+        panel = document.createElement("div");
+        panel.id = "war-city-info";
+        panel.style.cssText =
+            "position:fixed;left:50%;bottom:90px;transform:translateX(-50%);width:370px;max-width:92vw;z-index:1200;" + WAR_PANEL_CSS;
+        document.body.appendChild(panel);
+    }
+
+    panel.innerHTML =
+        '<div style="display:flex;justify-content:space-between;"><b style="font-size:15px;letter-spacing:2px;color:#fff;">' +
+        city.name.toUpperCase() + '</b><button type="button" id="war-city-close" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;">✕</button></div>' +
+        '<div style="margin-top:6px;">Held by: <b style="color:' + (holder ? holder.color : "#fff") + ';">' + (holder ? holder.name : "unknown") + "</b></div>" +
+        '<div style="margin:4px 0;">' + (besieger
+            ? 'Besieged by <b style="color:' + besieger.color + ';">' + besieger.name + "</b>: " + Math.round(Number(reg.siege_progress)) + "%"
+            : "Not under siege") + "</div>" +
+        '<div style="color:#8fb0c0;">Fortification: ' + (reg ? Math.round(Number(reg.fortification) * 10) / 10 : 0) + " / 5</div>" +
+        '<div style="color:#9fb8c4;margin-top:4px;">No faction can take a city on its own. Open the FACTIONS tab to back an assault.</div>';
+
+    document.getElementById("war-city-close").addEventListener("click", function() { panel.remove(); });
+
+}
+
+async function warRefresh() {
+
+    if (await loadWar()) {
+        drawWarMap();
+        updateWarPanels();
+        renderPlanet();
+    }
+
+}
+
+async function warCycle() {
+
+    await supabaseClient.rpc("advance_war");
+    await warRefresh();
+
+    setTimeout(warCycle, 12000);
+
+}
+
+if (isWarPlanet) {
+    buildWarPanels();
+    warCycle();
+}
+
+initialize();
+
+</script>
+
+</body>
+
+</html>

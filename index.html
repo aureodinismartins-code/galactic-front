@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Galactic Wars: The Galactic Front
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase.js"></script>
+        <script>window.GC_NO_OVERLAY = true;</script>
+    <script src="gamecontrol.js"></script>
+
+</head>
+
+
+<body>
+
+
+    <div class="main-menu">
+
+        <h1>
+            GALACTIC WARS
+        </h1>
+
+        <h2>
+            THE GALACTIC FRONT
+        </h2>
+
+        <p>
+            A strategic map where players track the control
+            of planets and individual cities across the galaxy.
+        </p>
+
+
+        <div id="faction-selection">
+
+            <h3>
+                CHOOSE YOUR FACTION
+            </h3>
+
+
+            <button
+                class="faction-button combine"
+                onclick="chooseFaction('Combine')"
+            >
+                COMBINE
+            </button>
+
+
+            <button
+                class="faction-button independent"
+                onclick="chooseFaction('Independents')"
+            >
+                INDEPENDENTS
+            </button>
+
+
+            <button
+                class="faction-button freedom"
+                onclick="chooseFaction('Freedom Authority')"
+            >
+                FREEDOM AUTHORITY
+            </button>
+
+        </div>
+
+
+        <div
+            id="player-info"
+            style="display: none;"
+        >
+
+            <h3>
+                YOUR FACTION
+            </h3>
+
+
+            <p>
+                FACTION CREDITS:
+                <strong id="player-credits">
+                    500
+                </strong>
+            </p>
+
+
+            <p id="current-faction"></p>
+
+
+            <button
+                onclick="window.location.href='galaxy.html'"
+            >
+                ENTER GALACTIC FRONT
+            </button>
+
+
+            <button
+                onclick="changeFaction()"
+            >
+                CHANGE FACTION
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <div class="losses-panel">
+
+        <h3>
+            LOSSES
+        </h3>
+
+        <div class="loss-row">
+            <span>Freedom Authority</span>
+            <span class="loss-value" data-faction="Freedom Authority">0</span>
+        </div>
+
+        <div class="loss-row">
+            <span>Combine</span>
+            <span class="loss-value" data-faction="Combine">0</span>
+        </div>
+
+        <div class="loss-row">
+            <span>Independents</span>
+            <span class="loss-value" data-faction="Independents">0</span>
+        </div>
+
+    </div>
+
+
+        <div id="account-panel" style="position:fixed;left:20px;bottom:20px;z-index:50;width:290px;background:rgba(0,0,0,.85);border:1px solid #555;padding:12px 14px;color:#ccc;font:12px Arial,sans-serif;line-height:1.5;">
+        <strong style="color:#fff;letter-spacing:1px;">COMMANDER ACCOUNT</strong>
+        <div id="account-status" style="margin:4px 0 8px;color:#aaa;"></div>
+        <input id="acc-name" placeholder="commander name or email" autocomplete="username" style="width:100%;margin-bottom:5px;padding:5px;background:#111;color:#fff;border:1px solid #555;">
+        <input id="acc-pass" type="password" placeholder="password (6+ characters)" autocomplete="current-password" style="width:100%;margin-bottom:6px;padding:5px;background:#111;color:#fff;border:1px solid #555;">
+        <button type="button" onclick="saveAccount()" style="padding:5px 9px;">SAVE / CREATE</button>
+        <button type="button" onclick="loginAccount()" style="padding:5px 9px;">LOG IN</button>
+        <button type="button" id="acc-logout" onclick="logoutAccount()" style="padding:5px 9px;display:none;">LOG OUT</button>
+        <div id="account-message" style="margin-top:6px;color:#e8c46a;"></div>
+    </div>
+
+    <div class="status-panel">
+
+        <h3>
+            GALACTIC STATUS
+        </h3>
+
+
+        <div class="status-row">
+            <span>
+                ACTIVE SYSTEMS
+            </span>
+
+            <span id="status-systems">
+                40
+            </span>
+        </div>
+
+
+        <div class="status-row">
+            <span>
+                CONTESTED CITIES
+            </span>
+
+            <span id="status-contested">
+                0
+            </span>
+        </div>
+
+
+        <div class="status-row">
+            <span>
+                ACTIVE BATTLES
+            </span>
+
+            <span id="status-battles">
+                0
+            </span>
+        </div>
+
+    </div>
+
+
+    <script>
+
+
+        /*
+         * Get or create the player's Supabase account.
+         */
+
+        async function getPlayerAccount() {
+
+            /*
+             * Re-use the existing session. Only ever create a new
+             * anonymous player when there is truly nothing to restore,
+             * and ask first, so one person never ends up with two IDs.
+             */
+            let { data: { session } } = await supabaseClient.auth.getSession();
+
+            if (!session) {
+                const refreshed = await supabaseClient.auth.refreshSession();
+                session = refreshed.data ? refreshed.data.session : null;
+            }
+
+            let user = session ? session.user : null;
+
+            if (!user) {
+
+                if (
+                    localStorage.getItem("playerID") &&
+                    !confirm(
+                        "Your previous session could not be restored.\n\n" +
+                        "OK = continue as a NEW player (new ID)\n" +
+                        "Cancel = log in to your commander account instead"
+                    )
+                ) {
+                    return null;
+                }
+
+                const { data, error } =
+                    await supabaseClient.auth.signInAnonymously();
+
+                if (error) {
+
+                    console.error("Supabase account error:", error);
+
+                    alert("Could not connect to the game server.");
+
+                    return null;
+                }
+
+                user = data.user;
+
+            }
+
+            localStorage.setItem("playerID", user.id);
+
+            return user;
+
+        }
+
+
+
+        /*
+         * Create or update the player's database record.
+         */
+
+        async function savePlayerFaction(faction) {
+
+            const user =
+                await getPlayerAccount();
+
+
+            if (!user) {
+                return false;
+            }
+
+
+            const {
+                error
+            } =
+                await supabaseClient
+                    .from("players")
+                    .upsert({
+
+                        id: user.id,
+
+                        faction: faction,
+
+                        credits: 500
+
+                    });
+
+
+            if (error) {
+
+                console.error(
+                    "Player database error:",
+                    error
+                );
+
+                alert(
+                    "Could not save your player data."
+                );
+
+                return false;
+            }
+
+
+            return true;
+
+        }
+
+
+
+        /*
+         * Called when the player selects a faction.
+         */
+
+        async function chooseFaction(faction) {
+
+            /*
+             * Prevent accidental double-clicks.
+             */
+
+            const buttons =
+                document.querySelectorAll(
+                    ".faction-button"
+                );
+
+
+            buttons.forEach(
+                button =>
+                    button.disabled = true
+            );
+
+
+            const success =
+                await savePlayerFaction(
+                    faction
+                );
+
+
+            if (!success) {
+
+                buttons.forEach(
+                    button =>
+                        button.disabled = false
+                );
+
+                return;
+            }
+
+
+            /*
+             * Keep the faction locally so the
+             * existing pages can read it.
+             */
+
+            localStorage.setItem(
+                "playerFaction",
+                faction
+            );
+
+
+            showPlayerFaction();
+
+
+            buttons.forEach(
+                button =>
+                    button.disabled = false
+            );
+
+        }
+
+
+
+        /*
+         * Display the player's saved faction.
+         */
+
+        function showPlayerFaction() {
+
+            const faction =
+                localStorage.getItem(
+                    "playerFaction"
+                );
+
+
+            if (!faction) {
+                return;
+            }
+
+
+            document.getElementById(
+                "faction-selection"
+            ).style.display =
+                "none";
+
+
+            document.getElementById(
+                "player-info"
+            ).style.display =
+                "block";
+
+
+            document.getElementById(
+                "current-faction"
+            ).textContent =
+                faction.toUpperCase();
+
+        }
+
+
+
+        /*
+         * Load the player's credits from Supabase.
+         */
+
+        async function updateCredits() {
+
+            const playerID =
+                localStorage.getItem(
+                    "playerID"
+                );
+
+
+            if (!playerID) {
+                return;
+            }
+
+
+            const {
+                data,
+                error
+            } =
+                await supabaseClient.rpc("get_faction_credits");
+
+
+            if (error) {
+
+                console.error(
+                    "Could not load credits:",
+                    error
+                );
+
+                return;
+            }
+
+
+            if (data !== null && data !== undefined) {
+
+                document.getElementById(
+                    "player-credits"
+                ).textContent =
+                    Number(data).toLocaleString();
+
+            }
+
+        }
+
+
+
+        /*
+         * Allows the player to choose
+         * a different faction.
+         */
+
+        async function changeFaction() {
+
+            const playerID =
+                localStorage.getItem(
+                    "playerID"
+                );
+
+
+            if (!playerID) {
+
+                localStorage.removeItem(
+                    "playerFaction"
+                );
+
+                showPlayerFaction();
+
+                return;
+            }
+
+
+            const {
+                error
+            } =
+                await supabaseClient
+                    .from("players")
+                    .update({
+
+                        faction:
+                            "Independents"
+
+                    })
+                    .eq(
+                        "id",
+                        playerID
+                    );
+
+
+            if (error) {
+
+                console.error(
+                    "Faction change error:",
+                    error
+                );
+
+                alert(
+                    "Could not change faction."
+                );
+
+                return;
+            }
+
+
+            localStorage.removeItem(
+                "playerFaction"
+            );
+
+
+            document.getElementById(
+                "player-info"
+            ).style.display =
+                "none";
+
+
+            document.getElementById(
+                "faction-selection"
+            ).style.display =
+                "block";
+
+        }
+
+
+
+        /*
+         * Load the existing player when
+         * the menu opens.
+         */
+
+        async function initializeMenu() {
+
+            const {
+                data: {
+                    user
+                }
+            } =
+                await supabaseClient.auth.getUser();
+
+
+            /*
+             * If this browser already has a Supabase
+             * account, keep using it.
+             */
+
+            if (user) {
+
+                localStorage.setItem(
+                    "playerID",
+                    user.id
+                );
+
+            }
+
+
+            showPlayerFaction();
+
+
+            await updateCredits();
+
+        }
+
+
+
+
+        /*
+         * Load faction casualty totals from Supabase.
+         */
+
+        async function loadLosses() {
+
+            const { data, error } =
+                await supabaseClient
+                    .from("faction_losses")
+                    .select("faction, soldiers_lost");
+
+            if (error) {
+                console.error("Could not load losses:", error);
+                return;
+            }
+
+            const totals = {};
+
+            for (const row of data || []) {
+                totals[row.faction] = Number(row.soldiers_lost) || 0;
+            }
+
+            document.querySelectorAll(".loss-value").forEach(function(el) {
+                el.textContent =
+                    (totals[el.dataset.faction] || 0).toLocaleString();
+            });
+
+        }
+
+        /* Refresh when returning to the menu (including back button) */
+        window.addEventListener("pageshow", loadLosses);
+
+        /*
+         * Live galactic status (systems, contested cities, active battles).
+         */
+        async function loadGalaxyStatus() {
+
+            const { data, error } =
+                await supabaseClient.rpc("get_galaxy_status");
+
+            if (error || !data) {
+                console.error("Could not load galaxy status:", error);
+                return;
+            }
+
+            document.getElementById("status-systems").textContent = data.systems;
+            document.getElementById("status-contested").textContent = data.contested_cities;
+            document.getElementById("status-battles").textContent = data.active_battles;
+
+        }
+
+        window.addEventListener("pageshow", loadGalaxyStatus);
+        setInterval(loadGalaxyStatus, 15000);
+
+        /*
+         * COMMANDER ACCOUNT
+         * A name + password is tied to your player ID, so it stays the same
+         * on every browser and after any amount of time.
+         */
+        /*
+         * Players log in with EITHER a commander name or a real email.
+         *  - a name (letters, numbers, _) is turned into an internal alias address
+         *  - anything containing "@" is used as the real email, untouched
+         * If Supabase ever rejects the alias domain ("email address is invalid"),
+         * change ACCOUNT_ALIAS_DOMAIN to another domain that has DNS records.
+         */
+        const ACCOUNT_ALIAS_DOMAIN = "example.com";
+
+        function accountEmail(name) {
+
+            const raw = name.trim();
+
+            if (raw.includes("@")) {
+                return raw.toLowerCase();
+            }
+
+            return "gw_" + raw.toLowerCase().replace(/[^a-z0-9_]/g, "") +
+                "@" + ACCOUNT_ALIAS_DOMAIN;
+
+        }
+
+        function isAliasEmail(email) {
+            return !!email && email.endsWith("@" + ACCOUNT_ALIAS_DOMAIN) && email.startsWith("gw_");
+        }
+
+        function friendlyAuthError(error) {
+
+            const m = (error && error.message) || "Something went wrong.";
+
+            if (/invalid/i.test(m) && /email/i.test(m)) {
+                return "The server rejected that address. Try a real email, or ask the admin to change ACCOUNT_ALIAS_DOMAIN.";
+            }
+            if (/already|registered|exists/i.test(m)) {
+                return "That name or email is already taken. Use LOG IN instead.";
+            }
+            if (/invalid login|credentials/i.test(m)) {
+                return "Wrong name/email or password.";
+            }
+            if (/confirm/i.test(m)) {
+                return "Check your inbox to confirm the email, then log in.";
+            }
+
+            return m;
+
+        }
+
+        function accountMessage(text) {
+            document.getElementById("account-message").textContent = text;
+        }
+
+        async function refreshAccountStatus() {
+
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            const user = session ? session.user : null;
+            const status = document.getElementById("account-status");
+            const logout = document.getElementById("acc-logout");
+
+            if (user && !user.is_anonymous && user.email) {
+                status.textContent = "Logged in as " + (isAliasEmail(user.email) ? user.email.slice(3).split("@")[0] : user.email);
+                logout.style.display = "inline-block";
+            }
+            else {
+                status.textContent =
+                    "Guest session. Save an account to keep this player ID forever.";
+                logout.style.display = "none";
+            }
+
+        }
+
+        function readAccountForm() {
+
+            const name = document.getElementById("acc-name").value.trim();
+            const pass = document.getElementById("acc-pass").value;
+
+            if (name.includes("@")) {
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name)) {
+                    accountMessage("That email does not look right.");
+                    return null;
+                }
+            }
+            else if (name.replace(/[^a-zA-Z0-9_]/g, "").length < 3) {
+                accountMessage("Name: at least 3 letters or numbers (or use an email).");
+                return null;
+            }
+
+            if (pass.length < 6) {
+                accountMessage("Password: at least 6 characters.");
+                return null;
+            }
+
+            return { email: accountEmail(name), password: pass };
+
+        }
+
+        async function saveAccount() {
+
+            const form = readAccountForm();
+
+            if (!form) { return; }
+
+            let { data: { session } } = await supabaseClient.auth.getSession();
+
+            let result;
+
+            if (session && session.user.is_anonymous) {
+                /* upgrades THIS player: the ID does not change */
+                result = await supabaseClient.auth.updateUser(form);
+            }
+            else if (!session) {
+                result = await supabaseClient.auth.signUp(form);
+            }
+            else {
+                accountMessage("You are already logged in.");
+                return;
+            }
+
+            if (result.error) {
+                accountMessage(friendlyAuthError(result.error));
+                return;
+            }
+
+            accountMessage("Account saved. Log in with this name (or email) and password anywhere.");
+            await refreshAccountStatus();
+
+        }
+
+        async function loginAccount() {
+
+            const form = readAccountForm();
+
+            if (!form) { return; }
+
+            let { data, error } = await supabaseClient.auth.signInWithPassword(form);
+
+            /* accounts made before this fix used the old alias domain */
+            if (error && isAliasEmail(form.email)) {
+                const legacy = await supabaseClient.auth.signInWithPassword({
+                    email: form.email.slice(3).split("@")[0] + "@galactic-wars-players.com",
+                    password: form.password
+                });
+                if (!legacy.error) { data = legacy.data; error = null; }
+            }
+
+            if (error) {
+                accountMessage(friendlyAuthError(error));
+                return;
+            }
+
+            localStorage.setItem("playerID", data.user.id);
+
+            const { data: player } = await supabaseClient
+                .from("players")
+                .select("faction")
+                .eq("id", data.user.id)
+                .maybeSingle();
+
+            if (player && player.faction) {
+                localStorage.setItem("playerFaction", player.faction);
+            }
+
+            showPlayerFaction();
+            await updateCredits();
+            await refreshAccountStatus();
+            accountMessage("Logged in.");
+
+        }
+
+        async function logoutAccount() {
+
+            await supabaseClient.auth.signOut();
+
+            localStorage.removeItem("playerID");
+            localStorage.removeItem("playerFaction");
+
+            window.location.reload();
+
+        }
+
+        initializeMenu();
+        refreshAccountStatus();
+
+
+    </script>
+
+
+</body>
+
+</html>

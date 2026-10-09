@@ -1,0 +1,4085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galactic Wars - City Battle</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="gamecontrol.js"></script>
+<script src="knightmare_sprites.js"></script>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #101010; color: white; font-family: Arial, sans-serif; overflow: hidden; }
+.battle-page { width: 100vw; height: 100vh; position: relative; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; background: #202820; cursor: default; user-select: none; }
+.battle-header { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10; text-align: center; pointer-events: none; }
+.battle-header h1 { margin: 0; font-size: 28px; letter-spacing: 3px; }
+.battle-header p { margin: 6px 0; color: #aaa; letter-spacing: 2px; }
+.unit-key { position: absolute; top: 20px; left: 20px; z-index: 10; background: rgba(0,0,0,.78); border: 1px solid #555; padding: 10px 13px; color: #ccc; font-size: 12px; line-height: 1.7; }
+.unit-key strong { color: white; letter-spacing: 1px; }
+.status { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; background: rgba(0,0,0,.85); border: 1px solid #555; padding: 12px 25px; min-width: 350px; text-align: center; }
+.main-menu-button { position: absolute; top: 20px; right: 20px; z-index: 20; padding: 10px 18px; background: #111; color: white; border: 1px solid #555; cursor: pointer; font-weight: bold; }
+.main-menu-button:hover { background: #222; }
+#victory-screen { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; text-align: center; background: rgba(0,0,0,.94); border: 2px solid #777; padding: 35px 55px; min-width: 390px; }
+#victory-screen.visible { display: block; }
+#victory-title { margin: 0 0 12px; font-size: 38px; letter-spacing: 5px; }
+#victory-description { color: #bbb; margin-bottom: 15px; }
+#battle-loss-summary { color: #ddd; line-height: 1.6; margin-bottom: 22px; }
+#battle-return-button { padding: 12px 25px; background: #151515; color: white; border: 1px solid #777; cursor: pointer; font-weight: bold; }
+#battle-return-button:hover { background: #252525; }
+
+/* VICTORY CINEMATIC */
+#victory-cinematic {
+    position: absolute;
+    inset: 0;
+    z-index: 80;
+    display: none;
+    pointer-events: none;
+    overflow: hidden;
+    background: rgba(0,0,0,0);
+}
+#victory-cinematic.active { display: block; }
+#victory-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 48%, rgba(255,255,255,.035) 0%, rgba(0,0,0,.08) 42%, rgba(0,0,0,.72) 100%);
+    opacity: 0;
+    transition: opacity 1s ease;
+}
+#victory-cinematic.active #victory-vignette { opacity: 1; }
+.victory-bar {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 7vh;
+    background: #050505;
+    opacity: .92;
+}
+#victory-bar-top { top: -7vh; }
+#victory-bar-bottom { bottom: -7vh; }
+#victory-cinematic.active #victory-bar-top { animation: victoryBarTop .9s ease forwards; }
+#victory-cinematic.active #victory-bar-bottom { animation: victoryBarBottom .9s ease forwards; }
+@keyframes victoryBarTop { to { top: 0; } }
+@keyframes victoryBarBottom { to { bottom: 0; } }
+#victory-banner-light {
+    position: absolute;
+    left: 50%;
+    top: 46%;
+    width: 300px;
+    height: 260px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255,255,255,.13), rgba(255,255,255,0) 68%);
+    opacity: 0;
+}
+#victory-cinematic.banner-stage #victory-banner-light { animation: bannerLight 1.5s ease forwards; }
+@keyframes bannerLight { to { opacity: 1; } }
+#victory-caption {
+    position: absolute;
+    left: 50%;
+    bottom: 13vh;
+    transform: translate(-50%, 18px);
+    width: min(900px, 90vw);
+    text-align: center;
+    opacity: 0;
+    transition: opacity .7s ease, transform .7s ease;
+    text-shadow: 0 3px 18px #000;
+}
+#victory-caption.show { opacity: 1; transform: translate(-50%, 0); }
+#victory-caption-kicker { font-size: 13px; letter-spacing: 5px; color: #bbb; margin-bottom: 9px; }
+#victory-caption-title { font-size: clamp(38px, 6vw, 72px); font-weight: 900; letter-spacing: 9px; margin: 0; }
+#victory-caption-city { margin-top: 9px; font-size: clamp(17px, 2vw, 25px); letter-spacing: 4px; color: #eee; }
+#victory-final-card {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(.96);
+    min-width: min(520px, 88vw);
+    padding: 30px 42px;
+    text-align: center;
+    background: rgba(5,7,8,.91);
+    border: 1px solid rgba(255,255,255,.28);
+    box-shadow: 0 25px 80px rgba(0,0,0,.7);
+    opacity: 0;
+    transition: opacity .7s ease, transform .7s ease;
+    pointer-events: none;
+}
+#victory-final-card.show { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+#victory-final-card h2 { margin: 0 0 8px; font-size: 30px; letter-spacing: 5px; }
+#victory-final-card p { margin: 0 0 20px; color: #aaa; letter-spacing: 1px; }
+#victory-continue { padding: 12px 28px; background: #121212; color: #fff; border: 1px solid #777; font-weight: bold; letter-spacing: 2px; cursor: pointer; }
+#victory-continue:hover { background: #242424; }
+
+</style>
+</head>
+
+<body>
+<div class="battle-page">
+<canvas id="battleCanvas"></canvas>
+
+<div class="battle-header">
+    <h1 id="battle-city">CITY BATTLE</h1>
+    <p id="battle-planet">PLANET</p>
+</div>
+
+<div class="unit-key">
+    <strong>DIVISION TYPES</strong><br>
+    ● Rifle &nbsp;&nbsp; ■ MG &nbsp;&nbsp; ▲ Assault<br>
+    ◆ AT &nbsp;&nbsp; ⬡ Sniper<br>
+    ▬ Tank &nbsp;&nbsp; ◉ Artillery
+</div>
+
+<div class="status"><span id="battle-message">Loading fleet...</span></div>
+
+<div id="victory-screen">
+    <h1 id="victory-title">VICTORY</h1>
+    <p id="victory-description">Enemy forces eliminated.</p>
+    <div id="battle-loss-summary">Calculating losses...</div>
+    <button id="battle-return-button" type="button">RETURN TO PLANET</button>
+</div>
+
+
+<div id="victory-cinematic" aria-hidden="true">
+    <div id="victory-vignette"></div>
+    <div class="victory-bar" id="victory-bar-top"></div>
+    <div class="victory-bar" id="victory-bar-bottom"></div>
+    <div id="victory-banner-light"></div>
+    <div id="victory-caption">
+        <div id="victory-caption-kicker">TACTICAL OBJECTIVE SECURED</div>
+        <h1 id="victory-caption-title">CITY CAPTURED</h1>
+        <div id="victory-caption-city"></div>
+    </div>
+    <div id="victory-final-card">
+        <h2 id="victory-final-title">CITY CAPTURED</h2>
+        <p id="victory-final-description"></p>
+        <button id="victory-continue" type="button">RETURN TO PLANET</button>
+    </div>
+</div>
+
+<button class="main-menu-button" type="button" id="main-menu-button">MAIN MENU</button>
+</div>
+
+<script>
+
+/* =========================================
+   URL
+========================================= */
+
+const params = new URLSearchParams(window.location.search);
+const fleetID = params.get("fleet");
+const cityName = params.get("city") || "Unknown City";
+const planetName = params.get("planet") || "Unknown Planet";
+const cityID = (planetName + "-" + cityName).replace(/ /g, "-");
+const playerFaction = params.get("attacker") || "Independents";
+const enemyFaction = params.get("defender") || "Combine";
+
+/* reinforcements: ?join=<battle id> means "I am reinforcing a battle that is already running" */
+const joinBattleID = params.get("join");
+const isGuest = !!joinBattleID;
+
+document.getElementById("battle-city").textContent = cityName.toUpperCase();
+document.getElementById("battle-planet").textContent = planetName.toUpperCase();
+
+
+/* =========================================
+   CANVAS
+========================================= */
+
+const canvas = document.getElementById("battleCanvas");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+
+/* =========================================
+   GAME STATE
+========================================= */
+
+const playerUnits = [];
+const enemyUnits = [];
+
+let selectedUnits = [];
+
+let battleActive = false;
+let battleResult = null;
+let battleResolved = false;
+
+let victoryCutscene = null;
+let victoryReturnTimer = null;
+
+let garrisonLevel = 1;
+let enemyInitialSoldiers = 0;
+
+const garrisonComposition = {
+    1: { Rifle: 5 },
+    2: { Rifle: 7 },
+    3: { Rifle: 8, MG: 1 },
+    4: { Rifle: 8, MG: 2, Sniper: 2 },
+    5: { Rifle: 10, MG: 3, Sniper: 3, AT: 2 }
+};
+
+async function loadGarrisonLevel() {
+
+    const { data, error } = await supabaseClient
+        .from("cities")
+        .select("garrison_level")
+        .eq("planet_id", planetName)
+        .eq("name", cityName)
+        .maybeSingle();
+
+    if (error || !data) { return 1; }
+
+    return Math.max(1, Math.min(5, Number(data.garrison_level) || 1));
+
+}
+
+let fleetState = null;
+let battleID = null;
+
+/* ---- live battle (reinforcements) state ---- */
+let myUid = null;            /* my player id */
+let mySide = "A";            /* "A" = attacking side, "D" = defending side */
+let liveChannel = null;      /* realtime broadcast channel shared by everybody in this battle */
+let liveGuestCount = 0;      /* host: how many reinforcing fleets have joined */
+const liveGuests = {};       /* host: fleets already spawned */
+let liveTimers = [];
+let shotLog = [];            /* host: shots fired since the last snapshot */
+let guestSeq = 0;
+let guestSquads = [];
+let guestInitialSoldiers = 0;
+const ghostById = new Map(); /* guest: units rebuilt from the host's snapshots */
+let lastSnapAt = 0;
+let gotSnap = false;
+let guestEnded = false;
+let joinRetry = null;
+
+const soldiersPerDivision = { Rifle: 1000, MG: 750, Assault: 1000, AT: 600, Sniper: 400, Tank: 200, Artillery: 250, Knightmare: 3 };
+
+let isDraggingSelection = false;
+let dragStartX = 0, dragStartY = 0, dragCurrentX = 0, dragCurrentY = 0;
+
+const shotEffects = [];
+const projectiles = [];
+const impacts = [];
+const damageNumbers = [];
+
+
+/* =========================================
+   MAP
+========================================= */
+
+const BASE_CITY_WIDTH = 620;
+const BASE_CITY_HEIGHT = 440;
+
+/* the city fills most of the screen (layouts are authored at 620 x 440) */
+function cityScale() {
+    return Math.max(1, Math.min(canvas.width * 0.8 / BASE_CITY_WIDTH, canvas.height * 0.86 / BASE_CITY_HEIGHT, 1.9));
+}
+function cityWidth() { return BASE_CITY_WIDTH * cityScale(); }
+function cityHeight() { return BASE_CITY_HEIGHT * cityScale(); }
+const GRID_SIZE = 26;
+const UNIT_RADIUS = 7;
+const BUILDING_PADDING = 5;
+
+
+/* =========================================
+   UNIT STATS
+========================================= */
+
+const unitStats = {
+    Rifle:   { health: 100, damage: 11, range: 165, fireRate: 900,  speed: 48, accuracy: 0.78 },
+    MG:      { health: 120, damage: 5,  range: 200, fireRate: 350,  speed: 39, accuracy: 0.70 },
+    Assault: { health: 120, damage: 17, range: 130, fireRate: 850,  speed: 58, accuracy: 0.82 },
+    AT:      { health: 100, damage: 34, range: 225, fireRate: 1700, speed: 35, accuracy: 0.68 },
+    Sniper:  { health: 80,  damage: 44, range: 300, fireRate: 2400, speed: 28, accuracy: 0.92 },
+    Tank:    { health: 220, damage: 40, range: 210, fireRate: 1800, speed: 36, accuracy: 0.75 },
+    /* indirect fire: shoots over buildings, no line of sight needed */
+    Artillery: { health: 70, damage: 55, range: 420, fireRate: 3500, speed: 22, accuracy: 0.60, indirect: true },
+    /* Knightmare squad: 3 mechs. Per mech: 250 hp (+15% frame), armor 4 (+1 frame), rifle 18 dmg / 1 s (+10% controls),
+       speed 2.2 (+10% wheel). health here is the whole squad (3 x 287.5). */
+    Knightmare: { health: 862.5, damage: 18, range: 285, fireRate: 909, speed: 100, accuracy: 0.80, armor: 5 }
+};
+
+const KN_MEMBER_HP = 287.5;
+const KN_RIFLE_RANGE = 170;
+const KN_CANNON = { damage: 60, splash: 42, range: 285, cooldown: 5000, windup: 400 };
+
+/*
+   NEW: per-unit-type movement tuning (combat stats untouched).
+   separation : personal space between friendly units (px)
+   repath     : minimum ms between route recalculations
+   goalDrift  : how far the goal may move before the route is rebuilt
+   stuckMs    : time window used for stuck detection
+*/
+const movementProfiles = {
+    Rifle:   { separation: 20, repath: 900,  goalDrift: 45, stuckMs: 1000 },
+    MG:      { separation: 22, repath: 1200, goalDrift: 55, stuckMs: 1200 },
+    Assault: { separation: 17, repath: 600,  goalDrift: 30, stuckMs: 800  },
+    AT:      { separation: 22, repath: 1200, goalDrift: 55, stuckMs: 1200 },
+    Sniper:  { separation: 24, repath: 1500, goalDrift: 65, stuckMs: 1400 },
+    Tank:    { separation: 26, repath: 1200, goalDrift: 55, stuckMs: 1200 },
+    Artillery: { separation: 24, repath: 1500, goalDrift: 65, stuckMs: 1400 },
+    Knightmare: { separation: 30, repath: 700, goalDrift: 35, stuckMs: 900 }
+};
+
+
+/* =========================================
+   CITY
+========================================= */
+
+function getCityBounds() {
+    return {
+        x: canvas.width / 2 - cityWidth() / 2,
+        y: canvas.height / 2 - cityHeight() / 2
+    };
+}
+
+function hashString(str) {
+    let h = 0;
+    for (const ch of String(str)) { h = (h * 31 + ch.charCodeAt(0)) | 0; }
+    return Math.abs(h);
+}
+
+/*
+   Battlefield layouts (coordinates are relative to the city area, 620 x 440).
+   buildings [x,y,w,h] | cover [type,x,y,w,h] | roads [x,y,w,h] | decor [type,x,y]
+   The layout is picked from the city id, so each city always has the same map.
+*/
+const mapLayouts = [
+    {
+        name: "OLD TOWN", ground: "#555", road: "#777", bld: "#303030", roof: "#3b3b3b",
+        roads: [[0,205,620,55],[205,0,55,440]],
+        buildings: [[45,45,130,105],[245,65,150,110],[475,40,90,140],[70,285,155,105],[330,295,190,105]],
+        cover: [["sandbags",150,175,14,100],["sandbags",295,185,14,115],["sandbags",440,150,14,110],["sandbags",235,335,14,80],["wall",365,225,12,70]],
+        decor: []
+    },
+    {
+        name: "INDUSTRIAL YARD", ground: "#4a4d52", road: "#62666c", bld: "#2d3238", roof: "#3a4048",
+        roads: [[0,190,620,60],[270,0,60,440]],
+        buildings: [[40,40,170,90],[40,300,170,100],[390,40,120,100],[390,300,150,100]],
+        cover: [["container",120,160,40,16],["container",470,175,16,40],["container",130,265,40,16],["container",440,255,40,16],
+                ["container",300,150,16,40],["container",300,255,16,40],["tank",230,50,36,36],["tank",230,350,36,36]],
+        decor: []
+    },
+    {
+        name: "RIVERSIDE CROSSING", ground: "#4f5a48", road: "#6e6e66", bld: "#3a3733", roof: "#4b4640",
+        roads: [[0,205,620,45],[255,185,70,70]],
+        buildings: [[40,50,150,100],[40,290,140,110],[360,50,130,100],[380,300,160,100]],
+        cover: [["water",265,0,50,185],["water",265,255,50,185],["sandbags",225,160,14,40],["sandbags",225,250,14,40],
+                ["sandbags",345,160,14,40],["sandbags",345,250,14,40]],
+        decor: [["tree",215,20],["tree",230,420],["tree",335,15],["tree",345,425],["tree",20,190],["tree",20,265]]
+    },
+    {
+        name: "RUINED DISTRICT", ground: "#5b5249", road: "#6d655b", bld: "#3a332d", roof: "#4a423a",
+        roads: [[0,195,620,45]],
+        buildings: [[50,40,80,70],[160,60,60,90],[60,130,70,55],[200,290,90,60],[60,300,80,70],[340,40,70,60],[420,90,70,80],[350,270,60,50],[310,330,80,60],[450,300,70,70]],
+        cover: [["rubble",150,170,26,20],["rubble",260,200,24,24],["rubble",250,140,20,20],["rubble",380,200,26,22],
+                ["rubble",470,200,22,26],["rubble",140,260,22,22],["rubble",250,350,24,20],["wall",300,100,12,60]],
+        decor: []
+    },
+    {
+        name: "CENTRAL PLAZA", ground: "#5d6258", road: "#82857c", bld: "#34383a", roof: "#44494c",
+        roads: [[190,110,240,220],[0,205,190,30],[430,205,190,30]],
+        buildings: [[30,30,140,80],[450,30,130,80],[30,330,140,80],[440,335,130,80]],
+        cover: [["fountain",290,205,40,40],["sandbags",180,160,14,50],["sandbags",426,160,14,50],["sandbags",180,260,14,50],["sandbags",426,260,14,50]],
+        decor: [["tree",215,130],["tree",405,130],["tree",215,310],["tree",405,310],["tree",100,200],["tree",520,200]]
+    }
+];
+
+const battleLayout = mapLayouts[hashString(cityID) % mapLayouts.length];
+
+function getBuildings() {
+    const city = getCityBounds();
+    const s = cityScale();
+    return battleLayout.buildings.map(b => ({ x: city.x + b[0] * s, y: city.y + b[1] * s, width: b[2] * s, height: b[3] * s }));
+}
+
+function getCoverObjects() {
+    const city = getCityBounds();
+    const s = cityScale();
+    return battleLayout.cover.map(c => ({ type: c[0], x: city.x + c[1] * s, y: city.y + c[2] * s, width: c[3] * s, height: c[4] * s }));
+}
+
+/* CHANGED: obstacles are cached (rebuilt only if the canvas size changes) */
+let obstacleCache = [];
+let expandedObstacleCache = [];
+let obstacleCacheKey = "";
+const blockedCellCache = new Map();
+
+function getObstacles() {
+
+    const key = canvas.width + "x" + canvas.height;
+
+    if (key !== obstacleCacheKey) {
+
+        obstacleCache = [...getBuildings(), ...getCoverObjects()];
+
+        expandedObstacleCache = obstacleCache.map(o => ({
+            x: o.x - BUILDING_PADDING,
+            y: o.y - BUILDING_PADDING,
+            width: o.width + BUILDING_PADDING * 2,
+            height: o.height + BUILDING_PADDING * 2
+        }));
+
+        blockedCellCache.clear();
+        obstacleCacheKey = key;
+
+    }
+
+    return obstacleCache;
+
+}
+
+
+/* =========================================
+   COLLISION
+========================================= */
+
+function circleIntersectsRect(x, y, radius, rect) {
+
+    const closestX = Math.max(rect.x, Math.min(x, rect.x + rect.width));
+    const closestY = Math.max(rect.y, Math.min(y, rect.y + rect.height));
+
+    const dx = x - closestX;
+    const dy = y - closestY;
+
+    return (dx * dx + dy * dy) <= radius * radius;
+
+}
+
+/* CHANGED: uses cached padded rectangles */
+function canOccupyPosition(x, y) {
+
+    if (
+        x < UNIT_RADIUS ||
+        y < UNIT_RADIUS ||
+        x > canvas.width - UNIT_RADIUS ||
+        y > canvas.height - UNIT_RADIUS
+    ) {
+        return false;
+    }
+
+    getObstacles();
+
+    for (const expanded of expandedObstacleCache) {
+        if (circleIntersectsRect(x, y, UNIT_RADIUS, expanded)) {
+            return false;
+        }
+    }
+
+    return true;
+
+}
+
+
+/* =========================================
+   SAFE POSITION
+========================================= */
+
+function clampToBattlefield(x, y) {
+    return {
+        x: Math.max(UNIT_RADIUS, Math.min(canvas.width - UNIT_RADIUS, x)),
+        y: Math.max(UNIT_RADIUS, Math.min(canvas.height - UNIT_RADIUS, y))
+    };
+}
+
+function findSafePosition(x, y) {
+
+    const clamped = clampToBattlefield(x, y);
+
+    if (canOccupyPosition(clamped.x, clamped.y)) {
+        return clamped;
+    }
+
+    for (let radius = 12; radius <= 120; radius += 12) {
+        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+
+            const test = clampToBattlefield(
+                clamped.x + Math.cos(angle) * radius,
+                clamped.y + Math.sin(angle) * radius
+            );
+
+            if (canOccupyPosition(test.x, test.y)) {
+                return test;
+            }
+
+        }
+    }
+
+    return clamped;
+
+}
+
+
+/* =========================================
+   LINE OF SIGHT
+========================================= */
+
+function lineOfSight(shooter, target) {
+
+    const dx = target.x - shooter.x;
+    const dy = target.y - shooter.y;
+    const length = Math.hypot(dx, dy);
+
+    if (length <= 0) {
+        return true;
+    }
+
+    const steps = Math.ceil(length / 5);
+    const obstacles = getObstacles();
+
+    for (let i = 1; i < steps; i++) {
+
+        const progress = i / steps;
+        const x = shooter.x + dx * progress;
+        const y = shooter.y + dy * progress;
+
+        for (const obstacle of obstacles) {
+            if (obstacle.type === "water") { continue; }
+            if (circleIntersectsRect(x, y, 2, obstacle)) {
+                return false;
+            }
+        }
+
+    }
+
+    return true;
+
+}
+
+
+/* =========================================
+   PATHFINDING (A*)
+========================================= */
+
+function worldToGrid(x, y) {
+    return {
+        x: Math.max(0, Math.min(Math.floor(canvas.width / GRID_SIZE) - 1, Math.floor(x / GRID_SIZE))),
+        y: Math.max(0, Math.min(Math.floor(canvas.height / GRID_SIZE) - 1, Math.floor(y / GRID_SIZE)))
+    };
+}
+
+function gridToWorld(gx, gy) {
+    return {
+        x: gx * GRID_SIZE + GRID_SIZE / 2,
+        y: gy * GRID_SIZE + GRID_SIZE / 2
+    };
+}
+
+function gridKey(x, y) {
+    return x + "," + y;
+}
+
+/* CHANGED: blocked cells are cached */
+function isGridBlocked(gx, gy) {
+
+    getObstacles();
+
+    const key = gy * 1000 + gx;
+
+    let blocked = blockedCellCache.get(key);
+
+    if (blocked === undefined) {
+        const point = gridToWorld(gx, gy);
+        blocked = !canOccupyPosition(point.x, point.y);
+        blockedCellCache.set(key, blocked);
+    }
+
+    return blocked;
+
+}
+
+function findNearestOpenCell(gx, gy) {
+
+    if (!isGridBlocked(gx, gy)) {
+        return { x: gx, y: gy };
+    }
+
+    const cols = Math.floor(canvas.width / GRID_SIZE);
+    const rows = Math.floor(canvas.height / GRID_SIZE);
+
+    for (let radius = 1; radius <= 10; radius++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+
+                if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) {
+                    continue;
+                }
+
+                const testX = gx + dx;
+                const testY = gy + dy;
+
+                if (testX < 0 || testY < 0 || testX >= cols || testY >= rows) {
+                    continue;
+                }
+
+                if (!isGridBlocked(testX, testY)) {
+                    return { x: testX, y: testY };
+                }
+
+            }
+        }
+    }
+
+    return null;
+
+}
+
+function heuristic(a, b) {
+    const dx = Math.abs(a.x - b.x);
+    const dy = Math.abs(a.y - b.y);
+    return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+}
+
+function findPath(startX, startY, targetX, targetY) {
+
+    const startRaw = worldToGrid(startX, startY);
+    const targetRaw = worldToGrid(targetX, targetY);
+
+    const start = findNearestOpenCell(startRaw.x, startRaw.y);
+    const target = findNearestOpenCell(targetRaw.x, targetRaw.y);
+
+    if (!start || !target) {
+        return [];
+    }
+
+    const cols = Math.floor(canvas.width / GRID_SIZE);
+    const rows = Math.floor(canvas.height / GRID_SIZE);
+
+    const open = [];
+    const cameFrom = new Map();
+    const gScore = new Map();
+    const fScore = new Map();
+
+    const startKey = gridKey(start.x, start.y);
+    const targetKey = gridKey(target.x, target.y);
+
+    gScore.set(startKey, 0);
+    fScore.set(startKey, heuristic(start, target));
+    open.push({ x: start.x, y: start.y });
+
+    const directions = [
+        { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+        { x: 1, y: 1 }, { x: -1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: -1 }
+    ];
+
+    let iterations = 0;
+
+    while (open.length > 0 && iterations < 5000) {
+
+        iterations++;
+
+        let bestIndex = 0;
+
+        for (let i = 1; i < open.length; i++) {
+            const currentKey = gridKey(open[i].x, open[i].y);
+            const bestKey = gridKey(open[bestIndex].x, open[bestIndex].y);
+            if ((fScore.get(currentKey) ?? Infinity) < (fScore.get(bestKey) ?? Infinity)) {
+                bestIndex = i;
+            }
+        }
+
+        const current = open.splice(bestIndex, 1)[0];
+        const currentKey = gridKey(current.x, current.y);
+
+        if (currentKey === targetKey) {
+
+            const path = [];
+            let key = currentKey;
+
+            while (key) {
+                const [x, y] = key.split(",").map(Number);
+                path.push(gridToWorld(x, y));
+                key = cameFrom.get(key);
+            }
+
+            path.reverse();
+
+            if (
+                path.length > 0 &&
+                Math.hypot(path[0].x - startX, path[0].y - startY) < GRID_SIZE
+            ) {
+                path.shift();
+            }
+
+            return path;
+
+        }
+
+        for (const direction of directions) {
+
+            const nx = current.x + direction.x;
+            const ny = current.y + direction.y;
+
+            if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) {
+                continue;
+            }
+
+            if (isGridBlocked(nx, ny)) {
+                continue;
+            }
+
+            /* no corner cutting */
+            if (
+                direction.x !== 0 && direction.y !== 0 &&
+                (
+                    isGridBlocked(current.x + direction.x, current.y) ||
+                    isGridBlocked(current.x, current.y + direction.y)
+                )
+            ) {
+                continue;
+            }
+
+            const neighbourKey = gridKey(nx, ny);
+            const movementCost = (direction.x !== 0 && direction.y !== 0) ? 1.414 : 1;
+            const tentativeG = (gScore.get(currentKey) ?? Infinity) + movementCost;
+
+            if (tentativeG < (gScore.get(neighbourKey) ?? Infinity)) {
+
+                cameFrom.set(neighbourKey, currentKey);
+                gScore.set(neighbourKey, tentativeG);
+                fScore.set(neighbourKey, tentativeG + heuristic({ x: nx, y: ny }, target));
+
+                if (!open.some(node => node.x === nx && node.y === ny)) {
+                    open.push({ x: nx, y: ny });
+                }
+
+            }
+
+        }
+
+    }
+
+    return [];
+
+}
+
+
+/* =========================================
+   UNITS
+========================================= */
+
+function createUnit(x, y, faction, id, type, soldiers) {
+
+    const stats = unitStats[type] || unitStats.Rifle;
+    const divisionSize = soldiersPerDivision[type] || 1000;
+    const safePosition = findSafePosition(x, y);
+
+    const unit = {
+
+        id,
+        type,
+        x: safePosition.x,
+        y: safePosition.y,
+        faction,
+
+        soldiers: Math.max(0, Math.min(divisionSize, Number(soldiers) || divisionSize)),
+        divisionSize,
+
+        health: stats.health,
+        maxHealth: stats.health,
+
+        damage: stats.damage,
+        range: stats.range,
+        fireRate: stats.fireRate,
+        speed: stats.speed,
+        accuracy: stats.accuracy,
+        indirect: !!stats.indirect,
+        facing: 0,
+        attackOrder: false,
+
+        side: "A",
+        owner: null,
+        human: false,
+
+        selected: false,
+
+        targetX: safePosition.x,
+        targetY: safePosition.y,
+
+        attackTarget: null,
+        lastShot: -Infinity,
+        hitFlash: 0,
+
+        path: [],
+        pathIndex: 0,
+        pathGoalX: null,
+        pathGoalY: null,
+        nextPathUpdate: 0,
+
+        stuckSince: 0,
+        lastX: safePosition.x,
+        lastY: safePosition.y,
+
+        /* NEW: stuck detection fields */
+        progressTime: 0,
+        progressX: safePosition.x,
+        progressY: safePosition.y,
+        stuckCount: 0,
+
+        armor: stats.armor || 0
+
+    };
+
+    /* a Knightmare squad is three mechs, each with its own hit points */
+    if (type === "Knightmare") {
+
+        const alive = Math.max(0, Math.min(3, Math.round(unit.soldiers)));
+
+        unit.soldiers = alive;
+        unit.members = [0, 1, 2].map(i => i < alive ? KN_MEMBER_HP : 0);
+        unit.health = unit.members.reduce((a, b) => a + b, 0);
+        unit.cannonReady = 0;
+        unit.fxKind = "idle";
+        unit.fxUntil = 0;
+
+    }
+
+    return unit;
+
+}
+
+/* damage with armor; a squad spreads hits over its living mechs */
+function damageUnit(target, damage) {
+
+    const dealt = target.armor ? Math.max(damage * 0.25, damage - target.armor) : damage;
+
+    if (target.members) {
+
+        const living = target.members.map((hp, i) => hp > 0 ? i : -1).filter(i => i >= 0);
+
+        if (living.length) {
+            const i = living[Math.floor(Math.random() * living.length)];
+            target.members[i] = Math.max(0, target.members[i] - dealt);
+        }
+
+        target.health = target.members.reduce((a, b) => a + b, 0);
+        target.soldiers = target.members.filter(hp => hp > 0).length;
+
+    }
+    else {
+        target.health -= dealt;
+    }
+
+    target.hitFlash = 100;
+
+    return dealt;
+
+}
+
+/* the sprite of a squad: right faction, right firing state, only the living mechs */
+const knImageCache = {};
+
+function knSprite(unit) {
+
+    const set = unit.faction === "Combine" ? "gunner" : "knightmare";
+    const state = unit.fxUntil > performance.now() ? unit.fxKind : "idle";
+    const mask = unit.members.map(m => m > 0 ? 1 : 0).join("");
+    const key = set + state + mask;
+
+    if (knImageCache[key]) { return knImageCache[key]; }
+
+    const doc = new DOMParser().parseFromString(KN_SPRITES[set][state], "image/svg+xml");
+
+    unit.members.forEach(function(hp, i) {
+        if (hp <= 0) {
+            const g = doc.getElementById("member-" + (i + 1));
+            if (g && g.parentNode) { g.parentNode.removeChild(g); }
+        }
+    });
+
+    const img = new Image();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(doc));
+
+    knImageCache[key] = img;
+
+    return img;
+
+}
+
+function drawKnightmareUnit(unit) {
+
+    drawRangeCircle(unit);
+
+    const w = 70;
+    const h = w * 226 / 320;
+
+    const img = knSprite(unit);
+
+    if (img.complete && img.naturalWidth > 0) {
+        ctx.globalAlpha = unit.hitFlash > 0 ? 0.65 : 1;
+        ctx.drawImage(img, unit.x - w / 2, unit.y - h / 2, w, h);
+        ctx.globalAlpha = 1;
+    }
+    else {
+        ctx.fillStyle = factionColor(unit.faction);
+        drawPolygon(unit.x, unit.y, 12, 6, 0);
+        ctx.fill();
+    }
+
+    /* one health pip per mech */
+    for (let i = 0; i < 3; i++) {
+        const ratio = Math.max(0, (unit.members[i] || 0) / KN_MEMBER_HP);
+        const px = unit.x - 21 + i * 15;
+        ctx.fillStyle = "#111";
+        ctx.fillRect(px, unit.y - h / 2 - 7, 12, 3);
+        ctx.fillStyle = ratio > .5 ? "#4caf50" : ratio > .25 ? "#d8a72c" : "#d33";
+        ctx.fillRect(px, unit.y - h / 2 - 7, 12 * ratio, 3);
+    }
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 8px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("KNIGHTMARE x" + getCurrentUnitSoldiers(unit), unit.x, unit.y - h / 2 - 14);
+
+    if (unit.selected) {
+        ctx.beginPath();
+        ctx.ellipse(unit.x, unit.y, w / 2 + 3, h / 2 + 3, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+}
+
+function normalizeDivisionEntry(entry) {
+
+    const type = entry.type || "Rifle";
+    const divisionSize = soldiersPerDivision[type] || 1000;
+    const amount = Math.max(0, Number(entry.amount) || 0);
+
+    let soldiers;
+
+    if (entry.soldiers !== undefined) {
+        soldiers = Math.max(0, Number(entry.soldiers) || 0);
+    }
+    else {
+        soldiers = amount * divisionSize;
+    }
+
+    if (soldiers <= 0) {
+        return null;
+    }
+
+    return {
+        type,
+        amount: Math.ceil(soldiers / divisionSize),
+        soldiers,
+        soldiersPerDivision: divisionSize
+    };
+
+}
+
+function expandFleetDivisions(squads) {
+
+    const divisions = [];
+    let index = 0;
+
+    for (const entry of squads || []) {
+
+        const normalized = normalizeDivisionEntry(entry);
+
+        if (!normalized) {
+            continue;
+        }
+
+        let remaining = normalized.soldiers;
+
+        while (remaining > 0) {
+
+            const soldiers = Math.min(normalized.soldiersPerDivision, remaining);
+
+            divisions.push({
+                type: normalized.type,
+                soldiers,
+                divisionSize: normalized.soldiersPerDivision,
+                index: index++
+            });
+
+            remaining -= soldiers;
+
+        }
+
+    }
+
+    return divisions;
+
+}
+
+
+/* =========================================
+   LOAD FLEET / START BATTLE
+========================================= */
+
+async function loadFleet() {
+
+    if (!fleetID) {
+        setBattleMessage("No fleet specified.");
+        return;
+    }
+
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+
+    if (userError || !userData.user) {
+        setBattleMessage("Not authenticated.");
+        return;
+    }
+
+    await supabaseClient.rpc("finalize_recruits");
+
+    let { data: fleet, error } = await supabaseClient
+        .from("fleets")
+        .select("*")
+        .eq("id", fleetID)
+        .single();
+
+    if (error) {
+        console.error("Fleet loading error:", error);
+        setBattleMessage("Could not load fleet.");
+        return;
+    }
+
+    if (fleet.player_id !== userData.user.id) {
+        setBattleMessage("You do not command this fleet.");
+        return;
+    }
+
+    if (fleet.faction && fleet.faction !== playerFaction) {
+        setBattleMessage("This fleet belongs to another faction.");
+        return;
+    }
+
+    if (
+        fleet.status === "building" &&
+        fleet.arrival_time &&
+        new Date(fleet.arrival_time).getTime() <= Date.now()
+    ) {
+
+        const { data: finalized, error: finalizeError } = await supabaseClient
+            .rpc("finalize_fleet_arrival", { fleet_id: fleetID });
+
+        if (finalizeError) {
+            console.error(finalizeError);
+            setBattleMessage("Could not complete fleet construction.");
+            return;
+        }
+
+        if (finalized) {
+
+            const result = await supabaseClient
+                .from("fleets")
+                .select("*")
+                .eq("id", fleetID)
+                .single();
+
+            if (result.error) {
+                setBattleMessage("Could not reload fleet.");
+                return;
+            }
+
+            fleet = result.data;
+
+        }
+
+    }
+
+    if (fleet.status !== "stationed") {
+        setBattleMessage("Fleet is not ready for battle.");
+        return;
+    }
+
+    if (fleet.origin !== planetName) {
+        setBattleMessage("Fleet is not at this planet.");
+        return;
+    }
+
+    fleetState = fleet;
+
+    const divisions = expandFleetDivisions(fleet.squads || []);
+
+    if (divisions.length === 0) {
+        setBattleMessage("Fleet has no divisions.");
+        return;
+    }
+
+    myUid = userData.user.id;
+    mySide = "A";
+
+    createPlayerUnits(divisions);
+    garrisonLevel = await loadGarrisonLevel();
+    createEnemyUnits();
+
+    const { data: newBattle, error: battleError } = await supabaseClient
+        .rpc("start_city_battle", {
+            battle_fleet_id: fleetID,
+            battle_planet_id: planetName,
+            battle_city_id: cityID,
+            battle_attacker_faction: playerFaction,
+            battle_defender_faction: enemyFaction
+        });
+
+    if (battleError) {
+        console.error("Battle start error:", battleError);
+        setBattleMessage("Could not start battle: " + battleError.message);
+        return;
+    }
+
+    battleID = newBattle;
+    battleActive = true;
+
+    startLiveBattle();
+
+    setBattleMessage("Battle started. Garrison level " + garrisonLevel + ". Select your divisions.");
+
+}
+
+
+/* =========================================
+   CREATE PLAYER / ENEMY DIVISIONS
+========================================= */
+
+function createPlayerUnits(divisions) {
+
+    playerUnits.length = 0;
+    selectedUnits.length = 0;
+
+    const city = getCityBounds();
+    const spacing = 38;
+
+    divisions.forEach(function(division, index) {
+
+        const column = Math.floor(index / 7);
+        const row = index % 7;
+
+        playerUnits.push(
+            createUnit(
+                city.x - 75 + column * spacing,
+                city.y + 100 + row * spacing,
+                playerFaction,
+                "P" + index,
+                division.type,
+                division.soldiers
+            )
+        );
+
+        playerUnits[playerUnits.length - 1].owner = myUid;
+
+    });
+
+}
+
+function createEnemyUnits() {
+
+    enemyUnits.length = 0;
+
+    const city = getCityBounds();
+    const comp = garrisonComposition[garrisonLevel] || garrisonComposition[1];
+
+    /* heavy units spawn at the back, riflemen in front */
+    const types = [];
+    for (const t of ["Sniper", "AT", "MG", "Rifle"]) {
+        for (let i = 0; i < (comp[t] || 0); i++) { types.push(t); }
+    }
+
+    const midY = city.y + cityHeight() / 2;
+    const spots = [];
+
+    for (let x = city.x + cityWidth() - 30; x >= city.x + cityWidth() - 230 * cityScale(); x -= 34) {
+
+        const ys = [];
+        for (let y = city.y + 25; y <= city.y + cityHeight() - 25; y += 34) { ys.push(y); }
+        ys.sort((a, b) => Math.abs(a - midY) - Math.abs(b - midY));
+
+        for (const y of ys) {
+            if (!canOccupyPosition(x, y)) { continue; }
+            if (spots.some(p => Math.hypot(p.x - x, p.y - y) < 30)) { continue; }
+            spots.push({ x, y });
+        }
+
+    }
+
+    enemyInitialSoldiers = 0;
+
+    types.forEach(function(type, i) {
+
+        const p = spots[i] || findSafePosition(city.x + cityWidth() - 60, city.y + cityHeight() / 2 + i * 5);
+
+        const garrisonUnit = createUnit(p.x, p.y, enemyFaction, "E" + i, type, soldiersPerDivision[type]);
+        garrisonUnit.side = "D";
+        enemyUnits.push(garrisonUnit);
+
+        enemyInitialSoldiers += soldiersPerDivision[type];
+
+    });
+
+}
+
+
+/* =========================================
+   MESSAGE / COLORS
+========================================= */
+
+function setBattleMessage(message) {
+    document.getElementById("battle-message").textContent = message;
+}
+
+function factionColor(faction) {
+    if (faction === "Combine") { return "#d52b2b"; }
+    if (faction === "Freedom Authority") { return "#347cff"; }
+    return "#eeeeee";
+}
+
+
+/* =========================================
+   DRAWING
+========================================= */
+
+function drawPolygon(x, y, radius, sides, rotation) {
+
+    ctx.beginPath();
+
+    for (let i = 0; i < sides; i++) {
+
+        const angle = rotation + Math.PI * 2 * i / sides;
+        const px = x + Math.cos(angle) * radius;
+        const py = y + Math.sin(angle) * radius;
+
+        if (i === 0) { ctx.moveTo(px, py); }
+        else { ctx.lineTo(px, py); }
+
+    }
+
+    ctx.closePath();
+
+}
+
+function drawRangeCircle(unit) {
+
+    if (!unit.selected || unit.faction !== playerFaction) {
+        return;
+    }
+
+    ctx.beginPath();
+    ctx.arc(unit.x, unit.y, unit.range, 0, Math.PI * 2);
+    ctx.strokeStyle = factionColor(unit.faction);
+    ctx.globalAlpha = 0.30;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+
+}
+
+/* main battle tank: treads, sloped hull, engine deck, rounded turret, long gun */
+function drawTank(unit, color) {
+
+    ctx.save();
+    ctx.translate(unit.x, unit.y);
+    ctx.rotate(unit.facing || 0);
+
+    ctx.fillStyle = "#1b1b1b";
+    ctx.fillRect(-11, -9.5, 22, 4.5);
+    ctx.fillRect(-11, 5, 22, 4.5);
+
+    ctx.strokeStyle = "#5a5a5a";
+    ctx.lineWidth = 0.8;
+    for (let i = -10; i <= 10; i += 3) {
+        ctx.beginPath();
+        ctx.moveTo(i, -9.5); ctx.lineTo(i, -5);
+        ctx.moveTo(i, 5); ctx.lineTo(i, 9.5);
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-10, -5); ctx.lineTo(8, -5); ctx.lineTo(12, -2.5);
+    ctx.lineTo(12, 2.5); ctx.lineTo(8, 5); ctx.lineTo(-10, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(0,0,0,.28)";
+    ctx.fillRect(-9.5, -3.5, 5, 7);
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(-1, 0, 6.5, 5.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255,255,255,.2)";
+    ctx.beginPath();
+    ctx.ellipse(-2.4, -1.4, 3, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#262626";
+    ctx.fillRect(4, -1.3, 15, 2.6);
+    ctx.fillRect(17, -2.2, 3.4, 4.4);
+
+    ctx.fillStyle = "rgba(0,0,0,.45)";
+    ctx.beginPath();
+    ctx.arc(-2.5, 1.6, 1.7, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+}
+
+/* field gun: split trail, wheels, gun shield and a long barrel */
+function drawArtillery(unit, color) {
+
+    ctx.save();
+    ctx.translate(unit.x, unit.y);
+    ctx.rotate(unit.facing || 0);
+
+    ctx.strokeStyle = "#222";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-3, 0); ctx.lineTo(-13, -6);
+    ctx.moveTo(-3, 0); ctx.lineTo(-13, 6);
+    ctx.stroke();
+
+    ctx.fillStyle = "#1b1b1b";
+    ctx.fillRect(-4, -9, 8, 3.2);
+    ctx.fillRect(-4, 5.8, 8, 3.2);
+
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#3a3a3a";
+    ctx.fillRect(3.5, -5.5, 2.4, 11);
+
+    ctx.fillStyle = "#262626";
+    ctx.fillRect(2, -1.6, 19, 3.2);
+    ctx.fillRect(19, -2.8, 3.4, 5.6);
+
+    ctx.restore();
+
+}
+
+function drawUnitShape(unit) {
+
+    ctx.fillStyle = factionColor(unit.faction);
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 1.5;
+
+    if (unit.type === "Rifle") {
+        ctx.beginPath();
+        ctx.arc(unit.x, unit.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+    else if (unit.type === "MG") {
+        ctx.fillRect(unit.x - 7, unit.y - 7, 14, 14);
+        ctx.strokeRect(unit.x - 7, unit.y - 7, 14, 14);
+    }
+    else if (unit.type === "Assault") {
+        drawPolygon(unit.x, unit.y, 9, 3, -Math.PI / 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+    else if (unit.type === "AT") {
+        drawPolygon(unit.x, unit.y, 9, 4, Math.PI / 4);
+        ctx.fill();
+        ctx.stroke();
+    }
+    else if (unit.type === "Tank") {
+        drawTank(unit, factionColor(unit.faction));
+    }
+    else if (unit.type === "Artillery") {
+        drawArtillery(unit, factionColor(unit.faction));
+    }
+    else {
+        drawPolygon(unit.x, unit.y, 8, 6, 0);
+        ctx.fill();
+        ctx.stroke();
+    }
+
+}
+
+function formatSoldiers(amount) {
+    return Math.max(0, Math.round(amount || 0)).toLocaleString();
+}
+
+function getCurrentUnitSoldiers(unit) {
+    if (unit.members) { return unit.members.filter(hp => hp > 0).length; }
+    const ratio = Math.max(0, Math.min(1, unit.health / unit.maxHealth));
+    return Math.round(unit.soldiers * ratio);
+}
+
+function drawUnit(unit) {
+
+    if (unit.members) { drawKnightmareUnit(unit); return; }
+
+    drawRangeCircle(unit);
+
+    const healthPercent = Math.max(0, unit.health / unit.maxHealth);
+
+    ctx.fillStyle = "#111";
+    ctx.fillRect(unit.x - 11, unit.y - 17, 22, 3);
+
+    ctx.fillStyle =
+        healthPercent > .5 ? "#4caf50" :
+        healthPercent > .25 ? "#d8a72c" : "#d33";
+
+    ctx.fillRect(unit.x - 11, unit.y - 17, 22 * healthPercent, 3);
+
+    drawUnitShape(unit);
+
+    ctx.fillStyle = unit.faction === "Independents" ? "#111" : "#fff";
+    ctx.font = "bold 6px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const symbols = { Rifle: "R", MG: "M", Assault: "A", AT: "T", Sniper: "S", Tank: "K", Artillery: "G" };
+
+    ctx.fillText(symbols[unit.type] || "?", unit.x, unit.y);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 8px Arial";
+
+    ctx.fillText(formatSoldiers(getCurrentUnitSoldiers(unit)), unit.x, unit.y - 24);
+
+    if (unit.selected) {
+        ctx.beginPath();
+        ctx.arc(unit.x, unit.y, 13, 0, Math.PI * 2);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+}
+
+
+/* =========================================
+   CITY DRAWING
+========================================= */
+
+function drawCity() {
+
+    const city = getCityBounds();
+    const L = battleLayout;
+
+    ctx.fillStyle = L.ground;
+    ctx.fillRect(city.x, city.y, cityWidth(), cityHeight());
+
+    ctx.fillStyle = L.road;
+    const sc = cityScale();
+    for (const r of L.roads) { ctx.fillRect(city.x + r[0] * sc, city.y + r[1] * sc, r[2] * sc, r[3] * sc); }
+
+    ctx.strokeStyle = "rgba(255,255,255,.18)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 10]);
+    for (const r of L.roads) {
+        if (Math.max(r[2], r[3]) < 150) { continue; }
+        ctx.beginPath();
+        if (r[2] > r[3]) {
+            ctx.moveTo(city.x + r[0] * sc, city.y + (r[1] + r[3] / 2) * sc);
+            ctx.lineTo(city.x + (r[0] + r[2]) * sc, city.y + (r[1] + r[3] / 2) * sc);
+        } else {
+            ctx.moveTo(city.x + (r[0] + r[2] / 2) * sc, city.y + r[1] * sc);
+            ctx.lineTo(city.x + (r[0] + r[2] / 2) * sc, city.y + (r[1] + r[3]) * sc);
+        }
+        ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = "#888";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(city.x, city.y, cityWidth(), cityHeight());
+
+    getBuildings().forEach(function(b, i) {
+
+        ctx.fillStyle = "rgba(0,0,0,.28)";
+        ctx.fillRect(b.x + b.width, b.y + 5, 6, b.height);
+        ctx.fillRect(b.x + 5, b.y + b.height, b.width, 6);
+
+        ctx.fillStyle = L.bld;
+        ctx.fillRect(b.x, b.y, b.width, b.height);
+
+        ctx.fillStyle = L.roof;
+        ctx.fillRect(b.x + 4, b.y + 4, b.width - 8, b.height - 8);
+
+        ctx.fillStyle = "rgba(255,255,255,.08)";
+        for (let k = 0; k < 3; k++) {
+            const vx = b.x + 10 + ((i * 37 + k * 53) % Math.max(1, b.width - 26));
+            const vy = b.y + 10 + ((i * 29 + k * 41) % Math.max(1, b.height - 26));
+            ctx.fillRect(vx, vy, 8 * cityScale(), 8 * cityScale());
+        }
+
+        ctx.strokeStyle = "#1a1a1a";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(b.x, b.y, b.width, b.height);
+
+    });
+
+    drawCover();
+
+    for (const d of L.decor) {
+        const dx = city.x + d[1] * sc;
+        const dy = city.y + d[2] * sc;
+        ctx.fillStyle = "#2c5a32";
+        ctx.beginPath(); ctx.arc(dx, dy, 10 * sc, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#3a7140";
+        ctx.beginPath(); ctx.arc(dx - 2 * sc, dy - 2 * sc, 6 * sc, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.fillStyle = "rgba(255,255,255,.55)";
+    ctx.font = "bold 11px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(L.name, city.x + cityWidth() / 2, city.y + cityHeight() - 8);
+
+}
+
+function drawCover() {
+
+    const colors = ["#a4452c", "#2f5f8a", "#c19a2e", "#4f7a4a"];
+
+    getCoverObjects().forEach(function(c, i) {
+
+        const cx = c.x + c.width / 2;
+        const cy = c.y + c.height / 2;
+
+        if (c.type === "water") {
+            ctx.fillStyle = "#2d5f8a";
+            ctx.fillRect(c.x, c.y, c.width, c.height);
+            ctx.strokeStyle = "rgba(255,255,255,.18)";
+            ctx.lineWidth = 1;
+            for (let y = c.y + 10; y < c.y + c.height; y += 22) {
+                ctx.beginPath(); ctx.moveTo(c.x + 6, y); ctx.lineTo(c.x + c.width - 6, y); ctx.stroke();
+            }
+            return;
+        }
+
+        if (c.type === "tank" || c.type === "fountain") {
+            ctx.fillStyle = c.type === "tank" ? "#8a8f94" : "#3f7fa8";
+            ctx.strokeStyle = "#222";
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(cx, cy, c.width / 2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = "rgba(255,255,255,.25)";
+            ctx.beginPath(); ctx.arc(cx, cy, c.width / 4, 0, Math.PI * 2); ctx.fill();
+            return;
+        }
+
+        const style = {
+            wall: ["#4b4b4b", "#222"],
+            sandbags: ["#8c7654", "#5d4d36"],
+            rubble: ["#6b635a", "#3d3832"],
+            container: [colors[i % colors.length], "#1a1a1a"]
+        }[c.type] || ["#777", "#222"];
+
+        ctx.fillStyle = style[0];
+        ctx.fillRect(c.x, c.y, c.width, c.height);
+        ctx.strokeStyle = style[1];
+        ctx.lineWidth = 1;
+        ctx.strokeRect(c.x, c.y, c.width, c.height);
+
+        if (c.type === "container") {
+            ctx.strokeStyle = "rgba(0,0,0,.35)";
+            const long = c.width >= c.height;
+            for (let k = 1; k < 4; k++) {
+                ctx.beginPath();
+                if (long) { ctx.moveTo(c.x + c.width * k / 4, c.y); ctx.lineTo(c.x + c.width * k / 4, c.y + c.height); }
+                else { ctx.moveTo(c.x, c.y + c.height * k / 4); ctx.lineTo(c.x + c.width, c.y + c.height * k / 4); }
+                ctx.stroke();
+            }
+        }
+
+    });
+
+}
+
+function drawBackground() {
+
+    ctx.fillStyle = "#263126";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#304030";
+
+    for (let x = 0; x < canvas.width; x += 80) {
+        for (let y = 0; y < canvas.height; y += 80) {
+            ctx.fillRect(x + 5, y + 5, 2, 2);
+        }
+    }
+
+}
+
+
+/* =========================================
+   EFFECTS
+========================================= */
+
+function drawEffects(now) {
+
+    for (let i = shotEffects.length - 1; i >= 0; i--) {
+
+        const effect = shotEffects[i];
+        const progress = Math.min(1, (now - effect.created) / effect.duration);
+
+        if (progress >= 1) {
+            shotEffects.splice(i, 1);
+            continue;
+        }
+
+        const x = effect.startX + (effect.endX - effect.startX) * progress;
+        const y = effect.startY + (effect.endY - effect.startY) * progress;
+
+        ctx.beginPath();
+        ctx.moveTo(effect.startX, effect.startY);
+        ctx.lineTo(x, y);
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = effect.missed ? 1 : 2;
+        ctx.globalAlpha = 1 - progress;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+    }
+
+    for (let i = damageNumbers.length - 1; i >= 0; i--) {
+
+        const number = damageNumbers[i];
+        const progress = Math.min(1, (now - number.created) / 700);
+
+        if (progress >= 1) {
+            damageNumbers.splice(i, 1);
+            continue;
+        }
+
+        ctx.globalAlpha = 1 - progress;
+        ctx.font = "bold 12px Arial";
+        ctx.textAlign = "center";
+        ctx.fillStyle = number.missed ? "#aaa" : "#fff";
+
+        ctx.fillText(
+            number.missed ? "MISS" : "-" + number.damage,
+            number.x,
+            number.y - progress * 22
+        );
+
+        ctx.globalAlpha = 1;
+
+    }
+
+}
+
+function drawSelectionBox() {
+
+    if (!isDraggingSelection) {
+        return;
+    }
+
+    const x = Math.min(dragStartX, dragCurrentX);
+    const y = Math.min(dragStartY, dragCurrentY);
+    const width = Math.abs(dragCurrentX - dragStartX);
+    const height = Math.abs(dragCurrentY - dragStartY);
+
+    ctx.fillStyle = "rgba(100,160,255,.15)";
+    ctx.fillRect(x, y, width, height);
+
+    ctx.strokeStyle = "#6fa8ff";
+    ctx.strokeRect(x, y, width, height);
+
+}
+
+function draw() {
+
+    drawBackground();
+    drawCity();
+
+    drawVictoryBanner(performance.now());
+
+    for (const unit of playerUnits) { drawUnit(unit); }
+    for (const enemy of enemyUnits) { drawUnit(enemy); }
+
+    drawVictoryCelebration(performance.now());
+
+    drawEffects(performance.now());
+    drawProjectiles(performance.now());
+    drawSelectionBox();
+
+}
+
+
+/* =========================================
+   MOVEMENT / COMBAT HELPERS
+========================================= */
+
+function distance(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function isMine(unit) {
+    return myUid !== null && unit.owner === myUid;
+}
+
+function myUnits() {
+    return (mySide === "D" ? enemyUnits : playerUnits).filter(isMine);
+}
+
+function foeUnits() {
+    return mySide === "D" ? playerUnits : enemyUnits;
+}
+
+function findUnitById(id) {
+    return playerUnits.find(u => u.id === id) || enemyUnits.find(u => u.id === id) || null;
+}
+
+function findEnemyAt(x, y) {
+    return foeUnits().find(enemy => distance({ x, y }, enemy) < (enemy.members ? 32 : 18)) || null;
+}
+
+function findPlayerAt(x, y) {
+    return myUnits().find(unit => distance({ x, y }, unit) < (unit.members ? 30 : 16)) || null;
+}
+
+function findClosestEnemy(unit) {
+
+    let closest = null;
+    let closestDistance = Infinity;
+
+    const foes = unit.side === "D" ? playerUnits : enemyUnits;
+
+    for (const enemy of foes) {
+        const d = distance(unit, enemy);
+        if (d < closestDistance) {
+            closestDistance = d;
+            closest = enemy;
+        }
+    }
+
+    return { unit: closest, distance: closestDistance };
+
+}
+
+
+/* =========================================
+   SELECTION
+========================================= */
+
+function clearSelection() {
+    for (const unit of playerUnits) { unit.selected = false; }
+    for (const unit of enemyUnits) { unit.selected = false; }
+    selectedUnits = [];
+}
+
+function setSelection(units) {
+
+    clearSelection();
+
+    for (const unit of units) {
+        if (isMine(unit)) {
+            unit.selected = true;
+            selectedUnits.push(unit);
+        }
+    }
+
+    setBattleMessage(selectedUnits.length + " divisions selected.");
+
+}
+
+function selectPlayerUnit(unit, add) {
+
+    if (!add) {
+        setSelection([unit]);
+        return;
+    }
+
+    const index = selectedUnits.indexOf(unit);
+
+    if (index === -1) {
+        unit.selected = true;
+        selectedUnits.push(unit);
+    }
+    else {
+        unit.selected = false;
+        selectedUnits.splice(index, 1);
+    }
+
+    setBattleMessage(selectedUnits.length + " divisions selected.");
+
+}
+
+
+/* =========================================
+   NEW: MOVEMENT HELPERS
+========================================= */
+
+function getMovementProfile(unit) {
+    return movementProfiles[unit.type] || movementProfiles.Rifle;
+}
+
+function getFriends(unit) {
+    return playerUnits.includes(unit) ? playerUnits : enemyUnits;
+}
+
+function idHash(unit) {
+
+    let h = 0;
+
+    for (const ch of String(unit.id)) {
+        h = (h * 31 + ch.charCodeAt(0)) | 0;
+    }
+
+    return Math.abs(h);
+
+}
+
+/* True if a unit-sized circle can walk the straight line without touching anything */
+function hasClearWalk(x1, y1, x2, y2) {
+
+    const steps = Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 5);
+
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        if (!canOccupyPosition(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)) {
+            return false;
+        }
+    }
+
+    return true;
+
+}
+
+/* Move with wall-sliding: try full move, then X only, then Y only */
+function tryMoveUnit(unit, dx, dy) {
+
+    if (canOccupyPosition(unit.x + dx, unit.y + dy)) {
+        unit.x += dx;
+        unit.y += dy;
+        return true;
+    }
+
+    if (dx !== 0 && canOccupyPosition(unit.x + dx, unit.y)) {
+        unit.x += dx;
+        return true;
+    }
+
+    if (dy !== 0 && canOccupyPosition(unit.x, unit.y + dy)) {
+        unit.y += dy;
+        return true;
+    }
+
+    return false;
+
+}
+
+/* Push-away vector from overlapping friendly units */
+function getSeparationVector(unit, factor) {
+
+    const minDist = getMovementProfile(unit).separation * (factor || 1);
+
+    let sx = 0;
+    let sy = 0;
+
+    for (const other of getFriends(unit)) {
+
+        if (other === unit) {
+            continue;
+        }
+
+        let dx = unit.x - other.x;
+        let dy = unit.y - other.y;
+        let d = Math.hypot(dx, dy);
+
+        if (d >= minDist) {
+            continue;
+        }
+
+        if (d < 0.01) {
+            /* exactly stacked: each unit picks its own escape direction */
+            const a = (idHash(unit) % 360) * Math.PI / 180;
+            dx = Math.cos(a);
+            dy = Math.sin(a);
+            d = 1;
+        }
+
+        const push = (minDist - d) / minDist;
+
+        sx += dx / d * push;
+        sy += dy / d * push;
+
+    }
+
+    return { x: sx, y: sy };
+
+}
+
+/* Idle units that overlap friends drift apart slowly */
+function separateIdleUnit(unit, dt) {
+
+    unit.progressTime = 0;
+
+    /* the player's idle units only separate when they truly overlap */
+    const sep = getSeparationVector(unit, playerUnits.includes(unit) ? 0.5 : 1);
+
+    if (Math.abs(sep.x) + Math.abs(sep.y) < 0.05) {
+        return;
+    }
+
+    const step = unit.speed * dt * 0.5;
+
+    tryMoveUnit(unit, sep.x * step, sep.y * step);
+
+}
+
+function clearUnitPath(unit) {
+    unit.path = [];
+    unit.pathIndex = 0;
+    unit.progressTime = 0;
+}
+
+function findDetourPoint(unit) {
+
+    const start = Math.random() * Math.PI * 2;
+
+    for (let i = 0; i < 8; i++) {
+
+        const a = start + i * Math.PI / 4;
+
+        for (const r of [50, 80]) {
+
+            const x = unit.x + Math.cos(a) * r;
+            const y = unit.y + Math.sin(a) * r;
+
+            if (canOccupyPosition(x, y) && hasClearWalk(unit.x, unit.y, x, y)) {
+                return { x, y };
+            }
+
+        }
+
+    }
+
+    return null;
+
+}
+
+/*
+   Called when a unit has made almost no progress for stuckMs.
+   1st stuck: rebuild the route from the current position.
+   2nd/3rd  : step out to a random open point first, then route.
+   4th      : give up for 1.5 s so it never pushes forever.
+*/
+function handleStuckUnit(unit, now) {
+
+    unit.stuckCount = (unit.stuckCount || 0) + 1;
+
+    const profile = getMovementProfile(unit);
+
+    if (unit.pathGoalX === null || unit.pathGoalY === null) {
+        clearUnitPath(unit);
+        return;
+    }
+
+    const goal = { x: unit.pathGoalX, y: unit.pathGoalY };
+
+    /* crowded around the goal: count as arrived */
+    if (distance(unit, goal) < 28) {
+        clearUnitPath(unit);
+        unit.stuckCount = 0;
+        return;
+    }
+
+    if (unit.stuckCount >= 4) {
+        clearUnitPath(unit);
+        unit.stuckCount = 0;
+        unit.nextPathUpdate = now + 1500;
+        return;
+    }
+
+    let path = null;
+
+    if (unit.stuckCount >= 2) {
+        const detour = findDetourPoint(unit);
+        if (detour) {
+            path = [detour, ...findPath(detour.x, detour.y, goal.x, goal.y)];
+        }
+    }
+
+    if (!path) {
+        path = findPath(unit.x, unit.y, goal.x, goal.y);
+    }
+
+    if (path.length === 0) {
+        clearUnitPath(unit);
+        unit.nextPathUpdate = now + 1000;
+        return;
+    }
+
+    path.push({ x: goal.x, y: goal.y });
+
+    unit.path = path;
+    unit.pathIndex = 0;
+    unit.progressTime = 0;
+    unit.nextPathUpdate = now + profile.repath;
+
+}
+
+
+/* =========================================
+   ORDERS
+========================================= */
+
+/* CHANGED: exact goal waypoint, safe fallback, per-type repath timing with jitter */
+function setUnitDestination(unit, x, y) {
+
+    const safeTarget = findSafePosition(x, y);
+    const profile = getMovementProfile(unit);
+
+    unit.targetX = safeTarget.x;
+    unit.targetY = safeTarget.y;
+
+    unit.pathGoalX = safeTarget.x;
+    unit.pathGoalY = safeTarget.y;
+
+    let path = findPath(unit.x, unit.y, safeTarget.x, safeTarget.y);
+
+    if (path.length > 0) {
+
+        const last = path[path.length - 1];
+
+        if (Math.hypot(last.x - safeTarget.x, last.y - safeTarget.y) > 4) {
+            path.push({ x: safeTarget.x, y: safeTarget.y });
+        }
+
+    }
+    else if (
+        distance(unit, safeTarget) > 10 &&
+        hasClearWalk(unit.x, unit.y, safeTarget.x, safeTarget.y)
+    ) {
+        path = [{ x: safeTarget.x, y: safeTarget.y }];
+    }
+
+    unit.path = path;
+    unit.pathIndex = 0;
+    unit.progressTime = 0;
+
+    unit.nextPathUpdate =
+        performance.now() + profile.repath + Math.random() * 300;
+
+}
+
+
+/* =========================================
+   ATTACK POSITIONS
+========================================= */
+
+function getAttackPosition(unit, target) {
+
+    const dx = unit.x - target.x;
+    const dy = unit.y - target.y;
+    const length = Math.hypot(dx, dy);
+
+    if (length < 1) {
+        return findSafePosition(target.x - unit.range * .55, target.y);
+    }
+
+    const desiredDistance = Math.max(45, unit.range * .62);
+
+    return findSafePosition(
+        target.x + dx / length * desiredDistance,
+        target.y + dy / length * desiredDistance
+    );
+
+}
+
+function getEnemyAttackPosition(enemy, target, slot) {
+
+    const slotCount = 8;
+    const baseAngle = (slot % slotCount) / slotCount * Math.PI * 2;
+    const desiredDistance = Math.max(55, enemy.range * 0.70);
+
+    const candidates = [];
+
+    for (let offset = -3; offset <= 3; offset++) {
+
+        const angle = baseAngle + offset * Math.PI / 12;
+
+        for (const extra of [0, 25, 50]) {
+            candidates.push({
+                x: target.x + Math.cos(angle) * (desiredDistance + extra),
+                y: target.y + Math.sin(angle) * (desiredDistance + extra)
+            });
+        }
+
+    }
+
+    let best = null;
+    let bestScore = -Infinity;
+
+    for (const candidate of candidates) {
+
+        const position = clampToBattlefield(candidate.x, candidate.y);
+
+        if (!canOccupyPosition(position.x, position.y)) {
+            continue;
+        }
+
+        let nearest = Infinity;
+
+        for (const other of enemyUnits) {
+            if (other === enemy) { continue; }
+            nearest = Math.min(nearest, distance(position, other));
+        }
+
+        const targetDistance = distance(position, target);
+        const distanceError = Math.abs(targetDistance - desiredDistance);
+        const separation = Math.min(nearest, 120);
+        const score = separation * 4 - distanceError * 2;
+
+        if (score > bestScore) {
+            bestScore = score;
+            best = position;
+        }
+
+    }
+
+    if (best) {
+        return best;
+    }
+
+    return findSafePosition(
+        target.x + Math.cos(baseAngle) * desiredDistance,
+        target.y + Math.sin(baseAngle) * desiredDistance
+    );
+
+}
+
+/* CHANGED: goal-drift threshold comes from the unit type */
+function shouldRefreshPath(unit, position, now) {
+
+    if (now < unit.nextPathUpdate) {
+        return false;
+    }
+
+    if (unit.path.length === 0 || unit.pathIndex >= unit.path.length) {
+        return true;
+    }
+
+    if (unit.pathGoalX === null || unit.pathGoalY === null) {
+        return true;
+    }
+
+    return (
+        Math.hypot(position.x - unit.pathGoalX, position.y - unit.pathGoalY) >
+        getMovementProfile(unit).goalDrift
+    );
+
+}
+
+function orderGroupAttack(target) {
+
+    if (isGuest) {
+        liveSend("cmd", { uid: myUid, kind: "attack", ids: selectedUnits.map(u => u.id), target: target.id });
+        setBattleMessage(selectedUnits.length + " divisions attacking.");
+        return;
+    }
+
+    for (const unit of selectedUnits) {
+        unit.attackTarget = target;
+        unit.attackOrder = true;
+        unit.nextPathUpdate = 0;
+        unit.path = [];
+        unit.pathIndex = 0;
+        unit.progressTime = 0;
+    }
+
+    setBattleMessage(selectedUnits.length + " divisions attacking.");
+
+}
+
+
+/* =========================================
+   CHANGED: moveAlongPath
+   wall-sliding, corner-cutting, separation, stuck detection
+========================================= */
+
+function moveAlongPath(unit, now, dt) {
+
+    if (unit.pathIndex >= unit.path.length) {
+        return;
+    }
+
+    const profile = getMovementProfile(unit);
+
+    /* pushed inside an obstacle / edge (e.g. window resize): pop out */
+    if (!canOccupyPosition(unit.x, unit.y)) {
+        const safe = findSafePosition(unit.x, unit.y);
+        unit.x = safe.x;
+        unit.y = safe.y;
+    }
+
+    /* skip reached waypoints, and cut corners when the straight line is clear */
+    for (let i = 0; i < 4 && unit.pathIndex < unit.path.length - 1; i++) {
+
+        const wp = unit.path[unit.pathIndex];
+        const next = unit.path[unit.pathIndex + 1];
+
+        if (
+            Math.hypot(wp.x - unit.x, wp.y - unit.y) < 10 ||
+            hasClearWalk(unit.x, unit.y, next.x, next.y)
+        ) {
+            unit.pathIndex++;
+        }
+        else {
+            break;
+        }
+
+    }
+
+    const waypoint = unit.path[unit.pathIndex];
+
+    const dx = waypoint.x - unit.x;
+    const dy = waypoint.y - unit.y;
+    const d = Math.hypot(dx, dy);
+
+    /* arrived at the final waypoint */
+    if (unit.pathIndex >= unit.path.length - 1 && d < 6) {
+        clearUnitPath(unit);
+        unit.stuckCount = 0;
+        return;
+    }
+
+    const step = Math.min(unit.speed * dt, d);
+    const sep = getSeparationVector(unit);
+
+    const mx = (d > 0 ? dx / d * step : 0) + sep.x * unit.speed * dt * 0.7;
+    const my = (d > 0 ? dy / d * step : 0) + sep.y * unit.speed * dt * 0.7;
+
+    const beforeX = unit.x;
+    const beforeY = unit.y;
+
+    tryMoveUnit(unit, mx, my);
+
+    if (Math.hypot(unit.x - beforeX, unit.y - beforeY) > 0.02) {
+        unit.facing = Math.atan2(unit.y - beforeY, unit.x - beforeX);
+    }
+
+    /* stuck detection: little progress over the time window */
+    if (!unit.progressTime) {
+
+        unit.progressTime = now;
+        unit.progressX = unit.x;
+        unit.progressY = unit.y;
+
+    }
+    else if (now - unit.progressTime >= profile.stuckMs) {
+
+        const moved = Math.hypot(unit.x - unit.progressX, unit.y - unit.progressY);
+        const expected = unit.speed * (profile.stuckMs / 1000);
+
+        unit.progressTime = now;
+        unit.progressX = unit.x;
+        unit.progressY = unit.y;
+
+        if (moved < expected * 0.25) {
+            handleStuckUnit(unit, now);
+        }
+        else {
+            unit.stuckCount = 0;
+        }
+
+    }
+
+    unit.lastX = unit.x;
+    unit.lastY = unit.y;
+
+}
+
+
+/* =========================================
+   COMBAT
+========================================= */
+
+function calculateHitChance(attacker, target) {
+
+    let chance = attacker.accuracy;
+    const ratio = Math.min(1, distance(attacker, target) / attacker.range);
+
+    chance -= ratio * .18;
+
+    return Math.max(.25, Math.min(.98, chance));
+
+}
+
+function knightmareShoot(attacker, target, now) {
+
+    if (!target || target.health <= 0) { return; }
+    if (distance(attacker, target) > KN_RIFLE_RANGE && !(now >= attacker.cannonReady && distance(attacker, target) <= KN_CANNON.range)) { return; }
+    if (!lineOfSight(attacker, target)) { return; }
+
+    const alive = attacker.members.filter(hp => hp > 0).length;
+
+    if (alive === 0) { return; }
+
+    attacker.facing = Math.atan2(target.y - attacker.y, target.x - attacker.x);
+
+    /* shoulder cannon: a short windup, then every living mech fires a splash shell */
+    if (now >= attacker.cannonReady && distance(attacker, target) <= KN_CANNON.range) {
+
+        attacker.cannonReady = now + KN_CANNON.cooldown + KN_CANNON.windup;
+        attacker.lastShot = now;
+        attacker.fxKind = "cannon";
+        attacker.fxUntil = performance.now() + KN_CANNON.windup + 250;
+
+        setTimeout(function() {
+
+            if (attacker.health <= 0 || target.health <= 0) { return; }
+
+            for (let i = 0; i < alive; i++) {
+                const hit = Math.random() < 0.85;
+                const jx = (Math.random() - 0.5) * 18;
+                const jy = (Math.random() - 0.5) * 18;
+                spawnProjectile(attacker, target, hit ? target.x + jx : target.x + (Math.random() * 60 - 30), hit ? target.y + jy : target.y + (Math.random() * 60 - 30), hit,
+                    { type: "KnightCannon", damage: KN_CANNON.damage, splash: KN_CANNON.splash });
+            }
+
+        }, KN_CANNON.windup);
+
+        return;
+
+    }
+
+    /* rifles: one shot per living mech */
+    if (now - attacker.lastShot < attacker.fireRate) { return; }
+    if (distance(attacker, target) > KN_RIFLE_RANGE) { return; }
+
+    attacker.lastShot = now;
+    attacker.fxKind = "rifle";
+    attacker.fxUntil = performance.now() + 140;
+
+    for (let i = 0; i < alive; i++) {
+        const hit = Math.random() < calculateHitChance(attacker, target);
+        spawnProjectile(attacker, target,
+            hit ? target.x + (Math.random() - 0.5) * 14 : target.x + (Math.random() * 60 - 30),
+            hit ? target.y + (Math.random() - 0.5) * 14 : target.y + (Math.random() * 60 - 30), hit);
+    }
+
+}
+
+function shoot(attacker, target, now) {
+
+    if (attacker.members) { knightmareShoot(attacker, target, now); return; }
+
+    if (!target || target.health <= 0) { return; }
+    if (now - attacker.lastShot < attacker.fireRate) { return; }
+    if (distance(attacker, target) > attacker.range) { return; }
+    if (!attacker.indirect && !lineOfSight(attacker, target)) { return; }
+
+    attacker.lastShot = now;
+    attacker.facing = Math.atan2(target.y - attacker.y, target.x - attacker.x);
+
+    const hit = Math.random() < calculateHitChance(attacker, target);
+
+    const endX = hit ? target.x : target.x + (Math.random() * 60 - 30);
+    const endY = hit ? target.y : target.y + (Math.random() * 60 - 30);
+
+    spawnProjectile(attacker, target, endX, endY, hit);
+
+}
+
+/* =========================================
+   PROJECTILES
+   Shots now fly to their target; damage lands on impact.
+========================================= */
+const projectileSpeeds = {
+    Rifle: 520, MG: 560, Assault: 520, Sniper: 900,
+    AT: 340, Tank: 420, Artillery: 230, Knightmare: 620, KnightCannon: 380
+};
+
+function spawnProjectile(attacker, target, endX, endY, hit, opts) {
+
+    const o = opts || {};
+    const ptype = o.type || attacker.type;
+
+    if (liveGuestCount > 0) {
+        const a = cityNorm(attacker.x, attacker.y);
+        const e = cityNorm(endX, endY);
+        shotLog.push([ptype, +a[0].toFixed(4), +a[1].toFixed(4), +e[0].toFixed(4), +e[1].toFixed(4), hit ? 1 : 0, target ? target.id : null, attacker.id]);
+        if (shotLog.length > 80) { shotLog.shift(); }
+    }
+
+    projectiles.push({
+        type: ptype,
+        sx: attacker.x,
+        sy: attacker.y,
+        ex: endX,
+        ey: endY,
+        travelled: 0,
+        speed: projectileSpeeds[ptype] || 500,
+        damage: o.damage !== undefined ? o.damage : attacker.damage,
+        splash: o.splash || 0,
+        target,
+        hit,
+        arc: attacker.indirect ? 55 : 0
+    });
+
+}
+
+function applyProjectileImpact(p, now) {
+
+    const target = p.target;
+    const alive = target && target.health > 0 &&
+        (enemyUnits.includes(target) || playerUnits.includes(target));
+
+    impacts.push({
+        x: p.ex,
+        y: p.ey,
+        created: now,
+        size: p.type === "Artillery" ? 24 : p.type === "KnightCannon" ? 20 : p.type === "Tank" ? 14 : p.type === "AT" ? 10 : 5
+    });
+
+    /* a reinforcing player only watches the impact; the host decides who is hurt */
+    if (isGuest) {
+        damageNumbers.push({ x: p.ex, y: p.ey, damage: p.hit ? p.damage : 0, missed: !p.hit, created: now });
+        return;
+    }
+
+    /* splash shells hurt every enemy near the impact, hit or miss */
+    if (p.splash && target) {
+
+        const foes = enemyUnits.includes(target) ? enemyUnits : playerUnits;
+
+        for (const u of [...foes]) {
+            if (u === target && p.hit && alive) { continue; }
+            if (u.health > 0 && Math.hypot(u.x - p.ex, u.y - p.ey) <= p.splash) {
+                const dealt = damageUnit(u, p.damage * 0.6);
+                damageNumbers.push({ x: u.x, y: u.y, damage: Math.round(dealt), missed: false, created: now });
+                if (u.health <= 0) { u.health = 0; u.soldiers = 0; removeUnit(u); }
+            }
+        }
+
+    }
+
+    if (!p.hit || !alive) {
+
+        if (!p.hit) {
+            damageNumbers.push({ x: p.ex, y: p.ey, damage: 0, missed: true, created: now });
+        }
+
+        return;
+
+    }
+
+    const dealt = damageUnit(target, p.damage);
+
+    damageNumbers.push({ x: target.x, y: target.y, damage: Math.round(dealt), missed: false, created: now });
+
+    if (target.health <= 0) {
+        target.health = 0;
+        target.soldiers = 0;
+        removeUnit(target);
+    }
+
+}
+
+function updateProjectiles(dt, now) {
+
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+
+        const p = projectiles[i];
+
+        /* shots that hit home in on the target's current position */
+        if (p.hit && p.target && p.target.health > 0) {
+            p.ex = p.target.x;
+            p.ey = p.target.y;
+        }
+
+        p.travelled += p.speed * dt;
+
+        const total = Math.hypot(p.ex - p.sx, p.ey - p.sy) || 1;
+
+        if (p.travelled >= total) {
+            projectiles.splice(i, 1);
+            applyProjectileImpact(p, now);
+        }
+
+    }
+
+}
+
+function drawProjectiles(now) {
+
+    for (const p of projectiles) {
+
+        const total = Math.hypot(p.ex - p.sx, p.ey - p.sy) || 1;
+        const t = Math.min(1, p.travelled / total);
+        const trail = p.type === "Sniper" ? 22 : p.type === "Artillery" ? 0 : 11;
+        const t2 = Math.max(0, t - trail / total);
+
+        const at = function(u) {
+            return {
+                x: p.sx + (p.ex - p.sx) * u,
+                y: p.sy + (p.ey - p.sy) * u - p.arc * Math.sin(Math.PI * u)
+            };
+        };
+
+        const head = at(t);
+        const tail = at(t2);
+
+        if (p.type === "Artillery") {
+
+            const ground = at(t);
+
+            ctx.fillStyle = "rgba(0,0,0,.3)";
+            ctx.beginPath();
+            ctx.ellipse(head.x, head.y + p.arc * Math.sin(Math.PI * t), 4, 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#d8d8d8";
+            ctx.beginPath();
+            ctx.arc(ground.x, ground.y, 3.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            continue;
+
+        }
+
+        const color =
+            p.type === "AT" ? "#ff8a3c" :
+            p.type === "Tank" ? "#ffd24a" : "#fff0b3";
+
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.55;
+        ctx.lineWidth = p.type === "Tank" || p.type === "AT" ? 3 : 1.5;
+        ctx.beginPath();
+        ctx.moveTo(tail.x, tail.y);
+        ctx.lineTo(head.x, head.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, p.type === "Tank" ? 3 : p.type === "AT" ? 2.6 : 1.8, 0, Math.PI * 2);
+        ctx.fill();
+
+    }
+
+    for (let i = impacts.length - 1; i >= 0; i--) {
+
+        const e = impacts[i];
+        const progress = Math.min(1, (now - e.created) / 280);
+
+        if (progress >= 1) { impacts.splice(i, 1); continue; }
+
+        ctx.globalAlpha = 1 - progress;
+        ctx.fillStyle = e.size > 12 ? "#ff9a3c" : "#ffe08a";
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 2 + progress * e.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+    }
+
+}
+
+function removeUnit(unit) {
+
+    const selectedIndex = selectedUnits.indexOf(unit);
+    if (selectedIndex !== -1) { selectedUnits.splice(selectedIndex, 1); }
+
+    const enemyIndex = enemyUnits.indexOf(unit);
+    if (enemyIndex !== -1) { enemyUnits.splice(enemyIndex, 1); }
+
+    const playerIndex = playerUnits.indexOf(unit);
+    if (playerIndex !== -1) { playerUnits.splice(playerIndex, 1); }
+
+    for (const unitList of [playerUnits, enemyUnits]) {
+        for (const other of unitList) {
+            if (other.attackTarget === unit) {
+                other.attackTarget = null;
+                /* only an explicit attack order is cancelled; a move order keeps walking */
+                if (other.attackOrder) {
+                    other.attackOrder = false;
+                    other.nextPathUpdate = 0;
+                    other.path = [];
+                    other.pathIndex = 0;
+                    other.progressTime = 0;
+                }
+            }
+        }
+    }
+
+    checkVictory();
+
+}
+
+function acquireAutomaticTarget(unit) {
+
+    if (
+        unit.attackTarget &&
+        (
+            enemyUnits.includes(unit.attackTarget) ||
+            playerUnits.includes(unit.attackTarget)
+        ) &&
+        unit.attackTarget.health > 0
+    ) {
+        return unit.attackTarget;
+    }
+
+    /* an automatically picked target that slipped out of range is dropped */
+    if (unit.attackTarget && !unit.attackOrder && distance(unit, unit.attackTarget) > unit.range * 1.05) {
+        unit.attackTarget = null;
+    }
+
+    const result = findClosestEnemy(unit);
+
+    if (result.unit && result.distance <= unit.range) {
+        unit.attackTarget = result.unit;
+        return result.unit;
+    }
+
+    return null;
+
+}
+
+
+/* =========================================
+   COMBAT UPDATE
+========================================= */
+
+/* =========================================
+   ENEMY AI: cover, holding ground, counter-attacks
+========================================= */
+
+const aiProfiles = {
+    /* advanceTo: how far across the city (0 = left edge, 1 = right edge) they push on their own */
+    Rifle:   { retreatHp: 0.45, counterEvery: 14000,    counterFor: 5000, advanceTo: 0.40 },
+    Assault: { retreatHp: 0.30, counterEvery: 8000,     counterFor: 6000, advanceTo: 0.30 },
+    MG:      { retreatHp: 0.40, counterEvery: Infinity, counterFor: 0,    advanceTo: 0.55 },
+    AT:      { retreatHp: 0.35, counterEvery: Infinity, counterFor: 0,    advanceTo: 0.55 },
+    Sniper:  { retreatHp: 0.50, counterEvery: Infinity, counterFor: 0,    advanceTo: 0.65 }
+};
+
+let coverSpotCache = [];
+let coverSpotKey = "";
+
+/* open positions hugging the edges of buildings and cover */
+function getCoverSpots() {
+
+    getObstacles();
+
+    if (coverSpotKey !== obstacleCacheKey) {
+
+        coverSpotKey = obstacleCacheKey;
+        coverSpotCache = [];
+
+        const off = BUILDING_PADDING + UNIT_RADIUS + 3;
+
+        for (const o of obstacleCache) {
+
+            if (o.type === "water") { continue; }
+
+            const x1 = o.x - off, x2 = o.x + o.width + off, xm = o.x + o.width / 2;
+            const y1 = o.y - off, y2 = o.y + o.height + off, ym = o.y + o.height / 2;
+
+            for (const p of [[x1,y1],[x2,y1],[x1,y2],[x2,y2],[xm,y1],[xm,y2],[x1,ym],[x2,ym]]) {
+                if (canOccupyPosition(p[0], p[1])) { coverSpotCache.push({ x: p[0], y: p[1] }); }
+            }
+
+        }
+
+    }
+
+    return coverSpotCache;
+
+}
+
+/*
+   wantLOS false: a spot hidden from the threat (to fall back to)
+   wantLOS true : a spot beside cover with a clear shot in range (to fight from)
+*/
+function pickCoverSpot(unit, threat, wantLOS) {
+
+    let best = null;
+    let bestScore = -Infinity;
+
+    for (const s of getCoverSpots()) {
+
+        const dUnit = Math.hypot(s.x - unit.x, s.y - unit.y);
+
+        if (dUnit > 170) { continue; }
+
+        const dThreat = Math.hypot(s.x - threat.x, s.y - threat.y);
+        const los = lineOfSight(s, threat);
+
+        let score = -dUnit * 0.6;
+
+        if (wantLOS) {
+            if (!los || dThreat > unit.range * 0.95) { continue; }
+            score -= Math.abs(dThreat - unit.range * 0.7) * 0.4;
+        }
+        else {
+            if (los || dThreat < 40) { continue; }
+            score -= Math.abs(dThreat - unit.range * 1.1) * 0.1;
+        }
+
+        for (const f of enemyUnits) {
+            if (f !== unit && Math.hypot(s.x - f.x, s.y - f.y) < 22) { score -= 80; }
+        }
+
+        if (score > bestScore) { bestScore = score; best = s; }
+
+    }
+
+    return best;
+
+}
+
+/* next piece of cover that brings the unit closer to the threat without leaving its zone */
+function pickAdvanceSpot(unit, threat, prof) {
+
+    const city = getCityBounds();
+    const limitX = city.x + cityWidth() * prof.advanceTo;
+    const dNow = Math.hypot(unit.x - threat.x, unit.y - threat.y);
+
+    let best = null;
+    let bestScore = -Infinity;
+
+    for (const s of getCoverSpots()) {
+
+        if (s.x < limitX) { continue; }
+
+        const dUnit = Math.hypot(s.x - unit.x, s.y - unit.y);
+
+        if (dUnit < 25 || dUnit > 190) { continue; }
+
+        const gain = dNow - Math.hypot(s.x - threat.x, s.y - threat.y);
+
+        if (gain < 20) { continue; }
+
+        let score = gain - dUnit * 0.3;
+
+        for (const f of enemyUnits) {
+            if (f !== unit && Math.hypot(s.x - f.x, s.y - f.y) < 24) { score -= 60; }
+        }
+
+        if (score > bestScore) { bestScore = score; best = s; }
+
+    }
+
+    return best;
+
+}
+
+function getAISpot(unit, threat, wantLOS, now) {
+
+    if (unit.aiSpot && unit.aiSpotWant === wantLOS && now - unit.aiSpotAt < 1500) {
+        return unit.aiSpot;
+    }
+
+    unit.aiSpot = pickCoverSpot(unit, threat, wantLOS);
+    unit.aiSpotWant = wantLOS;
+    unit.aiSpotAt = now + Math.random() * 400;
+
+    return unit.aiSpot;
+
+}
+
+function aiMoveTo(unit, pos, now) {
+
+    if (Math.hypot(pos.x - unit.x, pos.y - unit.y) < 8) {
+        if (unit.path.length > 0) { clearUnitPath(unit); }
+        return;
+    }
+
+    if (shouldRefreshPath(unit, pos, now)) {
+        setUnitDestination(unit, pos.x, pos.y);
+    }
+
+}
+
+/* push when the target is hurt or the defenders outnumber the attackers nearby */
+function shouldCounter(enemy, target) {
+
+    let friends = 0;
+    let foes = 0;
+
+    for (const e of enemyUnits) { if (distance(e, target) < 220) { friends++; } }
+    for (const p of playerUnits) { if (distance(p, target) < 220) { foes++; } }
+
+    return target.health / target.maxHealth < 0.45 || friends >= foes + 1;
+
+}
+
+function updateEnemyAI(enemy, now) {
+
+    const prof = aiProfiles[enemy.type] || aiProfiles.Rifle;
+
+    let closest = null;
+    let closestDistance = Infinity;
+
+    for (const p of playerUnits) {
+        const d = distance(enemy, p);
+        if (d < closestDistance) { closestDistance = d; closest = p; }
+    }
+
+    if (!closest) { return; }
+
+    enemy.attackTarget = closest;
+
+    const canFire = closestDistance <= enemy.range && lineOfSight(enemy, closest);
+
+    if (canFire) { shoot(enemy, closest, now); }
+
+    const hpRatio = enemy.health / enemy.maxHealth;
+    const sight = enemy.range * 1.7;
+
+    if (enemy.nextCounter === undefined) {
+        enemy.nextCounter = now + prof.counterEvery * (0.4 + Math.random() * 0.4);
+    }
+
+    let mode;
+
+    if (hpRatio < prof.retreatHp && closestDistance < sight * 1.3) {
+        mode = "retreat";
+    }
+    else if (enemy.counterUntil > now) {
+        mode = "counter";
+    }
+    else if (closestDistance <= sight) {
+
+        if (now >= enemy.nextCounter && shouldCounter(enemy, closest)) {
+            enemy.counterUntil = now + prof.counterFor;
+            enemy.nextCounter = now + prof.counterEvery;
+            mode = "counter";
+        }
+        else {
+            mode = "engage";
+        }
+
+    }
+    else {
+        mode = "hold";
+    }
+
+    enemy.aiMode = mode;
+
+    const slot = Math.max(0, parseInt(String(enemy.id).replace("E", ""), 10) || 0);
+
+    if (mode === "counter") {
+        aiMoveTo(enemy, getEnemyAttackPosition(enemy, closest, slot), now);
+    }
+    else if (mode === "retreat") {
+        const spot = getAISpot(enemy, closest, false, now);
+        if (spot) { aiMoveTo(enemy, spot, now); }
+    }
+    else if (mode === "engage") {
+        if (canFire) { return; }
+        const spot = getAISpot(enemy, closest, true, now);
+        aiMoveTo(enemy, spot || getEnemyAttackPosition(enemy, closest, slot), now);
+    }
+    else {
+
+        /* nobody in sight yet: creep forward from cover to cover, units staggered */
+        if (enemy.nextAdvance === undefined) { enemy.nextAdvance = now + Math.random() * 4000; }
+
+        if (now >= enemy.nextAdvance) {
+            const spot = pickAdvanceSpot(enemy, closest, prof);
+            if (spot) { enemy.advanceSpot = spot; }
+            enemy.nextAdvance = now + 3500 + Math.random() * 3500;
+        }
+
+        if (enemy.advanceSpot) { aiMoveTo(enemy, enemy.advanceSpot, now); }
+
+    }
+
+}
+
+
+/* =========================================
+   COMBAT UPDATE
+========================================= */
+
+function runManualUnit(unit, now) {
+
+    const target = acquireAutomaticTarget(unit);
+
+    if (!target) { return; }
+
+    const d = distance(unit, target);
+    const hasLineOfSight = unit.indirect || lineOfSight(unit, target);
+
+    if (d <= unit.range && hasLineOfSight) {
+        shoot(unit, target, now);
+        return;
+    }
+
+    /* units only chase when the player ordered an attack */
+    if (!unit.attackOrder) { return; }
+
+    const attackPosition = getAttackPosition(unit, target);
+
+    if (shouldRefreshPath(unit, attackPosition, now)) {
+        setUnitDestination(unit, attackPosition.x, attackPosition.y);
+    }
+
+}
+
+function updateCombat(now) {
+
+    /* ATTACKING DIVISIONS (the host's and any reinforcing attackers) */
+
+    for (const unit of [...playerUnits]) {
+        runManualUnit(unit, now);
+    }
+
+    /* DEFENDING DIVISIONS: the garrison is AI, reinforcing defenders are played by humans */
+
+    for (const enemy of [...enemyUnits]) {
+
+        if (playerUnits.length === 0) { break; }
+
+        if (enemy.human) {
+            runManualUnit(enemy, now);
+        }
+        else {
+            updateEnemyAI(enemy, now);
+        }
+
+    }
+
+}
+
+
+/* =========================================
+   FLEET STATE
+========================================= */
+
+function buildSurvivingFleetState() {
+
+    const grouped = new Map();
+
+    for (const unit of myUnits()) {
+
+        const remaining = getCurrentUnitSoldiers(unit);
+
+        if (remaining <= 0) { continue; }
+
+        if (!grouped.has(unit.type)) {
+            grouped.set(unit.type, {
+                type: unit.type,
+                soldiers: 0,
+                soldiersPerDivision: unit.divisionSize
+            });
+        }
+
+        grouped.get(unit.type).soldiers += remaining;
+
+    }
+
+    /* Knightmare squads keep their recruiting dates (the oldest ones survive) */
+    const source = isGuest ? guestSquads : ((fleetState && fleetState.squads) || []);
+    const bornList = [];
+
+    for (const e of source) {
+        if (e.type === "Knightmare") {
+            const n = Math.max(0, Number(e.amount) || 0);
+            const born = (e.born || []).slice();
+            while (born.length < n) { born.unshift("1970-01-01T00:00:00Z"); }
+            bornList.push(...born);
+        }
+    }
+
+    bornList.sort();
+
+    return Array.from(grouped.values()).map(function(entry) {
+
+        const out = {
+            type: entry.type,
+            amount: Math.ceil(entry.soldiers / entry.soldiersPerDivision),
+            soldiers: entry.soldiers,
+            soldiersPerDivision: entry.soldiersPerDivision
+        };
+
+        if (entry.type === "Knightmare") { out.born = bornList.slice(0, out.amount); }
+
+        return out;
+
+    });
+
+}
+
+function getInitialFleetSoldiers() {
+    return expandFleetDivisions(fleetState.squads || [])
+        .reduce((total, division) => total + division.soldiers, 0);
+}
+
+function getRemainingFleetSoldiers() {
+    return myUnits().reduce((total, unit) => total + getCurrentUnitSoldiers(unit), 0);
+}
+
+function getEnemyInitialSoldiers() {
+    return enemyInitialSoldiers;
+}
+
+function getEnemyRemainingSoldiers() {
+    /* only the garrison counts here; reinforcing human defenders save their own fleets */
+    return enemyUnits.filter(unit => !unit.human).reduce((total, unit) => total + getCurrentUnitSoldiers(unit), 0);
+}
+
+
+/* =========================================
+   SAVE RESULT
+========================================= */
+
+async function saveBattleResult() {
+
+    if (battleResolved) {
+        return true;
+    }
+
+    if (!battleID) {
+        console.error("No battle ID.");
+        return false;
+    }
+
+    battleResolved = true;
+
+    const survivingFleet = buildSurvivingFleetState();
+    const initialPlayerSoldiers = getInitialFleetSoldiers();
+    const remainingPlayerSoldiers = getRemainingFleetSoldiers();
+    const initialEnemySoldiers = getEnemyInitialSoldiers();
+    const remainingEnemySoldiers = getEnemyRemainingSoldiers();
+
+    const playerLosses = Math.max(0, initialPlayerSoldiers - remainingPlayerSoldiers);
+    const enemyLosses = Math.max(0, initialEnemySoldiers - remainingEnemySoldiers);
+
+    setBattleMessage("Saving battle result...");
+
+    const { data, error } = await supabaseClient.rpc("resolve_city_battle", {
+        battle_id: battleID,
+        battle_result: battleResult,
+        remaining_fleet_state: survivingFleet,
+        defender_initial_soldiers: initialEnemySoldiers,
+        defender_remaining_soldiers: remainingEnemySoldiers
+    });
+
+    if (error) {
+        console.error("Battle save error:", error);
+        battleResolved = false;
+        setBattleMessage("Could not save battle result: " + error.message);
+        return false;
+    }
+
+    console.log("Battle result saved:", data);
+
+    document.getElementById("battle-loss-summary").innerHTML =
+        "<strong>" +
+        "Your losses: " + formatSoldiers(playerLosses) + " soldiers" +
+        "</strong>" +
+        "<br>" +
+        "Enemy losses: " + formatSoldiers(enemyLosses) + " soldiers";
+
+    return true;
+
+}
+
+
+/* =========================================
+   VICTORY / DEFEAT
+========================================= */
+
+function checkVictory() {
+
+    if (!battleActive) { return; }
+
+    if (enemyUnits.length === 0) {
+        finishBattle("victory");
+        return;
+    }
+
+    if (playerUnits.length === 0) {
+        finishBattle("defeat");
+    }
+
+}
+
+async function finishBattle(result) {
+
+    if (!battleActive) { return; }
+
+    battleActive = false;
+    battleResult = result;
+
+    endLiveBattle(result);
+
+    /* The database must be updated before the victory cinematic begins. */
+    const saved = await saveBattleResult();
+
+    if (!saved) {
+        battleResult = null;
+        battleActive = false;
+        const screen = document.getElementById("victory-screen");
+        const title = document.getElementById("victory-title");
+        const description = document.getElementById("victory-description");
+        title.textContent = "SAVE FAILED";
+        title.style.color = "#e8c46a";
+        description.textContent = "The battle ended, but the result could not be saved.";
+        screen.classList.add("visible");
+        return;
+    }
+
+    if (result === "victory") {
+        startVictoryCutscene();
+        return;
+    }
+
+    const screen = document.getElementById("victory-screen");
+    const title = document.getElementById("victory-title");
+    const description = document.getElementById("victory-description");
+
+    title.textContent = "DEFEAT";
+    title.style.color = "#ff4c4c";
+    description.textContent = "Your attacking force was defeated.";
+    screen.classList.add("visible");
+    setBattleMessage("Battle result saved.");
+}
+
+
+/* =========================================
+   MOUSE
+========================================= */
+
+function getMousePosition(event) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+    };
+}
+
+canvas.addEventListener("mousedown", function(event) {
+
+    if (!battleActive || event.button !== 0) { return; }
+
+    const mouse = getMousePosition(event);
+    const clickedEnemy = findEnemyAt(mouse.x, mouse.y);
+
+    if (clickedEnemy && selectedUnits.length > 0) {
+        orderGroupAttack(clickedEnemy);
+        return;
+    }
+
+    const clickedPlayer = findPlayerAt(mouse.x, mouse.y);
+
+    if (clickedPlayer) {
+        selectPlayerUnit(clickedPlayer, event.shiftKey);
+        return;
+    }
+
+    isDraggingSelection = true;
+
+    dragStartX = mouse.x;
+    dragStartY = mouse.y;
+    dragCurrentX = mouse.x;
+    dragCurrentY = mouse.y;
+
+    if (!event.shiftKey) {
+        clearSelection();
+    }
+
+});
+
+canvas.addEventListener("mousemove", function(event) {
+
+    if (!isDraggingSelection) { return; }
+
+    const mouse = getMousePosition(event);
+
+    dragCurrentX = mouse.x;
+    dragCurrentY = mouse.y;
+
+});
+
+canvas.addEventListener("mouseup", function(event) {
+
+    if (event.button !== 0 || !isDraggingSelection) { return; }
+
+    isDraggingSelection = false;
+
+    const mouse = getMousePosition(event);
+
+    dragCurrentX = mouse.x;
+    dragCurrentY = mouse.y;
+
+    const left = Math.min(dragStartX, dragCurrentX);
+    const right = Math.max(dragStartX, dragCurrentX);
+    const top = Math.min(dragStartY, dragCurrentY);
+    const bottom = Math.max(dragStartY, dragCurrentY);
+
+    if (right - left < 5 && bottom - top < 5) {
+        if (!event.shiftKey) { clearSelection(); }
+        return;
+    }
+
+    const units = myUnits().filter(unit =>
+        unit.x >= left && unit.x <= right &&
+        unit.y >= top && unit.y <= bottom
+    );
+
+    if (event.shiftKey) {
+
+        for (const unit of units) {
+            if (!selectedUnits.includes(unit)) {
+                unit.selected = true;
+                selectedUnits.push(unit);
+            }
+        }
+
+        setBattleMessage(selectedUnits.length + " divisions selected.");
+
+    }
+    else {
+        setSelection(units);
+    }
+
+});
+
+
+/* =========================================
+   RIGHT CLICK MOVEMENT
+========================================= */
+
+canvas.addEventListener("contextmenu", function(event) {
+
+    event.preventDefault();
+
+    if (!battleActive || selectedUnits.length === 0) { return; }
+
+    const mouse = getMousePosition(event);
+    const spacing = 30;
+    const columns = Math.max(1, Math.ceil(Math.sqrt(selectedUnits.length)));
+    const rowCount = Math.ceil(selectedUnits.length / columns);
+
+    const guestOrders = [];
+
+    selectedUnits.forEach(function(unit, index) {
+
+        const column = index % columns;
+        const row = Math.floor(index / columns);
+
+        const targetX = mouse.x + (column - (columns - 1) / 2) * spacing;
+        const targetY = mouse.y + (row - (rowCount - 1) / 2) * spacing;
+
+        if (isGuest) {
+            const n = cityNorm(targetX, targetY);
+            guestOrders.push({ id: unit.id, x: +n[0].toFixed(4), y: +n[1].toFixed(4) });
+            return;
+        }
+
+        unit.attackTarget = null;
+        unit.attackOrder = false;
+        unit.nextPathUpdate = 0;
+
+        setUnitDestination(unit, targetX, targetY);
+
+    });
+
+    if (isGuest) { liveSend("cmd", { uid: myUid, kind: "move", orders: guestOrders }); }
+
+    setBattleMessage(selectedUnits.length + " divisions moving.");
+
+});
+
+
+/* =========================================
+   UPDATE
+========================================= */
+
+let lastFrameTime = performance.now();
+
+function updateUnits(now) {
+
+    if (victoryCutscene) {
+        updateVictoryCutscene(now);
+        return;
+    }
+
+    if (!battleActive) { return; }
+
+    if (isGuest) { updateGuest(now); return; }
+
+    const dt = Math.min(.05, (now - lastFrameTime) / 1000);
+
+    lastFrameTime = now;
+
+    updateCombat(now);
+    updateProjectiles(dt, now);
+
+    for (const unit of [...playerUnits, ...enemyUnits]) {
+
+        if (unit.hitFlash > 0) {
+            unit.hitFlash = Math.max(0, unit.hitFlash - dt * 1000);
+        }
+
+        if (unit.path.length > 0) {
+            moveAlongPath(unit, now, dt);
+        }
+        else {
+            separateIdleUnit(unit, dt);
+        }
+
+    }
+
+    checkVictory();
+
+}
+
+
+
+function startVictoryCutscene() {
+
+    if (victoryCutscene) { return; }
+
+    const cinematic = document.getElementById("victory-cinematic");
+    const caption = document.getElementById("victory-caption");
+    const captionCity = document.getElementById("victory-caption-city");
+    const finalCard = document.getElementById("victory-final-card");
+    const finalDescription = document.getElementById("victory-final-description");
+    const continueButton = document.getElementById("victory-continue");
+
+    const survivors = playerUnits.filter(function(unit) {
+        return unit && unit.health > 0 && unit.soldiers > 0;
+    });
+
+    const city = getCityBounds();
+    const bannerX = city.x + cityWidth() * 0.58;
+    const bannerY = city.y + cityHeight() * 0.48;
+
+    const actors = survivors.map(function(unit, index) {
+        const angle = -Math.PI * 0.82 + (index / Math.max(1, survivors.length - 1)) * Math.PI * 0.64;
+        const radiusX = Math.min(150, cityWidth() * 0.23);
+        const radiusY = Math.min(105, cityHeight() * 0.25);
+        const target = findSafePosition(
+            bannerX + Math.cos(angle) * radiusX,
+            bannerY + Math.sin(angle) * radiusY
+        );
+        return {
+            unit: unit,
+            fromX: unit.x,
+            fromY: unit.y,
+            toX: target.x,
+            toY: target.y
+        };
+    });
+
+    clearSelection();
+    projectiles.length = 0;
+    shotEffects.length = 0;
+    damageNumbers.length = 0;
+
+    for (const unit of playerUnits.concat(enemyUnits)) {
+        unit.path = [];
+        unit.attackTarget = null;
+        unit.attackOrder = false;
+    }
+
+    cinematic.classList.add("active", "banner-stage");
+    cinematic.style.setProperty("--victory-color", factionColor(playerFaction));
+    captionCity.textContent = cityName.toUpperCase();
+    finalDescription.textContent = cityName.toUpperCase() + " IS NOW CONTROLLED BY " + playerFaction.toUpperCase() + ".";
+    document.getElementById("victory-caption-title").style.color = factionColor(playerFaction);
+    document.getElementById("victory-final-title").style.color = factionColor(playerFaction);
+
+    victoryCutscene = {
+        started: performance.now(),
+        actors: actors,
+        bannerX: bannerX,
+        bannerY: bannerY,
+        duration: 9000
+    };
+
+    setBattleMessage("Victory secured. Occupying " + cityName + "...");
+
+    setTimeout(function() {
+        if (!victoryCutscene) { return; }
+        caption.classList.add("show");
+    }, 2700);
+
+    setTimeout(function() {
+        if (!victoryCutscene) { return; }
+        finalCard.classList.add("show");
+    }, 5200);
+
+    const returnToPlanet = function() {
+        if (victoryReturnTimer) { clearTimeout(victoryReturnTimer); }
+        window.location.href = "planet.html?name=" + encodeURIComponent(planetName);
+    };
+
+    continueButton.onclick = returnToPlanet;
+    victoryReturnTimer = setTimeout(returnToPlanet, 9000);
+}
+
+function updateVictoryCutscene(now) {
+
+    if (!victoryCutscene) { return; }
+
+    const elapsed = now - victoryCutscene.started;
+    const moveEnd = 2200;
+    const celebrateStart = 3000;
+
+    for (const actor of victoryCutscene.actors) {
+        const unit = actor.unit;
+        if (!unit || unit.health <= 0) { continue; }
+
+        if (elapsed < moveEnd) {
+            const raw = Math.max(0, Math.min(1, elapsed / moveEnd));
+            const t = raw * raw * (3 - 2 * raw);
+            unit.x = actor.fromX + (actor.toX - actor.fromX) * t;
+            unit.y = actor.fromY + (actor.toY - actor.fromY) * t;
+            unit.facing = Math.atan2(actor.toY - actor.fromY, actor.toX - actor.fromX);
+        }
+        else if (elapsed >= celebrateStart) {
+            const pulse = Math.sin((elapsed - celebrateStart) / 170 + idHash(unit)) * 0.035;
+            unit.x = actor.toX + Math.cos((idHash(unit) % 360) * Math.PI / 180) * pulse * 35;
+            unit.y = actor.toY + Math.sin((idHash(unit) % 360) * Math.PI / 180) * pulse * 35;
+        }
+    }
+}
+
+
+function drawVictoryCelebration(now) {
+
+    if (!victoryCutscene) { return; }
+
+    const elapsed = now - victoryCutscene.started;
+    if (elapsed < 3000) { return; }
+
+    const strength = Math.min(1, (elapsed - 3000) / 900);
+
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.28 + strength * 0.45;
+
+    for (const actor of victoryCutscene.actors) {
+        const unit = actor.unit;
+        if (!unit || unit.health <= 0) { continue; }
+
+        const phase = now / 180 + idHash(unit);
+        const lift = 5 + Math.sin(phase) * 3;
+        const baseY = unit.y - 14 - lift;
+        const arm = 8 + Math.sin(phase * 1.2) * 2;
+
+        ctx.strokeStyle = factionColor(unit.faction);
+        ctx.beginPath();
+        ctx.moveTo(unit.x - arm, baseY + 5);
+        ctx.lineTo(unit.x - arm - 4, baseY - 5);
+        ctx.moveTo(unit.x + arm, baseY + 5);
+        ctx.lineTo(unit.x + arm + 4, baseY - 5);
+        ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+}
+
+function drawVictoryBanner(now) {
+
+    if (!victoryCutscene) { return; }
+
+    const elapsed = now - victoryCutscene.started;
+    const rise = Math.max(0, Math.min(1, (elapsed - 900) / 1500));
+    const eased = rise * rise * (3 - 2 * rise);
+    const x = victoryCutscene.bannerX;
+    const groundY = victoryCutscene.bannerY + 62;
+    const topY = groundY - 125 * eased;
+    const color = factionColor(playerFaction);
+
+    ctx.save();
+
+    const glow = ctx.createRadialGradient(x, groundY - 70, 5, x, groundY - 70, 100);
+    glow.addColorStop(0, color + "55");
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - 120, groundY - 190, 240, 220);
+
+    ctx.strokeStyle = "#b9b9b9";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, groundY);
+    ctx.lineTo(x, topY);
+    ctx.stroke();
+
+    const wave = Math.sin(now / 190) * 5;
+    const flagWidth = 72;
+    const flagHeight = 42;
+
+    ctx.beginPath();
+    ctx.moveTo(x + 2, topY + 4);
+    ctx.quadraticCurveTo(x + 22, topY + wave, x + flagWidth, topY + 7 + wave);
+    ctx.lineTo(x + flagWidth, topY + flagHeight + wave);
+    ctx.quadraticCurveTo(x + 25, topY + flagHeight - 2 + wave, x + 2, topY + flagHeight - 1);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.96;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = "rgba(255,255,255,.55)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+
+/* =========================================
+   RETURN TO PLANET / MAIN MENU
+========================================= */
+
+document.getElementById("battle-return-button").addEventListener("click", function() {
+
+    if (battleResult === null) { return; }
+
+    window.location.href = "planet.html?name=" + encodeURIComponent(planetName);
+
+});
+
+document.getElementById("main-menu-button").addEventListener("click", function() {
+    window.location.href = "index.html";
+});
+
+
+/* =========================================
+   GAME LOOP
+========================================= */
+
+function gameLoop(now) {
+
+    updateUnits(now);
+    draw();
+
+    requestAnimationFrame(gameLoop);
+
+}
+
+
+/* =========================================
+   REINFORCEMENTS (join a battle in progress)
+
+   The player who started the battle is the HOST: his browser runs the
+   whole simulation and broadcasts a snapshot five times a second.
+   Players who arrive later are GUESTS: they are verified by the database,
+   their divisions are spawned by the host (attackers join the attacking
+   side, defenders take command of reinforcing garrison units) and they
+   send move / attack orders back over the same realtime channel.
+   Positions travel as fractions of the city, so any screen size works.
+========================================= */
+
+function cityNorm(x, y) {
+    const c = getCityBounds();
+    return [(x - c.x) / cityWidth(), (y - c.y) / cityHeight()];
+}
+
+function cityDenorm(nx, ny) {
+    const c = getCityBounds();
+    return { x: c.x + nx * cityWidth(), y: c.y + ny * cityHeight() };
+}
+
+function liveSend(event, payload) {
+
+    if (!liveChannel) { return; }
+
+    try {
+        liveChannel.send({ type: "broadcast", event: event, payload: payload });
+    }
+    catch (error) {
+        console.warn("Live send failed:", error);
+    }
+
+}
+
+/* ---------------- HOST ---------------- */
+
+async function startLiveBattle() {
+
+    try {
+
+        const bid = String(battleID);
+
+        const { error } = await supabaseClient.rpc("live_battle_open", {
+            p_battle: bid,
+            p_planet: planetName,
+            p_city: cityName,
+            p_attacker: playerFaction,
+            p_defender: enemyFaction,
+            p_fleet: String(fleetID)
+        });
+
+        if (error) {
+            /* stage8.sql not run yet: the battle simply stays single-player */
+            console.warn("Reinforcements unavailable:", error.message);
+            return;
+        }
+
+        liveChannel = supabaseClient.channel("lb-" + bid, { config: { broadcast: { self: false } } });
+
+        liveChannel
+            .on("broadcast", { event: "join" }, function(m) { hostHandleJoin(m.payload); })
+            .on("broadcast", { event: "cmd" }, function(m) { hostHandleCmd(m.payload); })
+            .subscribe();
+
+        liveTimers.push(setInterval(function() {
+            supabaseClient.rpc("live_battle_beat", { p_battle: bid }).then(function() {});
+        }, 10000));
+
+        liveTimers.push(setInterval(function() { broadcastSnapshot(false); }, 200));
+
+    }
+    catch (error) {
+        console.warn("Could not open the battle to reinforcements:", error);
+    }
+
+}
+
+async function hostHandleJoin(p) {
+
+    if (!p || !p.fleetId || !battleActive) { return; }
+
+    const key = String(p.fleetId);
+
+    if (liveGuests[key]) { return; }
+
+    liveGuests[key] = "pending";
+
+    try {
+
+        const { data, error } = await supabaseClient.rpc("reinforcement_check", {
+            p_battle: String(battleID),
+            p_fleet: key
+        });
+
+        if (error || !data || (p.uid && String(data.player_id) !== String(p.uid))) {
+            delete liveGuests[key];
+            return;
+        }
+
+        spawnGuestUnits(data);
+        liveGuests[key] = "ready";
+
+    }
+    catch (error) {
+        delete liveGuests[key];
+        console.warn("Join check failed:", error);
+    }
+
+}
+
+function spawnGuestUnits(info) {
+
+    const divisions = expandFleetDivisions(info.squads || []);
+    const side = info.side === "defender" ? "D" : "A";
+    const city = getCityBounds();
+    const spacing = 38;
+    const group = liveGuestCount;
+
+    divisions.forEach(function(division, index) {
+
+        const column = Math.floor(index / 7);
+        const row = index % 7;
+
+        let x;
+        let y = city.y + 30 + row * spacing;
+
+        if (side === "A") {
+            x = city.x - 75 + (3 + column + group * 2) * spacing;
+        }
+        else {
+            x = city.x + cityWidth() - 40 - (column + group * 2) * spacing;
+        }
+
+        const unit = createUnit(
+            x, y,
+            side === "A" ? playerFaction : enemyFaction,
+            (side === "A" ? "GA" : "GD") + (guestSeq++),
+            division.type,
+            division.soldiers
+        );
+
+        unit.side = side;
+        unit.owner = info.player_id;
+        unit.human = side === "D";
+
+        (side === "A" ? playerUnits : enemyUnits).push(unit);
+
+    });
+
+    liveGuestCount++;
+
+    setBattleMessage(
+        "Reinforcements have arrived for the " + (side === "A" ? "attackers" : "garrison") +
+        " (" + divisions.length + " divisions)."
+    );
+
+}
+
+function hostHandleCmd(p) {
+
+    if (!p || !p.uid || !battleActive) { return; }
+
+    const owned = function(id) {
+        const unit = findUnitById(id);
+        return unit && unit.owner === p.uid ? unit : null;
+    };
+
+    if (p.kind === "move") {
+
+        for (const order of p.orders || []) {
+
+            const unit = owned(order.id);
+
+            if (!unit) { continue; }
+
+            const t = cityDenorm(Number(order.x), Number(order.y));
+
+            unit.attackTarget = null;
+            unit.attackOrder = false;
+            unit.nextPathUpdate = 0;
+
+            setUnitDestination(unit, t.x, t.y);
+
+        }
+
+    }
+    else if (p.kind === "attack") {
+
+        const target = findUnitById(p.target);
+
+        if (!target) { return; }
+
+        for (const id of p.ids || []) {
+
+            const unit = owned(id);
+
+            if (!unit || unit.side === target.side) { continue; }
+
+            unit.attackTarget = target;
+            unit.attackOrder = true;
+            unit.nextPathUpdate = 0;
+            unit.path = [];
+            unit.pathIndex = 0;
+            unit.progressTime = 0;
+
+        }
+
+    }
+
+}
+
+function broadcastSnapshot(force) {
+
+    if (!liveChannel || liveGuestCount === 0) { return; }
+    if (!battleActive && !force) { return; }
+
+    const owners = [];
+
+    const row = function(u) {
+
+        let oi = -1;
+
+        if (u.owner && u.owner !== myUid) {
+            oi = owners.indexOf(u.owner);
+            if (oi < 0) { owners.push(u.owner); oi = owners.length - 1; }
+        }
+
+        const n = cityNorm(u.x, u.y);
+
+        return [u.id, u.side, u.type, +n[0].toFixed(4), +n[1].toFixed(4),
+                Math.round(u.soldiers), +u.health.toFixed(1), +(u.facing || 0).toFixed(2), oi];
+
+    };
+
+    liveSend("snap", {
+        u: [...playerUnits, ...enemyUnits].map(row),
+        o: owners,
+        s: shotLog.splice(0)
+    });
+
+}
+
+function endLiveBattle(result) {
+
+    if (!liveChannel) { return; }
+
+    broadcastSnapshot(true);
+    liveSend("end", { result: result });
+
+    for (const t of liveTimers) { clearInterval(t); }
+    liveTimers = [];
+
+    supabaseClient.rpc("live_battle_close", { p_battle: String(battleID) }).then(function() {});
+
+    const channel = liveChannel;
+
+    /* keep the channel a moment so the last messages leave */
+    setTimeout(function() { supabaseClient.removeChannel(channel); }, 3000);
+    setTimeout(function() { liveSend("end", { result: result }); }, 700);
+
+}
+
+/* ---------------- GUEST ---------------- */
+
+async function loadGuest() {
+
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+
+    if (userError || !userData.user) {
+        setBattleMessage("Not authenticated.");
+        return;
+    }
+
+    if (!fleetID) {
+        setBattleMessage("No fleet specified.");
+        return;
+    }
+
+    myUid = userData.user.id;
+
+    await supabaseClient.rpc("finalize_recruits");
+
+    const { data, error } = await supabaseClient.rpc("reinforcement_join", {
+        p_battle: String(joinBattleID),
+        p_fleet: String(fleetID)
+    });
+
+    if (error || !data) {
+        setBattleMessage("Could not join the battle: " + (error ? error.message : "no answer"));
+        return;
+    }
+
+    mySide = data.side === "defender" ? "D" : "A";
+    guestSquads = data.squads || [];
+    guestInitialSoldiers = expandFleetDivisions(guestSquads).reduce((n, d) => n + d.soldiers, 0);
+
+    battleActive = true;
+    lastSnapAt = performance.now();
+
+    setBattleMessage(
+        "Reinforcing the " + (mySide === "D" ? "garrison" : "attackers") +
+        ". Waiting for the battle commander to deploy your divisions..."
+    );
+
+    liveChannel = supabaseClient.channel("lb-" + joinBattleID, { config: { broadcast: { self: false } } });
+
+    liveChannel
+        .on("broadcast", { event: "snap" }, function(m) { applySnapshot(m.payload); })
+        .on("broadcast", { event: "end" }, function(m) { guestFinish(m.payload); })
+        .subscribe(function(status) {
+
+            if (status !== "SUBSCRIBED") { return; }
+
+            const hello = function() { liveSend("join", { uid: myUid, fleetId: String(fleetID) }); };
+
+            hello();
+
+            joinRetry = setInterval(function() {
+                if (gotSnap || guestEnded) { clearInterval(joinRetry); return; }
+                hello();
+            }, 2500);
+
+        });
+
+}
+
+function applySnapshot(s) {
+
+    if (!s || !s.u || guestEnded) { return; }
+
+    gotSnap = true;
+    lastSnapAt = performance.now();
+
+    const seen = new Set();
+
+    for (const row of s.u) {
+
+        const id = row[0];
+        const side = row[1];
+        const pos = cityDenorm(row[3], row[4]);
+
+        seen.add(id);
+
+        let unit = ghostById.get(id);
+
+        if (!unit) {
+
+            unit = createUnit(pos.x, pos.y, side === "A" ? playerFaction : enemyFaction, id, row[2], row[5]);
+            unit.x = pos.x;
+            unit.y = pos.y;
+            unit.side = side;
+            unit.owner = row[8] >= 0 ? s.o[row[8]] : null;
+
+            ghostById.set(id, unit);
+            (side === "A" ? playerUnits : enemyUnits).push(unit);
+
+        }
+
+        if (row[6] < unit.health) { unit.hitFlash = 100; }
+
+        unit.tx = pos.x;
+        unit.ty = pos.y;
+        unit.soldiers = row[5];
+        unit.health = row[6];
+        unit.facing = row[7];
+
+        if (unit.members) {
+            const alive = Math.max(0, Math.min(3, Math.round(row[5])));
+            unit.members = [0, 1, 2].map(i => i < alive ? Math.max(1, unit.health / Math.max(1, alive)) : 0);
+        }
+
+    }
+
+    for (const [id, unit] of ghostById) {
+
+        if (seen.has(id)) { continue; }
+
+        ghostById.delete(id);
+
+        for (const list of [playerUnits, enemyUnits, selectedUnits]) {
+            const i = list.indexOf(unit);
+            if (i !== -1) { list.splice(i, 1); }
+        }
+
+    }
+
+    for (const sh of s.s || []) {
+
+        const a = cityDenorm(sh[1], sh[2]);
+        const e = cityDenorm(sh[3], sh[4]);
+        const stats = unitStats[sh[0]] || unitStats.Rifle;
+
+        spawnProjectile(
+            { type: sh[0], x: a.x, y: a.y, damage: stats.damage, indirect: !!stats.indirect },
+            sh[6] ? ghostById.get(sh[6]) || null : null,
+            e.x, e.y, !!sh[5]
+        );
+
+        const shooter = sh[7] ? ghostById.get(sh[7]) : null;
+
+        if (shooter && shooter.members) {
+            shooter.fxKind = sh[0] === "KnightCannon" ? "cannon" : "rifle";
+            shooter.fxUntil = performance.now() + (sh[0] === "KnightCannon" ? 400 : 140);
+        }
+
+    }
+
+    if (myUnits().length > 0 && !guestEnded && /Waiting for the battle commander/.test(document.getElementById("battle-message").textContent)) {
+        setBattleMessage("Your divisions are in the battle. Select them and give orders.");
+    }
+
+}
+
+function updateGuest(now) {
+
+    const dt = Math.min(.05, (now - lastFrameTime) / 1000);
+
+    lastFrameTime = now;
+
+    const k = Math.min(1, dt * 12);
+
+    for (const unit of [...playerUnits, ...enemyUnits]) {
+
+        if (unit.tx !== undefined) {
+            unit.x += (unit.tx - unit.x) * k;
+            unit.y += (unit.ty - unit.y) * k;
+        }
+
+        if (unit.hitFlash > 0) { unit.hitFlash = Math.max(0, unit.hitFlash - dt * 1000); }
+
+    }
+
+    updateProjectiles(dt, now);
+
+    /* the commander's browser stopped answering */
+    if (!guestEnded && now - lastSnapAt > (gotSnap ? 15000 : 45000)) {
+        guestFinish({ result: "lost-contact" });
+    }
+
+}
+
+async function guestFinish(payload) {
+
+    if (guestEnded) { return; }
+
+    guestEnded = true;
+    battleActive = false;
+    clearInterval(joinRetry);
+
+    const result = payload && payload.result;
+    const screen = document.getElementById("victory-screen");
+    const title = document.getElementById("victory-title");
+    const description = document.getElementById("victory-description");
+    const summary = document.getElementById("battle-loss-summary");
+
+    if (result === "lost-contact") {
+
+        battleResult = "abandoned";
+
+        title.textContent = "CONTACT LOST";
+        title.style.color = "#e8c46a";
+        description.textContent = "The battle commander stopped responding. Your fleet was not committed.";
+        summary.textContent = "No losses recorded.";
+        screen.classList.add("visible");
+
+        return;
+
+    }
+
+    const attackersWon = result === "victory";
+    const iWon = mySide === "A" ? attackersWon : !attackersWon;
+
+    battleResult = iWon ? "victory" : "defeat";
+
+    title.textContent = iWon ? "VICTORY" : "DEFEAT";
+    title.style.color = iWon ? "#4cff72" : "#ff4c4c";
+    description.textContent = mySide === "A"
+        ? (attackersWon ? "The garrison is broken. The city has fallen." : "The assault failed.")
+        : (attackersWon ? "The city has fallen." : "The attackers were thrown back. The city holds.");
+
+    summary.textContent = "Saving your fleet...";
+    screen.classList.add("visible");
+
+    const remainingFleet = buildSurvivingFleetState();
+    const remainingSoldiers = getRemainingFleetSoldiers();
+    const lost = Math.max(0, guestInitialSoldiers - remainingSoldiers);
+
+    const { error } = await supabaseClient.rpc("reinforcement_report", {
+        p_battle: String(joinBattleID),
+        p_fleet: String(fleetID),
+        p_remaining: remainingFleet,
+        p_lost: Math.round(lost)
+    });
+
+    summary.innerHTML = error
+        ? "Could not save your fleet: " + error.message
+        : "<strong>Your losses: " + formatSoldiers(lost) + " soldiers</strong>";
+
+}
+
+
+/* =========================================
+   START
+========================================= */
+
+if (isGuest) { loadGuest(); }
+else { loadFleet(); }
+
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>

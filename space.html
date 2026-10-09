@@ -1,0 +1,2478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Space Battle</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script>window.GC_NO_BANNER = true;</script>
+<script src="gamecontrol.js"></script>
+<script src="ships.js"></script>
+<style>
+html, body { margin: 0; height: 100%; background: #01030a; overflow: hidden; font-family: Arial, sans-serif; color: #e8eef5; user-select: none; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+#msg { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); padding: 6px 16px; background: #000a; border: 1px solid #345; font-size: 12px; letter-spacing: 1px; pointer-events: none; text-align: center; max-width: 70vw; }
+#end-screen { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #000b; }
+#end-screen.visible { display: flex; }
+#end-title { font-size: 56px; font-weight: 900; letter-spacing: 12px; }
+#end-text { color: #b8c6d4; letter-spacing: 1px; text-align: center; max-width: 560px; }
+.btn { padding: 12px 30px; background: #101820; color: #fff; border: 1px solid #6a8; font-weight: bold; letter-spacing: 2px; cursor: pointer; }
+.btn:hover { background: #1c2a36; }
+#lost { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #000c; text-align: center; }
+#lost.visible { display: flex; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="msg">Connecting to the battle...</div>
+
+<div id="end-screen">
+    <div id="end-title"></div>
+    <div id="end-text"></div>
+    <button class="btn" id="end-return" type="button">RETURN</button>
+</div>
+
+<div id="lost">
+    <div style="font-size:30px;font-weight:900;letter-spacing:6px;">CONTACT LOST</div>
+    <div style="max-width:520px;color:#b8c6d4;">The player running this battle is no longer connected. You can take command (the battle restarts from your fleets as they were) or leave and keep your fleet frozen for later.</div>
+    <button class="btn" id="lost-retry" type="button">TAKE COMMAND</button>
+    <button class="btn" id="lost-leave" type="button">LEAVE</button>
+</div>
+
+<script>
+/* =========================================================
+   TACTICAL SPACE BATTLE
+
+   What makes it tactical:
+   - Ships have inertia: they accelerate, turn slowly and cannot strafe.
+   - Weapons fire only inside their ARCS: broadside batteries to the
+     sides, lances and torpedoes straight ahead, turrets all round.
+     So where a ship POINTS is the whole game.
+   - Damage goes through void shields -> armour -> hull. Light guns
+     cannot hurt heavy armour; lances, railguns and torpedoes can.
+   - Each ship class has a role (screen, raider, lance, sniper, line,
+     bombardment, carrier). Flak turrets shoot torpedoes down.
+   - Terrain: asteroids block fire, a nebula spoils aim, a planet
+     blocks the way.
+   - Orders: move, attack, right-drag to set the final heading,
+     power allocation, brace for impact.
+
+   One player's browser (the HOST) runs the simulation and sends it
+   10 times a second; the others are guests who see it and send orders.
+   Ships of absent players are flown by the AI.
+========================================================= */
+
+const params = new URLSearchParams(location.search);
+const battleId = params.get("battle");
+
+const WORLD_W = 3600;
+const WORLD_H = 2000;
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+const cam = { x: WORLD_W / 2, y: WORLD_H / 2, z: 0.45 };
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+function toWorld(ev) {
+    const r = canvas.getBoundingClientRect();
+    return {
+        x: (ev.clientX - r.left - canvas.width / 2) / cam.z + cam.x,
+        y: (ev.clientY - r.top - canvas.height / 2) / cam.z + cam.y
+    };
+}
+
+/* ---------------------------------------------------------
+   DATA
+--------------------------------------------------------- */
+
+const FACTION_COLORS = { "Combine": "#ff4a4a", "Freedom Authority": "#4a8cff", "Independents": "#e6e6e6" };
+const fcol = f => FACTION_COLORS[f] || "#ffd27a";
+
+const DIVISION_SIZE = { Rifle: 1000, MG: 750, Assault: 1000, AT: 600, Sniper: 400, Tank: 200, Artillery: 250, Krieg: 1000, Arstartes: 100, Knightmare: 3 };
+function sizeOf(type) { return DIVISION_SIZE[type] || 1000; }
+
+/* weapon arcs: [centre angle relative to the bow in degrees, half-width in degrees] */
+const ARC_SIDES = [[90, 58], [-90, 58]];
+const ARC_BOW = (half) => [[0, half]];
+const ARC_ALL = [[0, 180]];
+
+/*
+   One entry per division type. len = ship length in world units.
+   hull / armour / shield, speed (units per second), accel, turn (rad/s), evade (0..1),
+   style = how the AI (and ordered attacks) manoeuvre, pref = preferred fighting distance.
+*/
+const CLASSES = {
+    Rifle: {
+        name: "Escort Frigate", code: "E", role: "line", art: "small1", len: 92, sy: 1.0,
+        hull: 100, armor: 2, shield: 70, regen: 6, speed: 110, accel: 50, turn: 1.25, evade: 0.10,
+        style: "broadside", pref: 400, mods: ["ports3", "turret"],
+        weapons: [
+            { id: "bat", kind: "battery", name: "Broadside battery", dmg: 5, n: 3, rate: 1100, range: 560, acc: 0.72, arcs: ARC_SIDES },
+            { id: "tur", kind: "turret", name: "Turret", dmg: 2.4, n: 1, rate: 300, range: 260, acc: 0.8, arcs: ARC_ALL }
+        ]
+    },
+    MG: {
+        name: "Flak Corvette", code: "F", role: "screen", art: "small2", len: 72, sy: 1.0,
+        hull: 70, armor: 1, shield: 40, regen: 5, speed: 150, accel: 80, turn: 1.9, evade: 0.20,
+        style: "screen", pref: 300, mods: ["flak"],
+        weapons: [
+            { id: "flak", kind: "flak", name: "Flak battery", dmg: 3, n: 1, rate: 130, range: 360, acc: 0.85, arcs: ARC_ALL, pd: true },
+            { id: "bat", kind: "battery", name: "Light battery", dmg: 3, n: 2, rate: 900, range: 380, acc: 0.7, arcs: ARC_SIDES }
+        ]
+    },
+    Assault: {
+        name: "Raider", code: "R", role: "raider", art: "small3", len: 82, sy: 0.8,
+        hull: 80, armor: 1, shield: 35, regen: 6, speed: 200, accel: 110, turn: 2.4, evade: 0.30,
+        style: "raider", pref: 230, mods: ["ports2"],
+        weapons: [
+            { id: "bat", kind: "battery", name: "Close battery", dmg: 7, n: 4, rate: 1000, range: 300, acc: 0.78, arcs: ARC_SIDES }
+        ]
+    },
+    AT: {
+        name: "Lance Frigate", code: "L", role: "antibig", art: "small1", len: 118, sy: 1.0,
+        hull: 110, armor: 3, shield: 50, regen: 5, speed: 95, accel: 40, turn: 1.0, evade: 0.08,
+        style: "kite", pref: 760, mods: ["lance", "turret"],
+        weapons: [
+            { id: "lance", kind: "lance", name: "Lance", dmg: 100, n: 1, rate: 2800, range: 950, acc: 0.92, arcs: ARC_BOW(14), bypass: 0.6, pierce: 0.8 },
+            { id: "tur", kind: "turret", name: "Turret", dmg: 2.4, n: 1, rate: 320, range: 240, acc: 0.8, arcs: ARC_ALL }
+        ]
+    },
+    Sniper: {
+        name: "Railgun Destroyer", code: "D", role: "sniper", art: "small2", len: 128, sy: 0.82,
+        hull: 75, armor: 2, shield: 45, regen: 5, speed: 90, accel: 40, turn: 0.9, evade: 0.10,
+        style: "kite", pref: 980, mods: ["rail"],
+        weapons: [
+            { id: "rail", kind: "lance", name: "Railgun", dmg: 125, n: 1, rate: 4200, range: 1250, acc: 0.92, arcs: ARC_BOW(8), bypass: 0.4, pierce: 0.8 }
+        ]
+    },
+    Krieg: {
+        name: "Armoured Frigate", code: "K", role: "line", art: "small3", len: 100, sy: 1.25,
+        hull: 170, armor: 8, shield: 80, regen: 5, speed: 85, accel: 35, turn: 0.9, evade: 0.06,
+        style: "broadside", pref: 360, mods: ["ports3", "plating"],
+        weapons: [
+            { id: "bat", kind: "battery", name: "Broadside battery", dmg: 6, n: 4, rate: 1000, range: 470, acc: 0.72, arcs: ARC_SIDES },
+            { id: "tur", kind: "turret", name: "Turret", dmg: 2.4, n: 1, rate: 300, range: 260, acc: 0.8, arcs: ARC_ALL }
+        ]
+    },
+    Tank: {
+        name: "Battleship", code: "B", role: "line", art: "bigA", len: 240, sy: 1.0,
+        hull: 520, armor: 10, shield: 240, regen: 9, speed: 52, accel: 20, turn: 0.45, evade: 0.0,
+        style: "broadside", pref: 440, mods: ["ports6", "lance", "plating", "turret"],
+        weapons: [
+            { id: "bat", kind: "battery", name: "Heavy broadside", dmg: 14, n: 8, rate: 1100, range: 620, acc: 0.72, arcs: ARC_SIDES },
+            { id: "lance", kind: "lance", name: "Prow lance", dmg: 85, n: 1, rate: 3400, range: 900, acc: 0.9, arcs: ARC_BOW(12), bypass: 0.6, pierce: 0.8 },
+            { id: "tur", kind: "turret", name: "Turrets", dmg: 2.6, n: 1, rate: 260, range: 280, acc: 0.8, arcs: ARC_ALL }
+        ]
+    },
+    Artillery: {
+        name: "Bombardment Cruiser", code: "T", role: "bombard", art: "bigB", len: 220, sy: 1.0,
+        hull: 360, armor: 6, shield: 150, regen: 7, speed: 45, accel: 18, turn: 0.4, evade: 0.0,
+        style: "kite", pref: 1100, mods: ["tubes", "ports2"],
+        weapons: [
+            { id: "torp", kind: "torpedo", name: "Torpedo tubes", dmg: 120, n: 3, rate: 7500, range: 1350, acc: 1, arcs: ARC_BOW(28), speed: 150 },
+            { id: "bat", kind: "battery", name: "Light battery", dmg: 5, n: 4, rate: 1100, range: 480, acc: 0.7, arcs: ARC_SIDES },
+            { id: "tur", kind: "turret", name: "Turret", dmg: 2.4, n: 1, rate: 300, range: 260, acc: 0.8, arcs: ARC_ALL }
+        ]
+    },
+    Arstartes: {
+        name: "Assault Cruiser", code: "A", role: "raider", art: "bigA", len: 190, sy: 0.9,
+        hull: 400, armor: 9, shield: 160, regen: 7, speed: 105, accel: 45, turn: 0.9, evade: 0.05,
+        style: "raider", pref: 260, mods: ["ports6", "plating"],
+        weapons: [
+            { id: "bat", kind: "battery", name: "Heavy close battery", dmg: 12, n: 6, rate: 1000, range: 380, acc: 0.8, arcs: ARC_SIDES },
+            { id: "tur", kind: "turret", name: "Turret", dmg: 2.6, n: 1, rate: 260, range: 260, acc: 0.8, arcs: ARC_ALL }
+        ]
+    },
+    Knightmare: {
+        name: "Carrier", code: "C", role: "carrier", art: "bigB", len: 260, sy: 1.1,
+        hull: 700, armor: 8, shield: 280, regen: 8, speed: 58, accel: 22, turn: 0.5, evade: 0.0,
+        style: "broadside", pref: 420, mods: ["ports3", "hangar", "flak"],
+        weapons: [
+            { id: "bat", kind: "battery", name: "Broadside battery", dmg: 12, n: 6, rate: 1100, range: 560, acc: 0.72, arcs: ARC_SIDES },
+            { id: "flak", kind: "flak", name: "Flak turrets", dmg: 3, n: 1, rate: 150, range: 400, acc: 0.85, arcs: ARC_ALL, pd: true }
+        ]
+    }
+};
+
+function classOf(type) { return CLASSES[type] || CLASSES.Rifle; }
+
+/* the oldest Knightmare squad of a fleet rides the flagship */
+const FLAGSHIP = { hull: 1.7, shield: 1.6, len: 1.3, aura: 850 };
+
+const POWER_MODES = {
+    0: { name: "BALANCED", rate: 1, regen: 1, speed: 1, turn: 1 },
+    1: { name: "WEAPONS", rate: 0.78, regen: 0.3, speed: 1, turn: 1 },
+    2: { name: "SHIELDS", rate: 1.3, regen: 2.6, speed: 1, turn: 1 },
+    3: { name: "ENGINES", rate: 1.25, regen: 0.8, speed: 1.35, turn: 1.35 }
+};
+
+const BRACE = { duration: 5000, cooldown: 14000, reduce: 0.5 };
+
+function hashStr(s) {
+    let h = 0;
+    for (const ch of String(s)) { h = (h * 31 + ch.charCodeAt(0)) | 0; }
+    return Math.abs(h);
+}
+
+function expandDivisions(squads) {
+
+    const out = [];
+
+    for (const e of squads || []) {
+
+        const type = e.type;
+        const size = Number(e.soldiersPerDivision) || sizeOf(type);
+        let left = e.soldiers != null ? Number(e.soldiers) : (Number(e.amount) || 1) * size;
+
+        const born = (e.born || []).slice();
+        const count = Math.ceil(left / size);
+
+        while (born.length < count) { born.unshift("1970-01-01T00:00:00Z"); }
+
+        let k = 0;
+
+        while (left > 0) {
+            const soldiers = Math.min(size, left);
+            out.push({ type: type, soldiers: soldiers, size: size, born: type === "Knightmare" ? born[k] : null });
+            left -= soldiers;
+            k++;
+        }
+
+    }
+
+    return out;
+
+}
+
+/* ---------------------------------------------------------
+   STATE
+--------------------------------------------------------- */
+
+let me = null;
+let battle = null;
+let mySide = "A";
+let isHost = false;
+let fleetsInfo = [];
+let channel = null;
+
+let ships = [];
+let torps = [];
+let bolts = [];
+let beams = [];
+let fx = [];              /* visual effects, local only */
+let events = [];          /* host: things guests must also see */
+let selected = [];
+let ended = false;
+let lastSnapAt = 0;
+let gotSnap = false;
+let drag = null;          /* left-button box select */
+let rdrag = null;         /* right-button order with heading */
+let mouse = { x: 0, y: 0, sx: 0, sy: 0 };
+let shipSeq = 0;
+let torpSeq = 0;
+let lastFrame = performance.now();
+let aiClock = 0;
+let simTime = 0;
+let terrain = { asteroids: [], nebula: [], planet: null };
+let battleLog = [];
+let keys = {};
+
+function setMsg(t) { document.getElementById("msg").textContent = t; }
+
+function wrapPi(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+const DEG = Math.PI / 180;
+
+function log(text, color) {
+    battleLog.push({ t: performance.now(), text: text, color: color || "#cfe0f0" });
+    if (battleLog.length > 7) { battleLog.shift(); }
+    if (isHost) { events.push({ k: "log", t: text, c: color || "#cfe0f0" }); }
+}
+
+/* ---------------------------------------------------------
+   TERRAIN (same on every screen: seeded by the battle id)
+--------------------------------------------------------- */
+
+function seededRng(seed) {
+    let s = (seed % 2147483646) + 1;
+    return function() { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+}
+
+function buildTerrain() {
+
+    const rnd = seededRng(hashStr(battleId || "x"));
+
+    terrain = { asteroids: [], nebula: [], planet: null };
+
+    if (battle.kind === "orbit") {
+        terrain.planet = { x: WORLD_W / 2, y: WORLD_H + 760, r: 1150 };
+    }
+
+    /* one or two asteroid fields in the middle ground */
+    const fields = 1 + Math.floor(rnd() * 2);
+
+    for (let f = 0; f < fields; f++) {
+
+        const cx = WORLD_W * (0.38 + rnd() * 0.24);
+        const cy = WORLD_H * (0.2 + rnd() * 0.5);
+        const count = 10 + Math.floor(rnd() * 8);
+
+        for (let i = 0; i < count; i++) {
+            const a = rnd() * Math.PI * 2;
+            const d = Math.sqrt(rnd()) * 260;
+            terrain.asteroids.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d * 0.8, r: 22 + rnd() * 46, rot: rnd() * 6, v: 6 + Math.floor(rnd() * 3) });
+        }
+
+    }
+
+    /* a nebula that spoils aim */
+    terrain.nebula.push({ x: WORLD_W * (0.25 + rnd() * 0.5), y: WORLD_H * (0.25 + rnd() * 0.5), r: 300 + rnd() * 160 });
+
+}
+
+function inNebula(p) {
+    for (const n of terrain.nebula) { if (Math.hypot(p.x - n.x, p.y - n.y) < n.r) { return true; } }
+    return false;
+}
+
+/* is the straight line between two points blocked by rock or planet? returns the distance or null */
+function lineBlocked(x1, y1, x2, y2) {
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+
+    const obs = terrain.asteroids.concat(terrain.planet ? [terrain.planet] : []);
+
+    let best = null;
+
+    for (const o of obs) {
+        const t = clamp(((o.x - x1) * dx + (o.y - y1) * dy) / (len * len), 0, 1);
+        const px = x1 + dx * t;
+        const py = y1 + dy * t;
+        if (Math.hypot(px - o.x, py - o.y) < o.r * 0.9) {
+            const d = t * len;
+            if (best === null || d < best) { best = d; }
+        }
+    }
+
+    return best;
+
+}
+
+/* ---------------------------------------------------------
+   SHIPS
+--------------------------------------------------------- */
+
+function artFor(cls) { return SHIP_ART_BY_NAME[cls.art]; }
+
+function makeShip(id, side, type, fleetIdx, x, y, angle, hullRatio, flag, born) {
+
+    const c = classOf(type);
+    const art = artFor(c);
+    const f = fleetsInfo[fleetIdx] || {};
+    const len = c.len * (flag ? FLAGSHIP.len : 1);
+
+    const ship = {
+        id: id, side: side, type: type, cls: c, art: art, fleetIdx: fleetIdx, faction: f.faction,
+        x: x, y: y, angle: angle, speed: 0, tx: x, ty: y, tangle: angle,
+        maxHull: c.hull * (flag ? FLAGSHIP.hull : 1), maxShield: c.shield * (flag ? FLAGSHIP.shield : 1),
+        armor: c.armor, size: sizeOf(type),
+        owner: null, human: false,
+        dest: null, destHeading: null, face: null, target: null, attackOrder: false,
+        power: 0, braceUntil: 0, braceReady: 0,
+        sinceHit: 99999, shieldDownUntil: 0, shieldFlash: 0, hitDir: 0,
+        engineHit: 0, fire: 0,
+        weapons: c.weapons.map(w => ({ def: w, cd: Math.random() * w.rate, offUntil: 0 })),
+        scale: len / art.w, radius: len * 0.42,
+        flag: !!flag, born: born || null,
+        aura: 1
+    };
+
+    ship.hull = ship.maxHull * hullRatio;
+    ship.shield = ship.maxShield;
+
+    return ship;
+
+}
+
+let _a = 0, _d = 0;
+
+function spawnAllShips() {
+
+    ships = [];
+    _a = 0; _d = 0;
+
+    fleetsInfo.forEach(function(f, idx) {
+
+        const divs = expandDivisions(f.squads);
+
+        divs.sort((a, b) => (classOf(b.type).len) - (classOf(a.type).len));
+
+        let flagBorn = null;
+
+        for (const d of divs) {
+            if (d.type === "Knightmare" && (flagBorn === null || String(d.born) < String(flagBorn))) { flagBorn = d.born; }
+        }
+
+        let flagGiven = false;
+        const sideIsA = f.side === "A";
+        const lane = sideIsA ? _a++ : _d++;
+
+        divs.forEach(function(d, i) {
+
+            const isFlag = d.type === "Knightmare" && !flagGiven && String(d.born) === String(flagBorn);
+            if (isFlag) { flagGiven = true; }
+
+            /* big ships in the middle of the line, small ones on the wings */
+            const slot = i % 2 ? Math.ceil(i / 2) : -i / 2;
+            const x = sideIsA ? 380 - Math.floor(Math.abs(slot) / 5) * 150 - lane * 70 : WORLD_W - 380 + Math.floor(Math.abs(slot) / 5) * 150 + lane * 70;
+            const y = WORLD_H / 2 + slot * 150 + (lane % 2 ? 60 : -60);
+
+            const ship = makeShip("s" + (shipSeq++), f.side, d.type, idx, x, y, sideIsA ? 0 : Math.PI, d.soldiers / d.size, isFlag, d.born);
+
+            if (f.player_id && f.player_id === me) { ship.owner = me; ship.human = true; }
+
+            ships.push(ship);
+
+        });
+
+    });
+
+}
+
+function myShips() { return ships.filter(s => s.owner === me && s.hull > 0); }
+function shipById(id) { return ships.find(s => s.id === id) || null; }
+
+/* ---------------------------------------------------------
+   DAMAGE
+--------------------------------------------------------- */
+
+function applyDamage(t, dmg, o) {
+
+    if (t.hull <= 0) { return; }
+
+    o = o || {};
+
+    let d = dmg;
+
+    if (t.braceUntil > simTime) { d *= BRACE.reduce; }
+
+    const bypass = o.bypass || 0;
+    let shieldPart = d * (1 - bypass);
+    const direct = d * bypass;
+
+    if (t.shield > 0 && shieldPart > 0) {
+        const take = Math.min(t.shield, shieldPart);
+        t.shield -= take;
+        shieldPart -= take;
+        t.shieldFlash = 1;
+        t.hitDir = o.dir !== undefined ? o.dir : t.hitDir;
+        if (t.shield <= 0) {
+            t.shield = 0;
+            t.shieldDownUntil = simTime + 6000;
+            if (isHost) { log((t.cls.name + (t.flag ? " (flagship)" : "")) + "'s shields collapse", fcol(t.faction)); }
+        }
+    }
+
+    const through = shieldPart + direct;
+
+    t.sinceHit = 0;
+
+    if (through > 0) {
+
+        const armor = t.armor * (1 - (o.pierce || 0));
+        const dealt = Math.max(through * 0.2, through - armor);
+
+        t.hull -= dealt;
+
+        /* a badly hurt ship can suffer a critical hit */
+        if (t.hull > 0 && t.hull < t.maxHull * 0.6 && dealt > 3 && Math.random() < 0.08) {
+
+            const roll = Math.random();
+
+            if (roll < 0.4) {
+                t.engineHit = simTime + 20000;
+                if (isHost) { log(t.cls.name + ": engines damaged", "#ffb060"); }
+            }
+            else if (roll < 0.8) {
+                const real = t.weapons.filter(w => w.def.kind !== "turret" && w.def.kind !== "flak");
+                if (real.length) {
+                    real[Math.floor(Math.random() * real.length)].offUntil = simTime + 15000;
+                    if (isHost) { log(t.cls.name + ": a weapon system is knocked out", "#ffb060"); }
+                }
+            }
+            else {
+                t.fire = simTime + 7000;
+                if (isHost) { log(t.cls.name + ": fires on deck", "#ffb060"); }
+            }
+
+        }
+
+        if (t.hull <= 0) { destroyShip(t); }
+
+    }
+
+    if (isHost) { events.push({ k: "hit", id: t.id, a: +(o.dir || 0).toFixed(2), s: t.shield > 0 ? 1 : 0 }); }
+
+}
+
+function destroyShip(s) {
+
+    s.hull = 0;
+
+    const r = s.cls.len * (s.flag ? 1.2 : 0.8);
+
+    fx.push({ t: "boom", x: s.x, y: s.y, age: 0, r: r });
+
+    if (isHost) {
+        events.push({ k: "boom", x: s.x, y: s.y, r: r });
+        log(s.cls.name + (s.flag ? " (FLAGSHIP)" : "") + " destroyed", fcol(s.faction));
+    }
+
+    ships = ships.filter(o => o !== s);
+    selected = selected.filter(o => o !== s);
+
+    for (const o of ships) { if (o.target === s) { o.target = null; o.attackOrder = false; } }
+    for (const t of torps) { if (t.target === s) { t.target = null; } }
+
+}
+
+/* ---------------------------------------------------------
+   WEAPONS
+--------------------------------------------------------- */
+
+function weaponReady(s, w) {
+    if (w.offUntil && w.offUntil > simTime) { return false; }
+    if (s.braceUntil > simTime) { return false; }
+    return true;
+}
+
+function inArc(s, w, tx, ty) {
+    const bearing = Math.atan2(ty - s.y, tx - s.x);
+    for (const a of w.def.arcs) {
+        if (Math.abs(wrapPi(bearing - s.angle - a[0] * DEG)) <= a[1] * DEG) { return true; }
+    }
+    return false;
+}
+
+function hitChance(s, w, t, d) {
+    let p = w.def.acc * (1 - 0.35 * (d / w.def.range)) * (1 - (t.cls ? t.cls.evade : 0));
+    if (inNebula(t)) { p *= 0.65; }
+    if (inNebula(s)) { p *= 0.8; }
+    p *= s.aura;
+    return clamp(p, 0.08, 0.97);
+}
+
+function pickTarget(s, w) {
+
+    const range = w.def.range;
+    let best = null;
+    let bestScore = -1;
+
+    /* an ordered target comes first if this weapon can reach it */
+    if (s.target && s.target.hull > 0 && w.def.kind !== "flak") {
+        const d = dist(s, s.target);
+        if (d <= range && inArc(s, w, s.target.x, s.target.y) && lineBlocked(s.x, s.y, s.target.x, s.target.y) === null) { return { ship: s.target, d: d }; }
+    }
+
+    for (const o of ships) {
+
+        if (o.side === s.side || o.hull <= 0) { continue; }
+
+        const d = dist(s, o);
+
+        if (d > range) { continue; }
+        if (!inArc(s, w, o.x, o.y)) { continue; }
+        if (lineBlocked(s.x, s.y, o.x, o.y) !== null) { continue; }
+
+        let score = 1000 / (d + 50);
+
+        /* heavy weapons want heavy targets, light guns want soft ones */
+        if (w.def.kind === "lance" || w.def.kind === "torpedo") { score *= 1 + o.armor / 5 + o.maxHull / 300; }
+        else if (w.def.kind === "battery" && o.armor >= 8) { score *= 0.5; }
+
+        if (score > bestScore) { bestScore = score; best = { ship: o, d: d }; }
+
+    }
+
+    return best;
+
+}
+
+function fireBolts(s, w, t, d) {
+
+    const def = w.def;
+    const col = fcol(s.faction);
+    const dirTo = Math.atan2(t.y - s.y, t.x - s.x);
+
+    for (let i = 0; i < def.n; i++) {
+
+        const hit = Math.random() < hitChance(s, w, t, d);
+        const jitter = (Math.random() - 0.5) * s.radius * 1.2;
+        const miss = hit ? 0 : (60 + Math.random() * 90) * (Math.random() < 0.5 ? -1 : 1);
+
+        const sx = s.x + Math.cos(dirTo + Math.PI / 2) * jitter;
+        const sy = s.y + Math.sin(dirTo + Math.PI / 2) * jitter;
+
+        const speed = def.kind === "turret" || def.kind === "flak" ? 1200 : 900;
+
+        const b = {
+            x: sx, y: sy, target: t, dmg: def.dmg, hit: hit, miss: miss, color: col,
+            speed: speed, big: def.dmg >= 8, dir: dirTo, delay: i * 70
+        };
+
+        bolts.push(b);
+
+        if (isHost) { events.push({ k: "bolt", x: sx, y: sy, tid: t.id, hit: hit ? 1 : 0, c: col, big: b.big ? 1 : 0, d: b.delay, s: speed }); }
+
+    }
+
+}
+
+function fireLance(s, w, t, d) {
+
+    const def = w.def;
+    const hit = Math.random() < hitChance(s, w, t, d);
+    const col = fcol(s.faction);
+
+    /* a lance is stopped by anything in its path */
+    const block = lineBlocked(s.x, s.y, t.x, t.y);
+
+    const bx = s.x + Math.cos(s.angle) * s.radius * 0.9;
+    const by = s.y + Math.sin(s.angle) * s.radius * 0.9;
+    const bw = def.dmg > 70 ? 5 : 3.5;
+
+    beams.push({ x1: bx, y1: by, x2: t.x, y2: t.y, color: col, age: 0, w: bw });
+
+    if (isHost) { events.push({ k: "beam", x1: bx, y1: by, x2: t.x, y2: t.y, c: col, w: bw }); }
+
+    if (hit && block === null) {
+        applyDamage(t, def.dmg, { bypass: def.bypass, pierce: def.pierce, dir: Math.atan2(s.y - t.y, s.x - t.x) });
+        fx.push({ t: "hit", x: t.x, y: t.y, age: 0, big: true });
+    }
+
+}
+
+function fireTorpedoes(s, w, t) {
+
+    const def = w.def;
+
+    for (let i = 0; i < def.n; i++) {
+
+        const spread = (i - (def.n - 1) / 2) * 0.12;
+
+        torps.push({
+            id: "t" + (torpSeq++), side: s.side, x: s.x + Math.cos(s.angle) * s.radius, y: s.y + Math.sin(s.angle) * s.radius,
+            angle: s.angle + spread, speed: 40, maxSpeed: def.speed, target: t, dmg: def.dmg, hp: 1, life: 16000, color: fcol(s.faction),
+            delay: i * 260
+        });
+
+    }
+
+}
+
+/* flak shoots torpedoes down first */
+function pointDefence(s, w) {
+
+    const def = w.def;
+
+    let best = null;
+    let bd = def.range;
+
+    for (const t of torps) {
+        if (t.side === s.side || t.delay > 0 || t.dead) { continue; }
+        const d = Math.hypot(t.x - s.x, t.y - s.y);
+        if (d < bd) { bd = d; best = t; }
+    }
+
+    if (!best) { return false; }
+
+    const ex = best.x, ey = best.y;
+
+    fx.push({ t: "tracer", x1: s.x, y1: s.y, x2: ex, y2: ey, age: 0 });
+    if (isHost) { events.push({ k: "pd", x1: s.x, y1: s.y, x2: ex, y2: ey }); }
+
+    if (Math.random() < 0.6) {
+        best.hp -= 1;
+        if (best.hp <= 0) {
+            best.dead = true;
+            fx.push({ t: "boom", x: ex, y: ey, age: 0, r: 40 });
+            if (isHost) { events.push({ k: "boom", x: ex, y: ey, r: 40 }); }
+        }
+    }
+
+    return true;
+
+}
+
+function stepWeapons(s, dt) {
+
+    const mode = POWER_MODES[s.power];
+
+    for (const w of s.weapons) {
+
+        w.cd -= dt * 1000;
+
+        if (w.cd > 0) { continue; }
+        if (!weaponReady(s, w)) { continue; }
+
+        const def = w.def;
+
+        if (def.pd && pointDefence(s, w)) { w.cd = def.rate * mode.rate; continue; }
+
+        const pick = pickTarget(s, w);
+
+        if (!pick) { w.cd = 120; continue; }
+
+        w.cd = def.rate * mode.rate * (0.92 + Math.random() * 0.16);
+
+        if (def.kind === "lance") { fireLance(s, w, pick.ship, pick.d); }
+        else if (def.kind === "torpedo") { fireTorpedoes(s, w, pick.ship); }
+        else { fireBolts(s, w, pick.ship, pick.d); }
+
+    }
+
+}
+
+function stepBolts(dt) {
+
+    for (const b of bolts) {
+
+        if (b.delay > 0) { b.delay -= dt * 1000; continue; }
+
+        const t = b.target;
+        const ex = (t && t.hull > 0 ? t.x : b.x) + b.miss;
+        const ey = (t && t.hull > 0 ? t.y : b.y) + b.miss * 0.6;
+
+        const dx = ex - b.x;
+        const dy = ey - b.y;
+        const d = Math.hypot(dx, dy);
+        const step = b.speed * dt;
+
+        b.dir = Math.atan2(dy, dx);
+
+        /* rock in the way? */
+        if (!b.checked) {
+            b.checked = true;
+            const hitRock = lineBlocked(b.x, b.y, ex, ey);
+            if (hitRock !== null) { b.stopAt = hitRock; }
+        }
+
+        if (b.stopAt !== undefined) {
+            b.stopAt -= step;
+            if (b.stopAt <= 0) {
+                b.done = true;
+                fx.push({ t: "hit", x: b.x, y: b.y, age: 0, big: false });
+                continue;
+            }
+        }
+
+        if (d <= step + 8) {
+
+            b.done = true;
+            fx.push({ t: "hit", x: ex, y: ey, age: 0, big: b.big });
+
+            if (isHost && b.hit && t && t.hull > 0) {
+                applyDamage(t, b.dmg, { dir: Math.atan2(b.y - t.y, b.x - t.x) });
+            }
+
+        }
+        else {
+            b.x += dx / d * step;
+            b.y += dy / d * step;
+        }
+
+    }
+
+    bolts = bolts.filter(b => !b.done);
+
+}
+
+function stepTorps(dt) {
+
+    for (const t of torps) {
+
+        if (t.dead) { continue; }
+
+        if (t.delay > 0) { t.delay -= dt * 1000; continue; }
+
+        t.life -= dt * 1000;
+
+        if (t.life <= 0) { t.dead = true; continue; }
+
+        /* re-acquire the nearest enemy if the target is gone */
+        if (!t.target || t.target.hull <= 0) {
+            let best = null, bd = 900;
+            for (const o of ships) {
+                if (o.side === t.side || o.hull <= 0) { continue; }
+                const d = Math.hypot(o.x - t.x, o.y - t.y);
+                if (d < bd) { bd = d; best = o; }
+            }
+            t.target = best;
+        }
+
+        if (t.target) {
+            const want = Math.atan2(t.target.y - t.y, t.target.x - t.x);
+            const diff = wrapPi(want - t.angle);
+            t.angle += clamp(diff, -1.6 * dt, 1.6 * dt);
+        }
+
+        t.speed = Math.min(t.maxSpeed, t.speed + 90 * dt);
+        t.x += Math.cos(t.angle) * t.speed * dt;
+        t.y += Math.sin(t.angle) * t.speed * dt;
+
+        /* rocks stop torpedoes */
+        for (const r of terrain.asteroids) {
+            if (Math.hypot(t.x - r.x, t.y - r.y) < r.r * 0.8) { t.dead = true; fx.push({ t: "boom", x: t.x, y: t.y, age: 0, r: 40 }); }
+        }
+
+        if (!t.dead && t.target && Math.hypot(t.target.x - t.x, t.target.y - t.y) < t.target.radius * 0.7) {
+
+            t.dead = true;
+            fx.push({ t: "boom", x: t.x, y: t.y, age: 0, r: 70 });
+
+            if (isHost) {
+                events.push({ k: "boom", x: t.x, y: t.y, r: 70 });
+                applyDamage(t.target, t.dmg, { bypass: 0.7, pierce: 0.5, dir: Math.atan2(t.y - t.target.y, t.x - t.target.x) });
+            }
+
+        }
+
+    }
+
+    torps = torps.filter(t => !t.dead);
+
+}
+
+/* ---------------------------------------------------------
+   MOVEMENT
+--------------------------------------------------------- */
+
+function maxSpeedOf(s) {
+    const mode = POWER_MODES[s.power];
+    let v = s.cls.speed * mode.speed * (s.engineHit > simTime ? 0.55 : 1);
+    if (s.braceUntil > simTime) { v *= 0.5; }
+    return v;
+}
+
+/* steer around rocks and the planet instead of grinding against them */
+function avoidObstacles(s, wantHead) {
+
+    const look = s.radius * 1.5 + s.speed * 2.2 + 90;
+    const obs = terrain.asteroids.concat(terrain.planet ? [terrain.planet] : []);
+
+    for (const o of obs) {
+
+        const dx = o.x - s.x;
+        const dy = o.y - s.y;
+        const d = Math.hypot(dx, dy);
+
+        if (d - o.r > look) { continue; }
+
+        const ang = Math.atan2(dy, dx);
+        const diff = wrapPi(ang - wantHead);
+        const clearance = o.r + s.radius * 0.8 + 40;
+        const half = Math.asin(Math.min(1, clearance / Math.max(d, clearance + 1)));
+
+        if (Math.abs(diff) < half + 0.1) {
+            wantHead = ang + (diff >= 0 ? -1 : 1) * (half + 0.2);
+        }
+
+    }
+
+    return wantHead;
+
+}
+
+function steerShip(s, dt) {
+
+    const c = s.cls;
+    const mode = POWER_MODES[s.power];
+    const vmax = maxSpeedOf(s);
+
+    let wantHead = s.angle;
+    let wantSpeed = 0;
+
+    const tgt = s.target && s.target.hull > 0 ? s.target : null;
+
+    if (s.dest) {
+
+        const dx = s.dest.x - s.x;
+        const dy = s.dest.y - s.y;
+        const d = Math.hypot(dx, dy);
+
+        /* stopping distance with the ship's own braking */
+        const brake = (s.speed * s.speed) / (2 * c.accel * 1.4) + 20;
+
+        if (d < 22 && s.speed < 14) {
+            s.dest = null;
+            if (s.destHeading !== null) { s.face = s.destHeading; }
+            s.destHeading = null;
+        }
+        else {
+            wantHead = Math.atan2(dy, dx);
+            wantSpeed = d > brake ? vmax : Math.max(0, vmax * (d / brake) * 0.8);
+            /* the last stretch: line up with the final heading */
+            if (d < 120 && s.destHeading !== null) { wantHead = s.destHeading; }
+        }
+
+    }
+    else if (tgt && (s.attackOrder || !s.human)) {
+
+        const dx = tgt.x - s.x;
+        const dy = tgt.y - s.y;
+        const d = Math.hypot(dx, dy);
+        const bearing = Math.atan2(dy, dx);
+        const aggr = clamp((simTime - 240000) / 120000, 0, 1);
+        const pref = c.pref * (1 - 0.6 * aggr);
+        const style = aggr > 0.5 && (c.style === "kite" || c.style === "bow") ? "broadside" : c.style;
+
+        if (style === "bow") {
+            wantHead = bearing;
+            wantSpeed = d > pref ? vmax : (d < pref * 0.55 ? 0 : vmax * 0.25);
+        }
+        else if (style === "kite") {
+            let away = bearing + Math.PI + (s.id.length % 2 ? 0.5 : -0.5);
+
+            /* cornered against the arena edge: swing back towards the middle instead of sitting there */
+            const px = s.x + Math.cos(away) * 350, py = s.y + Math.sin(away) * 350;
+            if (px < 200 || px > WORLD_W - 200 || py < 200 || py > WORLD_H - 200) {
+                away = Math.atan2(WORLD_H / 2 - s.y, WORLD_W / 2 - s.x) + (s.id.length % 2 ? 0.9 : -0.9);
+            }
+
+            wantHead = d < pref * 0.88 ? away : bearing;
+            wantSpeed = d < pref * 0.88 ? vmax : (d > pref * 1.05 ? vmax * 0.8 : 0);
+        }
+        else if (style === "raider") {
+            if (d > pref * 1.4) { wantHead = bearing; wantSpeed = vmax; }
+            else {
+                const side = wrapPi(bearing + Math.PI / 2 - s.angle) < 0 ? -1 : 1;
+                wantHead = bearing + side * (70 * DEG);
+                wantSpeed = vmax * 0.8;
+            }
+        }
+        else if (style === "screen") {
+            /* stay close to the biggest friendly ship and face the enemy */
+            const anchor = ships.filter(o => o.side === s.side && o !== s && o.cls.len > 150)[0];
+            if (anchor && dist(s, anchor) > 380) { wantHead = Math.atan2(anchor.y - s.y, anchor.x - s.x); wantSpeed = vmax; }
+            else { wantHead = bearing + (wrapPi(bearing + Math.PI / 2 - s.angle) < 0 ? -1 : 1) * Math.PI / 2; wantSpeed = vmax * 0.3; }
+        }
+        else {
+            /* broadside: close in, then turn side-on and hold the distance */
+            if (d > pref * 1.2) { wantHead = bearing; wantSpeed = vmax; }
+            else {
+                const side = Math.abs(wrapPi(bearing + Math.PI / 2 - s.angle)) < Math.abs(wrapPi(bearing - Math.PI / 2 - s.angle)) ? 1 : -1;
+                const inward = d < pref * 0.7 ? 28 : -8;
+                wantHead = bearing + side * (90 - inward) * DEG;
+                wantSpeed = d < pref * 0.7 ? vmax * 0.6 : vmax * 0.35;
+            }
+        }
+
+    }
+    else if (s.face !== null) {
+        wantHead = s.face;
+    }
+
+    if (wantSpeed > 0) { wantHead = avoidObstacles(s, wantHead); }
+
+    /* turn: slower at speed, a ship needs room to manoeuvre */
+    const turnRate = c.turn * mode.turn * (s.engineHit > simTime ? 0.6 : 1) * (0.55 + 0.45 * (1 - Math.min(1, s.speed / (c.speed * 1.4))));
+    const diff = wrapPi(wantHead - s.angle);
+
+    s.angle += clamp(diff, -turnRate * dt, turnRate * dt);
+
+    /* a ship that is pointing the wrong way cannot burn hard */
+    const align = Math.max(0.15, 1 - Math.abs(diff) / 1.9);
+    const target = wantSpeed * align;
+
+    const acc = c.accel * (target > s.speed ? 1 : 1.4);
+    s.speed += clamp(target - s.speed, -acc * dt, acc * dt);
+
+    s.x += Math.cos(s.angle) * s.speed * dt;
+    s.y += Math.sin(s.angle) * s.speed * dt;
+
+    /* arena edge, planet and rocks push ships away */
+    s.x = clamp(s.x, 60, WORLD_W - 60);
+    s.y = clamp(s.y, 60, WORLD_H - 60);
+
+    const obs = terrain.asteroids.concat(terrain.planet ? [terrain.planet] : []);
+
+    for (const o of obs) {
+        const dx = s.x - o.x;
+        const dy = s.y - o.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const min = o.r + s.radius * 0.6;
+        if (d < min) {
+            s.x += dx / d * (min - d);
+            s.y += dy / d * (min - d);
+            s.speed *= 0.97;
+        }
+    }
+
+}
+
+function stepShip(s, dt) {
+
+    steerShip(s, dt);
+
+    /* shields come back after a few quiet seconds */
+    s.sinceHit += dt * 1000;
+
+    const mode = POWER_MODES[s.power];
+
+    if (s.shieldDownUntil <= simTime && s.sinceHit > 3500 && s.shield < s.maxShield) {
+        s.shield = Math.min(s.maxShield, s.shield + s.cls.regen * mode.regen * s.aura * dt * (s.flag ? 1.3 : 1));
+    }
+
+    if (s.shieldFlash > 0) { s.shieldFlash = Math.max(0, s.shieldFlash - dt * 3); }
+
+    if (s.fire > simTime) {
+        s.hull -= 1.6 * dt;
+        if (s.hull <= 0) { destroyShip(s); return; }
+    }
+
+    stepWeapons(s, dt);
+
+}
+
+/* keep ships from overlapping */
+function separateShips(dt) {
+
+    for (let i = 0; i < ships.length; i++) {
+        for (let j = i + 1; j < ships.length; j++) {
+
+            const a = ships[i], b = ships[j];
+            const dx = a.x - b.x, dy = a.y - b.y;
+            const d = Math.hypot(dx, dy) || 0.01;
+            const min = (a.radius + b.radius) * 0.7;
+
+            if (d < min) {
+                const push = (min - d) * 0.5 * Math.min(1, dt * 6);
+                a.x += dx / d * push; a.y += dy / d * push;
+                b.x -= dx / d * push; b.y -= dy / d * push;
+            }
+
+        }
+    }
+
+}
+
+/* ---------------------------------------------------------
+   AI (ships of absent players, and the enemy)
+--------------------------------------------------------- */
+
+function aiThink() {
+
+    /* each AI side picks a focus target near its fleet */
+    for (const side of ["A", "D"]) {
+
+        const mine = ships.filter(s => s.side === side && !s.human);
+        if (!mine.length) { continue; }
+
+        const foes = ships.filter(s => s.side !== side && s.hull > 0);
+        if (!foes.length) { continue; }
+
+        const cx = mine.reduce((n, s) => n + s.x, 0) / mine.length;
+        const cy = mine.reduce((n, s) => n + s.y, 0) / mine.length;
+
+        let focus = null, fs = -1;
+
+        for (const f of foes) {
+            const d = Math.hypot(f.x - cx, f.y - cy);
+            const weak = 1 + (1 - f.hull / f.maxHull) * 1.5 + (f.shield <= 0 ? 0.6 : 0);
+            const score = (1200 / (d + 200)) * weak * (f.flag ? 1.4 : 1);
+            if (score > fs) { fs = score; focus = f; }
+        }
+
+        for (const s of mine) {
+
+            const r = s.cls.role;
+            let t = null;
+
+            if (r === "antibig" || r === "sniper" || r === "bombard") {
+                /* heavy weapons go for the big, armoured targets */
+                let bs = -1;
+                for (const f of foes) {
+                    const d = dist(s, f);
+                    const sc = (f.armor + f.maxHull / 60 + (f.flag ? 8 : 0)) * 1000 / (d + 300);
+                    if (sc > bs) { bs = sc; t = f; }
+                }
+            }
+            else if (r === "raider") {
+                /* raiders hunt the soft artillery and snipers */
+                let bs = -1;
+                for (const f of foes) {
+                    const d = dist(s, f);
+                    const soft = f.cls.role === "bombard" || f.cls.role === "sniper" ? 3 : f.cls.role === "antibig" ? 2 : 1;
+                    const sc = soft * 1000 / (d + 300);
+                    if (sc > bs) { bs = sc; t = f; }
+                }
+            }
+            else if (r === "screen") {
+                t = foes.slice().sort((a, b) => dist(s, a) - dist(s, b))[0];
+            }
+            else {
+                t = focus;
+            }
+
+            if (!s.target || s.target.hull <= 0 || Math.random() < 0.06) { s.target = t; }
+            s.attackOrder = true;
+
+            /* brace when the shields are gone and the ship is being hurt */
+            if (s.shield <= 0 && s.hull < s.maxHull * 0.55 && s.braceReady <= simTime && s.sinceHit < 1500) {
+                s.braceUntil = simTime + BRACE.duration;
+                s.braceReady = simTime + BRACE.cooldown;
+            }
+
+            /* reroute power to the shields when they are nearly gone */
+            s.power = s.shield < s.maxShield * 0.25 ? 2 : 0;
+
+        }
+
+    }
+
+}
+
+function updateAuras() {
+
+    for (const s of ships) { s.aura = 1; }
+
+    for (const f of ships) {
+        if (!f.flag) { continue; }
+        for (const s of ships) {
+            if (s.side === f.side && dist(s, f) < FLAGSHIP.aura) { s.aura = 1.12; }
+        }
+    }
+
+}
+
+/* ---------------------------------------------------------
+   HOST SIMULATION STEP
+--------------------------------------------------------- */
+
+function simulate(dt) {
+
+    simTime += dt * 1000;
+
+    aiClock += dt;
+
+    if (aiClock > 0.5) { aiClock = 0; aiThink(); updateAuras(); }
+
+    for (const s of [...ships]) {
+        if (s.hull > 0) { stepShip(s, dt); }
+    }
+
+    separateShips(dt);
+    stepBolts(dt);
+    stepTorps(dt);
+
+}
+
+/* ---------------------------------------------------------
+   ORDERS
+--------------------------------------------------------- */
+
+function applyMove(uid, orders) {
+    for (const o of orders) {
+        const s = shipById(o.id);
+        if (!s || s.owner !== uid) { continue; }
+        s.dest = { x: Number(o.x), y: Number(o.y) };
+        s.destHeading = o.h === null || o.h === undefined ? null : Number(o.h);
+        s.face = null;
+        s.attackOrder = false;
+        s.target = null;
+    }
+}
+
+function applyAttack(uid, ids, targetId) {
+    const t = shipById(targetId);
+    if (!t) { return; }
+    for (const id of ids) {
+        const s = shipById(id);
+        if (!s || s.owner !== uid || s.side === t.side) { continue; }
+        s.target = t;
+        s.attackOrder = true;
+        s.dest = null;
+    }
+}
+
+function applyFace(uid, ids, h) {
+    for (const id of ids) {
+        const s = shipById(id);
+        if (!s || s.owner !== uid) { continue; }
+        s.face = Number(h);
+        s.dest = null;
+        s.attackOrder = false;
+        s.target = null;
+    }
+}
+
+function applyStop(uid, ids) {
+    for (const id of ids) {
+        const s = shipById(id);
+        if (!s || s.owner !== uid) { continue; }
+        s.dest = null; s.target = null; s.attackOrder = false; s.face = null;
+    }
+}
+
+function applyPower(uid, ids, mode) {
+    for (const id of ids) {
+        const s = shipById(id);
+        if (!s || s.owner !== uid) { continue; }
+        s.power = clamp(Number(mode) | 0, 0, 3);
+    }
+}
+
+function applyBrace(uid, ids) {
+    for (const id of ids) {
+        const s = shipById(id);
+        if (!s || s.owner !== uid) { continue; }
+        if (s.braceReady > simTime) { continue; }
+        s.braceUntil = simTime + BRACE.duration;
+        s.braceReady = simTime + BRACE.cooldown;
+    }
+}
+
+function command(kind, data) {
+
+    const mine = selected.filter(s => s.owner === me && s.hull > 0).map(s => s.id);
+
+    if (!mine.length && kind !== "move" && kind !== "face") { return; }
+
+    const payload = Object.assign({ kind: kind, ids: mine }, data);
+
+    if (isHost) { hostApply(me, payload); }
+    else { send("cmd", Object.assign({ uid: me }, payload)); }
+
+}
+
+function hostApply(uid, p) {
+
+    if (p.kind === "move") { applyMove(uid, p.orders || []); }
+    else if (p.kind === "attack") { applyAttack(uid, p.ids || [], p.target); }
+    else if (p.kind === "face") { applyFace(uid, p.ids || [], p.h); }
+    else if (p.kind === "stop") { applyStop(uid, p.ids || []); }
+    else if (p.kind === "power") { applyPower(uid, p.ids || [], p.mode); }
+    else if (p.kind === "brace") { applyBrace(uid, p.ids || []); }
+
+}
+
+function orderMove(list, x, y, heading) {
+
+    const n = list.length;
+    const h = heading === null ? (list.reduce((a, s) => a + Math.cos(s.angle), 0) < 0 ? Math.PI : 0) : heading;
+    const lineDir = h + Math.PI / 2;
+    const spacing = Math.max.apply(null, list.map(s => s.radius)) * 1.9 + 24;
+    const orders = [];
+
+    /* line abreast, perpendicular to the final heading */
+    list.slice().sort((a, b) => a.y - b.y).forEach(function(s, i) {
+        const off = (i - (n - 1) / 2) * spacing;
+        orders.push({
+            id: s.id,
+            x: clamp(x + Math.cos(lineDir) * off, 80, WORLD_W - 80),
+            y: clamp(y + Math.sin(lineDir) * off, 80, WORLD_H - 80),
+            h: heading === null ? null : +h.toFixed(3)
+        });
+    });
+
+    command("move", { orders: orders });
+
+    fx.push({ t: "ping", x: x, y: y, age: 0 });
+
+}
+
+function orderAttack(list, target) {
+    command("attack", { target: target.id });
+    fx.push({ t: "ping", x: target.x, y: target.y, age: 0, red: true });
+}
+
+/* ---------------------------------------------------------
+   NETWORKING
+--------------------------------------------------------- */
+
+function send(event, payload) {
+    if (!channel) { return; }
+    try { channel.send({ type: "broadcast", event: event, payload: payload }); } catch (e) { console.warn(e); }
+}
+
+async function hostHandleJoin(p) {
+
+    if (!p || !p.fleetIds || ended) { return; }
+
+    for (const fid of p.fleetIds) {
+
+        const { data, error } = await supabaseClient.rpc("space_battle_check", { p_battle: battleId, p_fleet: String(fid) });
+
+        if (error || !data || (p.uid && String(data.player_id) !== String(p.uid))) { continue; }
+
+        const idx = fleetsInfo.findIndex(f => String(f.fleet_id) === String(fid));
+
+        if (idx < 0) { continue; }
+
+        let changed = 0;
+
+        for (const s of ships) {
+            if (s.fleetIdx === idx && !s.human) { s.human = true; s.owner = data.player_id; s.target = null; s.dest = null; s.attackOrder = false; changed++; }
+        }
+
+        if (changed) { setMsg(fleetsInfo[idx].name + " is now commanded by its player."); log(fleetsInfo[idx].name + " is now commanded by its player", "#9fd0ff"); }
+
+    }
+
+}
+
+function broadcastSnapshot() {
+
+    if (!channel || ended) { return; }
+
+    const owners = [];
+    const oi = u => { if (!u || u === me) return -1; let i = owners.indexOf(u); if (i < 0) { owners.push(u); i = owners.length - 1; } return i; };
+
+    send("snap", {
+        s: ships.map(s => [
+            s.id, s.side, s.type, s.fleetIdx, +s.x.toFixed(1), +s.y.toFixed(1), +s.angle.toFixed(3), +s.speed.toFixed(0),
+            +(s.shield / s.maxShield).toFixed(3), +(s.hull / s.maxHull).toFixed(3), oi(s.owner), s.flag ? 1 : 0,
+            (s.braceUntil > simTime ? 1 : 0) | (s.shield <= 0 ? 2 : 0) | (s.engineHit > simTime ? 4 : 0) | (s.fire > simTime ? 8 : 0) | (s.power << 4)
+        ]),
+        t: torps.filter(t => t.delay <= 0).map(t => [t.id, t.side, +t.x.toFixed(1), +t.y.toFixed(1), +t.angle.toFixed(2)]),
+        o: owners,
+        e: events.splice(0)
+    });
+
+}
+
+function applySnapshot(p) {
+
+    if (!p || !p.s || ended) { return; }
+
+    gotSnap = true;
+    lastSnapAt = performance.now();
+
+    const seen = new Set();
+    const byId = new Map(ships.map(s => [s.id, s]));
+
+    for (const r of p.s) {
+
+        seen.add(r[0]);
+
+        let s = byId.get(r[0]);
+
+        if (!s) {
+            s = makeShip(r[0], r[1], r[2], r[3], r[4], r[5], r[6], 1, !!r[11]);
+            ships.push(s);
+        }
+
+        s.tx = r[4]; s.ty = r[5]; s.tangle = r[6]; s.speed = r[7];
+        s.shield = s.maxShield * r[8];
+        s.hull = s.maxHull * r[9];
+        s.owner = r[10] >= 0 ? p.o[r[10]] : (fleetsInfo[r[3]] && fleetsInfo[r[3]].player_id === hostId ? hostId : null);
+        s.braceUntil = (r[12] & 1) ? simTime + 1000 : 0;
+        s.engineHit = (r[12] & 4) ? simTime + 1000 : 0;
+        s.fire = (r[12] & 8) ? simTime + 1000 : 0;
+        s.power = (r[12] >> 4) & 3;
+
+    }
+
+    for (const g of ships.filter(s => !seen.has(s.id))) {
+        ships = ships.filter(o => o !== g);
+        selected = selected.filter(o => o !== g);
+    }
+
+    /* torpedoes */
+    const tseen = new Set();
+
+    for (const r of p.t || []) {
+        tseen.add(r[0]);
+        let t = torps.find(o => o.id === r[0]);
+        if (!t) { t = { id: r[0], side: r[1], x: r[2], y: r[3], angle: r[4], delay: 0, life: 99999, color: r[1] === mySide ? "#7dff9d" : "#ff8a5a" }; torps.push(t); }
+        t.tx = r[2]; t.ty = r[3]; t.tangle = r[4];
+    }
+
+    torps = torps.filter(t => tseen.has(t.id));
+
+    for (const e of p.e || []) {
+
+        if (e.k === "boom") { fx.push({ t: "boom", x: e.x, y: e.y, age: 0, r: e.r }); }
+        else if (e.k === "bolt") {
+            const t = shipById(e.tid);
+            bolts.push({ x: e.x, y: e.y, target: t, dmg: 0, hit: !!e.hit, miss: e.hit ? 0 : 80, color: e.c, speed: e.s, big: !!e.big, dir: 0, delay: e.d || 0 });
+        }
+        else if (e.k === "beam") { beams.push({ x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2, color: e.c, age: 0, w: e.w }); }
+        else if (e.k === "pd") { fx.push({ t: "tracer", x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2, age: 0 }); }
+        else if (e.k === "hit") {
+            const t = shipById(e.id);
+            if (t) { t.shieldFlash = e.s ? 1 : 0; t.hitDir = e.a; }
+        }
+        else if (e.k === "log") { battleLog.push({ t: performance.now(), text: e.t, color: e.c }); if (battleLog.length > 7) { battleLog.shift(); } }
+
+    }
+
+}
+
+let hostId = null;
+
+function hostHandleCmd(p) {
+    if (!p || !p.uid || ended) { return; }
+    hostApply(p.uid, p);
+}
+
+/* ---------------------------------------------------------
+   END OF BATTLE
+--------------------------------------------------------- */
+
+function buildResults() {
+
+    return fleetsInfo.map(function(f, idx) {
+
+        const grouped = new Map();
+
+        for (const s of ships) {
+            if (s.fleetIdx !== idx || s.hull <= 0) { continue; }
+            const ratio = clamp(s.hull / s.maxHull, 0, 1);
+            const soldiers = s.type === "Knightmare" ? Math.max(1, Math.round(3 * ratio)) : Math.max(1, Math.round(s.size * ratio));
+            if (!grouped.has(s.type)) { grouped.set(s.type, { type: s.type, soldiers: 0, soldiersPerDivision: s.size, born: [] }); }
+            grouped.get(s.type).soldiers += soldiers;
+            if (s.type === "Knightmare") { grouped.get(s.type).born.push(s.born || "1970-01-01T00:00:00Z"); }
+        }
+
+        return {
+            fleet_id: f.fleet_id,
+            squads: Array.from(grouped.values()).map(e => {
+                const out = {
+                    type: e.type, amount: Math.ceil(e.soldiers / e.soldiersPerDivision),
+                    soldiers: e.soldiers, soldiersPerDivision: e.soldiersPerDivision
+                };
+                if (e.type === "Knightmare") { out.born = e.born.sort(); }
+                return out;
+            })
+        };
+
+    });
+
+}
+
+async function finishBattle(winner) {
+
+    if (ended) { return; }
+    ended = true;
+
+    const results = buildResults();
+
+    ended = false; broadcastSnapshot(); ended = true;
+
+    send("end", { winner: winner, results: results });
+    setTimeout(function() { send("end", { winner: winner, results: results }); }, 800);
+
+    showEnd(winner, results);
+
+    const { error } = await supabaseClient.rpc("space_battle_finish", { p_battle: battleId, p_results: results, p_winner: winner });
+
+    if (error) {
+        document.getElementById("end-text").textContent += "  (Could not save the result: " + error.message + ")";
+    }
+
+}
+
+function showEnd(winner, results) {
+
+    ended = true;
+
+    const won = winner === mySide;
+    const title = document.getElementById("end-title");
+
+    title.textContent = won ? "VICTORY" : "DEFEAT";
+    title.style.color = won ? "#4cff72" : "#ff4c4c";
+
+    const mine = results.filter(r => {
+        const f = fleetsInfo.find(x => String(x.fleet_id) === String(r.fleet_id));
+        return f && f.player_id === me;
+    });
+
+    let before = 0, left = 0;
+
+    for (const r of mine) {
+        const f = fleetsInfo.find(x => String(x.fleet_id) === String(r.fleet_id));
+        before += expandDivisions(f.squads).reduce((n, d) => n + d.soldiers, 0);
+        left += r.squads.reduce((n, e) => n + e.soldiers, 0);
+    }
+
+    const lost = Math.max(0, before - left);
+
+    document.getElementById("end-text").textContent =
+        (won ? "The enemy fleet has been destroyed. " : "Your fleet was defeated. ") +
+        "Your losses: " + lost.toLocaleString() + " soldiers" + (left > 0 ? "; " + left.toLocaleString() + " survive." : ".") +
+        (battle.kind === "orbit" && won && mySide === "A" ? " The orbit is clear: you can now attack the city." : "");
+
+    document.getElementById("end-screen").classList.add("visible");
+
+}
+
+document.getElementById("end-return").addEventListener("click", function() {
+    location.href = battle && battle.kind === "orbit" && battle.planet
+        ? "planet.html?name=" + encodeURIComponent(battle.planet)
+        : "galaxy.html";
+});
+
+document.getElementById("lost-retry").addEventListener("click", function() { location.reload(); });
+document.getElementById("lost-leave").addEventListener("click", function() { location.href = "galaxy.html"; });
+
+/* ---------------------------------------------------------
+   INPUT
+--------------------------------------------------------- */
+
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+canvas.addEventListener("wheel", function(ev) {
+    ev.preventDefault();
+    const before = toWorld(ev);
+    cam.z = clamp(cam.z * (ev.deltaY < 0 ? 1.12 : 1 / 1.12), 0.16, 1.4);
+    const after = toWorld(ev);
+    cam.x += before.x - after.x;
+    cam.y += before.y - after.y;
+}, { passive: false });
+
+function minimapRect() {
+    const w = 240, h = Math.round(240 * WORLD_H / WORLD_W);
+    return { x: canvas.width - w - 14, y: canvas.height - h - 14, w: w, h: h };
+}
+
+function overMinimap(ev) {
+    const r = canvas.getBoundingClientRect();
+    const m = minimapRect();
+    const x = ev.clientX - r.left, y = ev.clientY - r.top;
+    return x >= m.x && x <= m.x + m.w && y >= m.y && y <= m.y + m.h ? { x: (x - m.x) / m.w * WORLD_W, y: (y - m.y) / m.h * WORLD_H } : null;
+}
+
+canvas.addEventListener("mousedown", function(ev) {
+
+    if (ended) { return; }
+
+    const mm = overMinimap(ev);
+
+    if (mm) {
+        if (ev.button === 0) { cam.x = mm.x; cam.y = mm.y; }
+        else if (ev.button === 2) {
+            const mine = selected.filter(s => s.owner === me && s.hull > 0);
+            if (mine.length) { orderMove(mine, mm.x, mm.y, null); }
+        }
+        return;
+    }
+
+    const w = toWorld(ev);
+
+    if (ev.button === 0) {
+        drag = { x0: w.x, y0: w.y, x1: w.x, y1: w.y };
+        return;
+    }
+
+    if (ev.button === 1) {
+        rdrag = { pan: true, sx: ev.clientX, sy: ev.clientY, cx: cam.x, cy: cam.y };
+        ev.preventDefault();
+        return;
+    }
+
+    if (ev.button === 2) {
+
+        const mine = selected.filter(s => s.owner === me && s.hull > 0);
+
+        if (!mine.length) { return; }
+
+        const foe = ships.find(o => o.side !== mySide && o.hull > 0 && Math.hypot(o.x - w.x, o.y - w.y) < o.radius + 20 / cam.z);
+
+        if (foe) { orderAttack(mine, foe); return; }
+
+        rdrag = { x0: w.x, y0: w.y, x1: w.x, y1: w.y, shift: ev.shiftKey };
+
+    }
+
+});
+
+canvas.addEventListener("mousemove", function(ev) {
+
+    const w = toWorld(ev);
+    mouse = { x: w.x, y: w.y, sx: ev.clientX, sy: ev.clientY };
+
+    if (drag) { drag.x1 = w.x; drag.y1 = w.y; }
+
+    if (rdrag) {
+        if (rdrag.pan) {
+            cam.x = rdrag.cx - (ev.clientX - rdrag.sx) / cam.z;
+            cam.y = rdrag.cy - (ev.clientY - rdrag.sy) / cam.z;
+        }
+        else { rdrag.x1 = w.x; rdrag.y1 = w.y; }
+    }
+
+});
+
+window.addEventListener("mouseup", function(ev) {
+
+    if (ev.button === 0 && drag) {
+
+        const x0 = Math.min(drag.x0, drag.x1), x1 = Math.max(drag.x0, drag.x1);
+        const y0 = Math.min(drag.y0, drag.y1), y1 = Math.max(drag.y0, drag.y1);
+        const small = (x1 - x0) * cam.z < 6 && (y1 - y0) * cam.z < 6;
+        const mine = myShips();
+
+        let pick;
+
+        if (small) {
+            const hit = mine.filter(s => Math.hypot(s.x - drag.x0, s.y - drag.y0) < s.radius + 14 / cam.z)
+                .sort((a, b) => dist(a, { x: drag.x0, y: drag.y0 }) - dist(b, { x: drag.x0, y: drag.y0 }))[0];
+            pick = hit ? [hit] : [];
+        }
+        else { pick = mine.filter(s => s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1); }
+
+        selected = ev.shiftKey ? Array.from(new Set(selected.concat(pick))) : pick;
+        drag = null;
+
+    }
+
+    if ((ev.button === 2 || ev.button === 1) && rdrag) {
+
+        if (rdrag.pan) { rdrag = null; return; }
+
+        const mine = selected.filter(s => s.owner === me && s.hull > 0);
+        const len = Math.hypot(rdrag.x1 - rdrag.x0, rdrag.y1 - rdrag.y0);
+
+        if (mine.length) {
+
+            if (rdrag.shift) {
+                /* shift + right click: turn on the spot to face that point */
+                const h = Math.atan2(rdrag.y0 - mine[0].y, rdrag.x0 - mine[0].x);
+                command("face", { h: +h.toFixed(3) });
+            }
+            else if (len * cam.z > 30) {
+                /* right-drag: go to the start point and end up facing the drag direction */
+                orderMove(mine, rdrag.x0, rdrag.y0, Math.atan2(rdrag.y1 - rdrag.y0, rdrag.x1 - rdrag.x0));
+            }
+            else { orderMove(mine, rdrag.x0, rdrag.y0, null); }
+
+        }
+
+        rdrag = null;
+
+    }
+
+});
+
+window.addEventListener("keydown", function(ev) {
+
+    keys[ev.key.toLowerCase()] = true;
+
+    const mine = selected.filter(s => s.owner === me && s.hull > 0);
+
+    if (ev.key.toLowerCase() === "a" && ev.ctrlKey) { ev.preventDefault(); selected = myShips(); return; }
+    if (ev.key === "Escape") { selected = []; return; }
+
+    if (ev.key === " ") {
+        ev.preventDefault();
+        const list = mine.length ? mine : myShips();
+        if (list.length) { cam.x = list.reduce((n, s) => n + s.x, 0) / list.length; cam.y = list.reduce((n, s) => n + s.y, 0) / list.length; }
+        return;
+    }
+
+    if (!mine.length || ev.ctrlKey) { return; }
+
+    const k = ev.key.toLowerCase();
+
+    if (k === "b") { command("brace", {}); }
+    else if (k === "h" || k === "s") { command("stop", {}); }
+    else if (k === "1") { command("power", { mode: 1 }); }
+    else if (k === "2") { command("power", { mode: 2 }); }
+    else if (k === "3") { command("power", { mode: 3 }); }
+    else if (k === "0" || k === "q") { command("power", { mode: 0 }); }
+
+});
+
+window.addEventListener("keyup", function(ev) { keys[ev.key.toLowerCase()] = false; });
+
+/* ---------------------------------------------------------
+   DRAWING
+--------------------------------------------------------- */
+
+const stars = [];
+{
+    const rnd = seededRng(777);
+    for (let i = 0; i < 420; i++) { stars.push({ x: rnd() * WORLD_W, y: rnd() * WORLD_H, r: rnd() * 1.6 + 0.4, a: rnd() * 0.7 + 0.2, d: 0.4 + rnd() * 0.6 }); }
+}
+
+function drawBackground() {
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#01030a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    /* stars drift a little slower than the ships (depth) */
+    for (const st of stars) {
+        const px = (st.x - cam.x) * cam.z * st.d + canvas.width / 2;
+        const py = (st.y - cam.y) * cam.z * st.d + canvas.height / 2;
+        if (px < -4 || py < -4 || px > canvas.width + 4 || py > canvas.height + 4) { continue; }
+        ctx.globalAlpha = st.a;
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(px, py, st.r, st.r);
+    }
+
+    ctx.globalAlpha = 1;
+
+    ctx.setTransform(cam.z, 0, 0, cam.z, canvas.width / 2 - cam.x * cam.z, canvas.height / 2 - cam.y * cam.z);
+
+    /* arena edge */
+    ctx.strokeStyle = "rgba(120,160,220,.25)";
+    ctx.lineWidth = 3 / cam.z;
+    ctx.setLineDash([30 / cam.z, 20 / cam.z]);
+    ctx.strokeRect(0, 0, WORLD_W, WORLD_H);
+    ctx.setLineDash([]);
+
+    /* nebula */
+    for (const n of terrain.nebula) {
+        const g = ctx.createRadialGradient(n.x, n.y, n.r * 0.15, n.x, n.y, n.r);
+        g.addColorStop(0, "rgba(150,70,200,.40)");
+        g.addColorStop(0.6, "rgba(80,50,160,.22)");
+        g.addColorStop(1, "rgba(40,20,100,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill();
+        if (cam.z > 0.3) {
+            ctx.fillStyle = "rgba(210,170,255,.55)";
+            ctx.font = "bold " + (14 / cam.z) + "px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("NEBULA: AIM SPOILED", n.x, n.y + 4 / cam.z);
+        }
+    }
+
+    /* planet */
+    if (terrain.planet) {
+        const p = terrain.planet;
+        const g = ctx.createRadialGradient(p.x, p.y - p.r * 0.35, p.r * 0.2, p.x, p.y, p.r);
+        g.addColorStop(0, "#35588f");
+        g.addColorStop(0.85, "#16263f");
+        g.addColorStop(1, "rgba(120,170,255,.55)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "rgba(200,220,255,.5)";
+        ctx.font = "bold " + (26 / cam.z) + "px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(String(battle.planet).toUpperCase(), p.x, WORLD_H - 70);
+    }
+
+    /* asteroids */
+    for (const a of terrain.asteroids) {
+        ctx.save();
+        ctx.translate(a.x, a.y);
+        ctx.rotate(a.rot);
+        ctx.fillStyle = "#3a3d46";
+        ctx.strokeStyle = "#5a5f6c";
+        ctx.lineWidth = 2 / cam.z;
+        ctx.beginPath();
+        for (let i = 0; i < a.v; i++) {
+            const ang = i / a.v * Math.PI * 2;
+            const rr = a.r * (0.78 + 0.22 * Math.sin(i * 2.3 + a.rot * 5));
+            if (i === 0) { ctx.moveTo(Math.cos(ang) * rr, Math.sin(ang) * rr); } else { ctx.lineTo(Math.cos(ang) * rr, Math.sin(ang) * rr); }
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+    }
+
+}
+
+/* the small details that make each class look like what it does */
+function drawMods(s, art, col) {
+
+    const w = art.w, h = art.h;
+    const dark = "rgba(10,18,32,.55)";
+
+    for (const m of s.cls.mods) {
+
+        if (m.indexOf("ports") === 0) {
+            const n = Number(m.slice(5));
+            ctx.fillStyle = col;
+            for (let i = 0; i < n; i++) {
+                const x = w * (0.3 + i * (0.4 / Math.max(1, n - 1)));
+                ctx.fillRect(x, h * 0.3, w * 0.025, h * 0.07);
+                ctx.fillRect(x, h * 0.66, w * 0.025, h * 0.07);
+            }
+        }
+        else if (m === "turret") {
+            ctx.fillStyle = dark;
+            ctx.beginPath(); ctx.arc(w * 0.42, h * 0.45, h * 0.1, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = col;
+            ctx.fillRect(w * 0.42, h * 0.43, w * 0.07, h * 0.04);
+        }
+        else if (m === "flak") {
+            ctx.fillStyle = dark;
+            for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(w * (0.32 + i * 0.15), h * 0.42, h * 0.07, 0, Math.PI * 2); ctx.fill(); }
+            ctx.strokeStyle = col; ctx.lineWidth = h * 0.03;
+            for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(w * (0.32 + i * 0.15), h * 0.42); ctx.lineTo(w * (0.32 + i * 0.15) + w * 0.05, h * 0.36); ctx.stroke(); }
+        }
+        else if (m === "lance" || m === "rail") {
+            ctx.strokeStyle = m === "lance" ? "#ffd9a0" : "#9fe8ff";
+            ctx.lineWidth = h * (m === "rail" ? 0.07 : 0.05);
+            ctx.beginPath(); ctx.moveTo(w * 0.2, h * 0.5); ctx.lineTo(w * 0.99, h * 0.53); ctx.stroke();
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(w * 0.985, h * 0.53, h * 0.06, 0, Math.PI * 2); ctx.fill();
+        }
+        else if (m === "tubes") {
+            ctx.fillStyle = dark;
+            for (let i = 0; i < 3; i++) { ctx.fillRect(w * 0.7, h * (0.36 + i * 0.1), w * 0.12, h * 0.06); }
+            ctx.fillStyle = "#ff8a5a";
+            for (let i = 0; i < 3; i++) { ctx.fillRect(w * 0.82, h * (0.37 + i * 0.1), w * 0.02, h * 0.04); }
+        }
+        else if (m === "hangar") {
+            ctx.fillStyle = dark;
+            ctx.fillRect(w * 0.4, h * 0.38, w * 0.22, h * 0.24);
+            ctx.fillStyle = (Math.floor(performance.now() / 400) % 2) ? "#ffd24c" : "#6a5a1a";
+            ctx.fillRect(w * 0.4, h * 0.38, w * 0.02, h * 0.24);
+            ctx.fillRect(w * 0.6, h * 0.38, w * 0.02, h * 0.24);
+        }
+        else if (m === "plating") {
+            ctx.strokeStyle = "rgba(30,40,60,.65)";
+            ctx.lineWidth = h * 0.05;
+            for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(w * (0.3 + i * 0.14), h * 0.2); ctx.lineTo(w * (0.3 + i * 0.14), h * 0.8); ctx.stroke(); }
+        }
+
+    }
+
+}
+
+function drawShip(s) {
+
+    const art = s.art;
+    const col = fcol(s.faction);
+    const u = s.scale;
+
+    ctx.save();
+    ctx.translate(s.x, s.y);
+
+    /* the art faces right (pointed end first); flying left mirrors it so it is never upside down */
+    if (Math.cos(s.angle) >= 0) { ctx.rotate(s.angle); }
+    else { ctx.rotate(s.angle + Math.PI); ctx.scale(-1, 1); }
+
+    ctx.scale(u, u * s.cls.sy);
+    ctx.translate(-art.w / 2, -art.h / 2);
+
+    /* engine glow at the blunt stern */
+    const thrust = Math.min(1, s.speed / Math.max(1, s.cls.speed));
+    if (thrust > 0.05) {
+        const fl = (0.7 + Math.random() * 0.5) * (0.5 + thrust);
+        const r = 16 * fl;
+        const g = ctx.createRadialGradient(0, art.h * 0.45, 1, 0, art.h * 0.45, r);
+        g.addColorStop(0, "rgba(255,235,190,.95)");
+        g.addColorStop(1, "rgba(255,110,40,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, art.h * 0.45, r, 0, Math.PI * 2); ctx.fill();
+    }
+
+    const d = new Path2D(art.d);
+
+    ctx.shadowColor = s.flag ? "#ffd24c" : col;
+    ctx.shadowBlur = s.flag ? 24 : 8;
+    ctx.fillStyle = "#e9edf7";
+    ctx.fill(d);
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = (s.flag ? 2.8 : 1.6) / u;
+    ctx.strokeStyle = s.flag ? "#ffd24c" : col;
+    ctx.stroke(d);
+
+    ctx.save();
+    ctx.clip(d);
+    drawMods(s, art, col);
+    ctx.restore();
+
+    ctx.restore();
+
+    /* void shield bubble */
+    if (s.shield > 0 || s.shieldFlash > 0) {
+        const ratio = s.shield / s.maxShield;
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(s.angle);
+        const rx = s.cls.len * (s.flag ? FLAGSHIP.len : 1) * 0.62;
+        const ry = rx * 0.5 * (0.7 + 0.3 * s.cls.sy);
+        ctx.strokeStyle = "rgba(120,200,255," + (0.10 + 0.35 * ratio + 0.5 * s.shieldFlash) + ")";
+        ctx.lineWidth = (1.4 + 2.2 * s.shieldFlash) / cam.z;
+        ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+        if (s.shieldFlash > 0) {
+            ctx.fillStyle = "rgba(140,210,255," + (0.18 * s.shieldFlash) + ")";
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    /* smoke and sparks on a hurt ship */
+    if (s.hull < s.maxHull * 0.5 && Math.random() < 0.3) {
+        fx.push({ t: "smoke", x: s.x + (Math.random() - 0.5) * s.radius, y: s.y + (Math.random() - 0.5) * s.radius * 0.4, age: 0, fire: s.fire > simTime || s.hull < s.maxHull * 0.25 });
+    }
+
+    /* brace aura */
+    if (s.braceUntil > simTime) {
+        ctx.strokeStyle = "rgba(255,230,120,.8)";
+        ctx.lineWidth = 3 / cam.z;
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.radius * 1.15, 0, Math.PI * 2); ctx.stroke();
+    }
+
+}
+
+function drawArcs(s) {
+
+    ctx.save();
+    ctx.translate(s.x, s.y);
+
+    for (const w of s.weapons) {
+
+        const def = w.def;
+
+        if (def.arcs === ARC_ALL) { continue; }
+
+        const off = w.offUntil && w.offUntil > simTime;
+        const col = def.kind === "lance" ? "255,217,160" : def.kind === "torpedo" ? "255,138,90" : "125,255,157";
+
+        for (const a of def.arcs) {
+            ctx.fillStyle = "rgba(" + col + "," + (off ? 0.04 : 0.09) + ")";
+            ctx.strokeStyle = "rgba(" + col + "," + (off ? 0.2 : 0.4) + ")";
+            ctx.lineWidth = 1.5 / cam.z;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, def.range, s.angle + (a[0] - a[1]) * DEG, s.angle + (a[0] + a[1]) * DEG);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+    }
+
+    ctx.restore();
+
+}
+
+function drawBars(s) {
+
+    const w = Math.max(50, s.cls.len * 0.7) * (s.flag ? 1.2 : 1);
+    const y = s.y - s.radius - 16 / cam.z;
+    const h = 4 / cam.z;
+    const x = s.x - w / 2;
+
+    ctx.fillStyle = "rgba(0,0,0,.7)";
+    ctx.fillRect(x - 1 / cam.z, y - h * 2.4, w + 2 / cam.z, h * 3.4 + 1 / cam.z);
+
+    ctx.fillStyle = "#4fb8ff";
+    ctx.fillRect(x, y - h * 2.2, w * clamp(s.shield / s.maxShield, 0, 1), h);
+    ctx.fillStyle = s.hull / s.maxHull > 0.5 ? "#4cff72" : s.hull / s.maxHull > 0.25 ? "#ffd24c" : "#ff4c4c";
+    ctx.fillRect(x, y - h * 0.9, w * clamp(s.hull / s.maxHull, 0, 1), h * 1.4);
+
+}
+
+function drawIcon(s) {
+
+    /* zoomed far out the ships become class markers you can still read */
+    const r = Math.max(9, s.cls.len * 0.09) / cam.z * 0.9;
+    ctx.fillStyle = fcol(s.faction);
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#000";
+    ctx.font = "bold " + (r * 1.2) + "px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(s.flag ? "★" : s.cls.code, s.x, s.y + 1);
+    ctx.textBaseline = "alphabetic";
+
+}
+
+function drawEffects(dt) {
+
+    for (const b of beams) {
+        b.age += dt;
+        const k = b.age / 0.4;
+        ctx.globalAlpha = Math.max(0, 1 - k);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = b.w * 1.0 / cam.z;
+        ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = b.w * 3 / cam.z;
+        ctx.globalAlpha = Math.max(0, 0.5 - k * 0.5);
+        ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+        ctx.globalAlpha = 1;
+    }
+
+    beams = beams.filter(b => b.age < 0.4);
+
+    for (const b of bolts) {
+        if (b.delay > 0) { continue; }
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.dir || 0);
+        ctx.fillStyle = b.color;
+        ctx.shadowColor = b.color;
+        ctx.shadowBlur = 8;
+        const l = b.big ? 26 : 14;
+        ctx.fillRect(-l / 2, -(b.big ? 2.4 : 1.4), l, b.big ? 4.8 : 2.8);
+        ctx.restore();
+    }
+
+    for (const t of torps) {
+        if (t.tx !== undefined) {
+            t.x += (t.tx - t.x) * 0.35; t.y += (t.ty - t.y) * 0.35; t.angle = t.tangle;
+        }
+        if (t.delay > 0) { continue; }
+        ctx.save();
+        ctx.translate(t.x, t.y);
+        ctx.rotate(t.angle);
+        ctx.fillStyle = t.color;
+        ctx.shadowColor = "#ff7a30";
+        ctx.shadowBlur = 12;
+        ctx.fillRect(-9, -3, 18, 6);
+        ctx.fillStyle = "#ffb060";
+        ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(-30 - Math.random() * 14, 0); ctx.lineTo(-9, 3); ctx.closePath(); ctx.fill();
+        ctx.restore();
+    }
+
+    for (const e of fx) {
+
+        e.age += dt;
+
+        if (e.t === "boom") {
+            const k = e.age / 1.1;
+            const r = e.r * (0.25 + k * 1.3);
+            ctx.globalAlpha = Math.max(0, 1 - k);
+            const g = ctx.createRadialGradient(e.x, e.y, 2, e.x, e.y, r);
+            g.addColorStop(0, "#fff");
+            g.addColorStop(0.3, "#ffc060");
+            g.addColorStop(1, "rgba(255,60,0,0)");
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+        else if (e.t === "hit") {
+            const k = e.age / 0.3;
+            ctx.globalAlpha = Math.max(0, 1 - k);
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(e.x, e.y, (e.big ? 16 : 7) * (0.5 + k), 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+        else if (e.t === "tracer") {
+            ctx.globalAlpha = Math.max(0, 1 - e.age / 0.12);
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1.5 / cam.z;
+            ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+        else if (e.t === "smoke") {
+            const k = e.age / 1.8;
+            ctx.globalAlpha = Math.max(0, 0.5 - k * 0.5);
+            ctx.fillStyle = e.fire ? "#ff8a30" : "#555";
+            ctx.beginPath(); ctx.arc(e.x, e.y - k * 30, 8 + k * 16, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+        else if (e.t === "ping") {
+            const k = e.age / 0.7;
+            ctx.globalAlpha = Math.max(0, 1 - k);
+            ctx.strokeStyle = e.red ? "#ff6a6a" : "#7dff9d";
+            ctx.lineWidth = 2.5 / cam.z;
+            ctx.beginPath(); ctx.arc(e.x, e.y, (10 + k * 34) / cam.z, 0, Math.PI * 2); ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
+    }
+
+    fx = fx.filter(e => e.age < (e.t === "smoke" ? 1.8 : e.t === "boom" ? 1.1 : e.t === "ping" ? 0.7 : 0.5));
+
+}
+
+function drawOrders() {
+
+    for (const s of selected) {
+
+        if (s.dest) {
+            ctx.strokeStyle = "rgba(125,255,157,.4)";
+            ctx.setLineDash([8 / cam.z, 8 / cam.z]);
+            ctx.lineWidth = 1.5 / cam.z;
+            ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.dest.x, s.dest.y); ctx.stroke();
+            ctx.setLineDash([]);
+            if (s.destHeading !== null) {
+                ctx.strokeStyle = "rgba(125,255,157,.8)";
+                ctx.beginPath(); ctx.moveTo(s.dest.x, s.dest.y);
+                ctx.lineTo(s.dest.x + Math.cos(s.destHeading) * 70, s.dest.y + Math.sin(s.destHeading) * 70); ctx.stroke();
+            }
+        }
+
+        if (s.target && s.target.hull > 0) {
+            ctx.strokeStyle = "rgba(255,106,106,.45)";
+            ctx.lineWidth = 1.5 / cam.z;
+            ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.target.x, s.target.y); ctx.stroke();
+        }
+
+    }
+
+    /* right-drag preview: where the line will form and which way it will face */
+    if (rdrag && !rdrag.pan) {
+        const len = Math.hypot(rdrag.x1 - rdrag.x0, rdrag.y1 - rdrag.y0);
+        ctx.strokeStyle = rdrag.shift ? "#ffd24c" : "#7dff9d";
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.lineWidth = 2.5 / cam.z;
+        ctx.beginPath(); ctx.arc(rdrag.x0, rdrag.y0, 8 / cam.z, 0, Math.PI * 2); ctx.stroke();
+        if (len * cam.z > 30) {
+            ctx.beginPath(); ctx.moveTo(rdrag.x0, rdrag.y0); ctx.lineTo(rdrag.x1, rdrag.y1); ctx.stroke();
+            const a = Math.atan2(rdrag.y1 - rdrag.y0, rdrag.x1 - rdrag.x0);
+            const hs = 16 / cam.z;
+            ctx.beginPath();
+            ctx.moveTo(rdrag.x1, rdrag.y1);
+            ctx.lineTo(rdrag.x1 - Math.cos(a - 0.4) * hs, rdrag.y1 - Math.sin(a - 0.4) * hs);
+            ctx.lineTo(rdrag.x1 - Math.cos(a + 0.4) * hs, rdrag.y1 - Math.sin(a + 0.4) * hs);
+            ctx.closePath(); ctx.fill();
+        }
+    }
+
+}
+
+function drawHud() {
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const W = canvas.width, H = canvas.height;
+
+    /* top bar */
+    ctx.fillStyle = "rgba(0,0,0,.6)";
+    ctx.fillRect(0, 0, W, 34);
+
+    ctx.font = "bold 14px Arial";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#e8eef5";
+    ctx.fillText(battle ? (battle.kind === "orbit" ? "BATTLE FOR THE ORBIT OF " + String(battle.planet).toUpperCase() : "SPACE BATTLE") : "", 16, 17);
+
+    const fa = fleetsInfo.find(f => f.side === "A");
+    const fd = fleetsInfo.find(f => f.side === "D");
+    const na = ships.filter(s => s.side === "A").length;
+    const nd = ships.filter(s => s.side === "D").length;
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = fa ? fcol(fa.faction) : "#fff";
+    ctx.fillText((fa ? fa.faction : "Attackers") + ": " + na + " ships", W / 2 - 150, 17);
+    ctx.fillStyle = fd ? fcol(fd.faction) : "#fff";
+    ctx.fillText((fd ? fd.faction : "Defenders") + ": " + nd + " ships", W / 2 + 150, 17);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#8fa3b8";
+    ctx.font = "12px Arial";
+    ctx.fillText(Math.floor(simTime / 60000) + ":" + String(Math.floor(simTime / 1000) % 60).padStart(2, "0"), W - 16, 17);
+
+    /* battle log */
+    ctx.textAlign = "left";
+    ctx.font = "12px Arial";
+    const now = performance.now();
+    battleLog = battleLog.filter(l => now - l.t < 14000);
+    battleLog.forEach(function(l, i) {
+        ctx.globalAlpha = clamp(1 - (now - l.t - 9000) / 5000, 0, 1);
+        ctx.fillStyle = l.color;
+        ctx.fillText(l.text, 16, 56 + i * 17);
+    });
+    ctx.globalAlpha = 1;
+
+    /* selection card */
+    const sel = selected.filter(s => s.hull > 0);
+
+    if (sel.length) {
+
+        const x = 14, h = 150, y = H - h - 14, w = 330;
+
+        ctx.fillStyle = "rgba(0,8,20,.82)";
+        ctx.strokeStyle = "rgba(120,170,230,.5)";
+        ctx.lineWidth = 1;
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+
+        if (sel.length === 1) {
+
+            const s = sel[0];
+
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 15px Arial";
+            ctx.fillText((s.flag ? "★ FLAGSHIP — " : "") + s.cls.name.toUpperCase(), x + 12, y + 18);
+
+            ctx.font = "11px Arial";
+            ctx.fillStyle = "#9fb0c2";
+            ctx.fillText("Armour " + s.armor + "   Speed " + Math.round(maxSpeedOf(s)) + "   Power: " + POWER_MODES[s.power].name + (s.braceUntil > simTime ? "   BRACED" : (s.braceReady > simTime ? "   brace in " + Math.ceil((s.braceReady - simTime) / 1000) + "s" : "")), x + 12, y + 36);
+
+            const bar = (label, v, m, yy, col) => {
+                ctx.fillStyle = "#9fb0c2"; ctx.fillText(label, x + 12, yy + 7);
+                ctx.fillStyle = "#13202e"; ctx.fillRect(x + 70, yy, 180, 9);
+                ctx.fillStyle = col; ctx.fillRect(x + 70, yy, 180 * clamp(v / m, 0, 1), 9);
+                ctx.fillStyle = "#cfe0f0"; ctx.fillText(Math.round(v) + " / " + Math.round(m), x + 256, yy + 8);
+            };
+
+            bar("SHIELD", s.shield, s.maxShield, y + 46, "#4fb8ff");
+            bar("HULL", s.hull, s.maxHull, y + 62, s.hull / s.maxHull > 0.5 ? "#4cff72" : s.hull / s.maxHull > 0.25 ? "#ffd24c" : "#ff4c4c");
+
+            s.weapons.forEach(function(wp, i) {
+                const off = wp.offUntil && wp.offUntil > simTime;
+                const arcs = wp.def.arcs === ARC_ALL ? "all round" : wp.def.kind === "battery" ? "broadside" : "bow only";
+                ctx.fillStyle = off ? "#ff7a6a" : "#cfe0f0";
+                ctx.fillText("• " + wp.def.name + " (" + arcs + ", " + wp.def.range + ")" + (off ? "  DISABLED" : ""), x + 12, y + 92 + i * 15);
+            });
+
+            const st = [];
+            if (s.engineHit > simTime) { st.push("ENGINES DAMAGED"); }
+            if (s.fire > simTime) { st.push("FIRE"); }
+            if (st.length) { ctx.fillStyle = "#ffb060"; ctx.fillText(st.join("  "), x + 12, y + h - 8); }
+
+        }
+        else {
+
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 15px Arial";
+            ctx.fillText(sel.length + " SHIPS SELECTED", x + 12, y + 18);
+
+            const counts = {};
+            for (const s of sel) { counts[s.cls.name] = (counts[s.cls.name] || 0) + 1; }
+
+            ctx.font = "12px Arial";
+            ctx.fillStyle = "#cfe0f0";
+            Object.keys(counts).forEach((k, i) => ctx.fillText(counts[k] + " × " + k, x + 12, y + 40 + i * 15));
+
+        }
+
+    }
+
+    /* orders help */
+    ctx.font = "11px Arial";
+    ctx.fillStyle = "rgba(140,163,184,.9)";
+    ctx.textAlign = "left";
+    ctx.fillText("CLICK/DRAG select · RIGHT-CLICK move · RIGHT-DRAG move and set final heading · RIGHT-CLICK enemy attack · SHIFT+RIGHT-CLICK turn on the spot", 14, H - (sel.length ? 176 : 40));
+    ctx.fillText("B brace (-50% damage, no fire) · 1 weapons · 2 shields · 3 engines · 0 balanced · S stop · SPACE centre · wheel zoom · middle-drag pan", 14, H - (sel.length ? 162 : 24));
+
+    /* minimap */
+    const m = minimapRect();
+
+    ctx.fillStyle = "rgba(0,6,16,.85)";
+    ctx.fillRect(m.x, m.y, m.w, m.h);
+    ctx.strokeStyle = "rgba(120,170,230,.5)";
+    ctx.strokeRect(m.x, m.y, m.w, m.h);
+
+    const mx = x => m.x + x / WORLD_W * m.w;
+    const my = y => m.y + y / WORLD_H * m.h;
+
+    ctx.fillStyle = "rgba(140,140,150,.6)";
+    for (const a of terrain.asteroids) { ctx.fillRect(mx(a.x) - 1, my(a.y) - 1, 2, 2); }
+    for (const n of terrain.nebula) { ctx.fillStyle = "rgba(150,80,200,.25)"; ctx.beginPath(); ctx.arc(mx(n.x), my(n.y), n.r / WORLD_W * m.w, 0, Math.PI * 2); ctx.fill(); }
+
+    for (const s of ships) {
+        ctx.fillStyle = s.side === mySide ? "#4cff72" : "#ff5a5a";
+        const r = s.cls.len > 150 ? 3 : 2;
+        ctx.fillRect(mx(s.x) - r, my(s.y) - r, r * 2, r * 2);
+    }
+
+    ctx.strokeStyle = "#fff";
+    ctx.strokeRect(mx(cam.x - canvas.width / 2 / cam.z), my(cam.y - canvas.height / 2 / cam.z), canvas.width / cam.z / WORLD_W * m.w, canvas.height / cam.z / WORLD_H * m.h);
+
+    ctx.textBaseline = "alphabetic";
+
+}
+
+function draw(dt) {
+
+    drawBackground();
+
+    /* world space from here on */
+    ctx.setTransform(cam.z, 0, 0, cam.z, canvas.width / 2 - cam.x * cam.z, canvas.height / 2 - cam.y * cam.z);
+
+    for (const s of selected.slice(0, 3)) { drawArcs(s); }
+
+    for (const s of ships) {
+        if (cam.z < 0.24) { drawIcon(s); } else { drawShip(s); }
+    }
+
+    drawEffects(dt);
+
+    for (const s of selected) {
+        const r = s.radius * 1.2;
+        ctx.strokeStyle = "#7dff9d";
+        ctx.lineWidth = 2 / cam.z;
+        const k = r * 0.4;
+        for (const q of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+            ctx.beginPath();
+            ctx.moveTo(s.x + q[0] * r, s.y + q[1] * (r - k));
+            ctx.lineTo(s.x + q[0] * r, s.y + q[1] * r);
+            ctx.lineTo(s.x + q[0] * (r - k), s.y + q[1] * r);
+            ctx.stroke();
+        }
+    }
+
+    drawOrders();
+
+    for (const s of ships) {
+        const hover = Math.hypot(mouse.x - s.x, mouse.y - s.y) < s.radius + 10 / cam.z;
+        if (cam.z >= 0.24 && (selected.includes(s) || hover || s.hull < s.maxHull || s.shield < s.maxShield)) { drawBars(s); }
+        if (hover && cam.z >= 0.24 && s.side !== mySide) {
+            ctx.fillStyle = "#ffb0a0";
+            ctx.font = "bold " + (12 / cam.z) + "px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(s.cls.name + (s.flag ? " ★" : ""), s.x, s.y + s.radius + 22 / cam.z);
+        }
+    }
+
+    if (drag) {
+        ctx.strokeStyle = "#7dff9d";
+        ctx.lineWidth = 1 / cam.z;
+        ctx.strokeRect(drag.x0, drag.y0, drag.x1 - drag.x0, drag.y1 - drag.y0);
+    }
+
+    drawHud();
+
+}
+
+/* ---------------------------------------------------------
+   MAIN LOOP
+--------------------------------------------------------- */
+
+function frame(now) {
+
+    const dt = Math.min(0.05, (now - lastFrame) / 1000);
+    lastFrame = now;
+
+    if (battle) {
+
+        /* camera keys */
+        const pan = 900 * dt / cam.z;
+        if (keys["arrowleft"]) { cam.x -= pan; }
+        if (keys["arrowright"]) { cam.x += pan; }
+        if (keys["arrowup"]) { cam.y -= pan; }
+        if (keys["arrowdown"]) { cam.y += pan; }
+        cam.x = clamp(cam.x, 0, WORLD_W);
+        cam.y = clamp(cam.y, 0, WORLD_H);
+
+        if (isHost && !ended) {
+
+            simulate(dt);
+
+            const a = ships.some(s => s.side === "A" && s.hull > 0);
+            const d = ships.some(s => s.side === "D" && s.hull > 0);
+
+            if (!a || !d) { finishBattle(a ? "A" : "D"); }
+
+        }
+        else if (!isHost) {
+
+            simTime += dt * 1000;
+
+            const k = Math.min(1, dt * 10);
+
+            for (const s of ships) {
+                s.x += (s.tx - s.x) * k;
+                s.y += (s.ty - s.y) * k;
+                s.angle += wrapPi(s.tangle - s.angle) * k;
+                if (s.shieldFlash > 0) { s.shieldFlash = Math.max(0, s.shieldFlash - dt * 3); }
+            }
+
+            stepBolts(dt);
+
+            if (!ended && gotSnap && now - lastSnapAt > 12000) { document.getElementById("lost").classList.add("visible"); }
+            else if (!ended && !gotSnap && now - lastSnapAt > 30000) { document.getElementById("lost").classList.add("visible"); }
+
+        }
+
+        draw(dt);
+
+    }
+
+    requestAnimationFrame(frame);
+
+}
+
+/* ---------------------------------------------------------
+   START
+--------------------------------------------------------- */
+
+async function start() {
+
+    if (!battleId) { setMsg("No battle specified."); return; }
+
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+
+    if (userError || !userData.user) { setMsg("Not authenticated."); return; }
+
+    me = userData.user.id;
+
+    const { data, error } = await supabaseClient.rpc("space_battle_join", { p_battle: battleId });
+
+    if (error || !data) { setMsg("Could not enter the battle: " + (error ? error.message : "no answer")); return; }
+
+    battle = data.battle;
+    isHost = !!data.is_host;
+    mySide = data.side;
+    fleetsInfo = data.fleets || [];
+
+    buildTerrain();
+
+    channel = supabaseClient.channel("sb-" + battleId, { config: { broadcast: { self: false } } });
+
+    if (isHost) {
+
+        hostId = me;
+
+        spawnAllShips();
+        aiThink();
+        updateAuras();
+
+        channel
+            .on("broadcast", { event: "join" }, m => hostHandleJoin(m.payload))
+            .on("broadcast", { event: "cmd" }, m => hostHandleCmd(m.payload))
+            .subscribe();
+
+        setInterval(broadcastSnapshot, 100);
+        setInterval(function() { if (!ended) { supabaseClient.rpc("space_battle_beat", { p_battle: battleId }).then(function() {}); } }, 8000);
+
+        setMsg("You command the battle. Ships of fleets whose players are absent are flown by the AI.");
+
+    }
+    else {
+
+        lastSnapAt = performance.now();
+
+        channel
+            .on("broadcast", { event: "snap" }, m => applySnapshot(m.payload))
+            .on("broadcast", { event: "end" }, m => { if (!ended) { showEnd(m.payload.winner, m.payload.results || []); } })
+            .subscribe(function(status) {
+
+                if (status !== "SUBSCRIBED") { return; }
+
+                const mine = fleetsInfo.filter(f => f.player_id === me).map(f => f.fleet_id);
+                const hello = function() { send("join", { uid: me, fleetIds: mine }); };
+
+                hello();
+
+                const retry = setInterval(function() { if (gotSnap || ended) { clearInterval(retry); } else { hello(); } }, 2500);
+
+            });
+
+        setMsg("Joined the battle. Waiting for the battle commander...");
+
+    }
+
+    /* start looking at the own fleet */
+    const mine = ships.filter(s => s.side === mySide);
+
+    if (mine.length) { cam.x = mine.reduce((n, s) => n + s.x, 0) / mine.length; cam.y = mine.reduce((n, s) => n + s.y, 0) / mine.length; }
+    else { cam.x = mySide === "A" ? 700 : WORLD_W - 700; cam.y = WORLD_H / 2; }
+
+    cam.z = 0.42;
+
+    setTimeout(function() { document.getElementById("msg").style.display = "none"; }, 9000);
+
+    requestAnimationFrame(frame);
+
+}
+
+start();
+</script>
+</body>
+</html>

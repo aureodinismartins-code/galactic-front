@@ -1,0 +1,3535 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Galactic Front - Galaxy Map</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+    ></script>
+
+    <script src="supabase.js"></script>
+        <script>window.GC_RESET = true;</script>
+    <script src="gamecontrol.js"></script>
+    <script src="ships.js"></script>
+
+
+    <style>
+
+        /* =========================================
+           FLEET SYSTEM
+        ========================================= */
+
+        .fleet-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 500;
+        }
+
+
+        .fleet-marker {
+            position: absolute;
+
+            width: 24px;
+            height: 24px;
+
+            border-radius: 50%;
+
+            transform:
+                translate(-50%, -50%);
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            font-size: 11px;
+            font-weight: bold;
+
+            border: 2px solid white;
+
+            box-shadow:
+                0 0 10px rgba(255,255,255,0.65);
+
+            cursor: pointer;
+
+            pointer-events: auto;
+
+            transition:
+                left 0.5s linear,
+                top 0.5s linear,
+                transform 0.15s;
+
+            z-index: 600;
+        }
+
+
+        .fleet-marker:hover {
+            transform:
+                translate(-50%, -50%)
+                scale(1.25);
+        }
+
+
+        .fleet-marker.combine {
+            background: #d52b2b;
+            color: white;
+        }
+
+
+        .fleet-marker.independent {
+            background: #eeeeee;
+            color: #111;
+        }
+
+
+        .fleet-marker.freedom {
+            background: #347cff;
+            color: white;
+        }
+
+
+        .fleet-marker.enemy {
+            opacity: 0.75;
+        }
+
+
+        .fleet-marker.selected {
+            outline:
+                3px solid white;
+
+            outline-offset: 4px;
+        }
+
+
+        .fleet-marker.travelling {
+            border-style: dashed;
+        }
+
+
+        /* =========================================
+           FLEET PANEL
+        ========================================= */
+
+        #fleet-command-panel {
+
+            position: absolute;
+
+            right: 25px;
+            bottom: 25px;
+
+            width: 300px;
+
+            max-height: calc(100vh - 50px);
+
+            overflow-y: auto;
+
+            padding: 18px;
+
+            background:
+                rgba(8, 10, 15, 0.96);
+
+            border:
+                1px solid rgba(255,255,255,0.25);
+
+            border-radius: 8px;
+
+            color: white;
+
+            z-index: 2000;
+
+            display: none;
+
+            box-shadow:
+                0 10px 35px rgba(0,0,0,0.55);
+        }
+
+
+        #fleet-command-panel.visible {
+            display: block;
+        }
+
+
+        #fleet-command-panel h2 {
+
+            margin:
+                0 0 8px 0;
+
+            font-size: 20px;
+        }
+
+
+        .fleet-panel-row {
+
+            margin:
+                7px 0;
+
+            font-size: 14px;
+
+            color: #cfd3d8;
+        }
+
+
+        .fleet-panel-row strong {
+            color: white;
+        }
+
+
+        #fleet-destination {
+
+            width: 100%;
+
+            box-sizing: border-box;
+
+            margin-top: 8px;
+
+            padding: 10px;
+
+            background: #11151c;
+
+            color: white;
+
+            border:
+                1px solid #555;
+
+            border-radius: 5px;
+
+            font-size: 14px;
+        }
+
+
+        #move-fleet-button {
+
+            width: 100%;
+
+            margin-top: 10px;
+
+            padding: 11px;
+
+            background: #26384d;
+
+            color: white;
+
+            border:
+                1px solid #65788c;
+
+            border-radius: 5px;
+
+            cursor: pointer;
+
+            font-weight: bold;
+        }
+
+
+        #move-fleet-button:hover {
+            background: #36506b;
+        }
+
+
+        #move-fleet-button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+
+        #close-fleet-panel {
+
+            position: absolute;
+
+            top: 8px;
+            right: 10px;
+
+            background: transparent;
+
+            color: #aaa;
+
+            border: none;
+
+            cursor: pointer;
+
+            font-size: 18px;
+        }
+
+
+        #fleet-message {
+
+            margin-top: 9px;
+
+            min-height: 18px;
+
+            font-size: 12px;
+
+            color: #ffcc66;
+        }
+
+
+        /* =========================================
+           FLEET RECRUITMENT
+        ========================================= */
+
+        #fleet-recruitment {
+
+            margin-top: 16px;
+
+            padding-top: 14px;
+
+            border-top:
+                1px solid rgba(255,255,255,0.18);
+        }
+
+
+        #fleet-recruitment-title {
+
+            margin-bottom: 10px;
+
+            font-size: 13px;
+
+            font-weight: bold;
+
+            letter-spacing: 2px;
+
+            color: white;
+        }
+
+
+        #fleet-composition {
+
+            margin-bottom: 8px;
+
+            font-size: 12px;
+
+            line-height: 1.5;
+
+            color: #dddddd;
+        }
+
+
+        #fleet-credits {
+
+            margin-bottom: 10px;
+
+            font-size: 13px;
+
+            color: #ffd166;
+        }
+
+
+        .recruit-button {
+
+            width: 100%;
+
+            margin-top: 6px;
+
+            padding: 9px;
+
+            background: #151b24;
+
+            color: white;
+
+            border:
+                1px solid #46515f;
+
+            border-radius: 5px;
+
+            cursor: pointer;
+
+            text-align: left;
+
+            font-size: 12px;
+        }
+
+
+        .recruit-button:hover {
+            background: #222c38;
+        }
+
+
+        .recruit-button:disabled {
+
+            opacity: 0.4;
+
+            cursor: not-allowed;
+        }
+
+
+        .recruit-button strong {
+            color: white;
+        }
+
+
+        .recruit-cost {
+
+            float: right;
+
+            color: #ffd166;
+        }
+
+
+        /* =========================================
+           MAP STATUS
+        ========================================= */
+
+        #fleet-status-display {
+
+            position: absolute;
+
+            left: 25px;
+            bottom: 25px;
+
+            padding: 9px 13px;
+
+            background:
+                rgba(8,10,15,0.85);
+
+            color: #ccc;
+
+            border:
+                1px solid rgba(255,255,255,0.15);
+
+            border-radius: 5px;
+
+            z-index: 1500;
+
+            font-size: 12px;
+        }
+
+
+        /* =========================================
+           FLEET LABEL
+        ========================================= */
+
+        .fleet-label {
+
+            position: absolute;
+
+            left: 50%;
+
+            top: 28px;
+
+            transform:
+                translateX(-50%);
+
+            white-space: nowrap;
+
+            padding: 3px 6px;
+
+            background:
+                rgba(0,0,0,0.75);
+
+            color: white;
+
+            font-size: 10px;
+
+            border-radius: 3px;
+
+            pointer-events: none;
+        }
+
+
+        /* =========================================
+           PLANET POSITIONS
+        ========================================= */
+
+        .planet-1  { left:10%; top:19%; }
+        .planet-2  { left:19%; top:12%; }
+        .planet-3  { left:28%; top:18%; }
+        .planet-4  { left:36%; top:10%; }
+        .planet-5  { left:43%; top:21%; }
+        .planet-6  { left:53%; top:13%; }
+        .planet-7  { left:65%; top:10%; }
+        .planet-8  { left:74%; top:20%; }
+        .planet-9  { left:82%; top:12%; }
+        .planet-10 { left:89%; top:25%; }
+
+        .planet-11 { left:13%; top:32%; }
+        .planet-12 { left:23%; top:29%; }
+        .planet-13 { left:31%; top:38%; }
+        .planet-14 { left:41%; top:31%; }
+        .planet-15 { left:49%; top:39%; }
+        .planet-16 { left:57%; top:29%; }
+        .planet-17 { left:65%; top:37%; }
+        .planet-18 { left:75%; top:31%; }
+        .planet-19 { left:85%; top:39%; }
+        .planet-20 { left:9%; top:48%; }
+
+        .planet-21 { left:18%; top:55%; }
+        .planet-22 { left:29%; top:48%; }
+        .planet-23 { left:38%; top:57%; }
+        .planet-24 { left:47%; top:49%; }
+        .planet-25 { left:57%; top:55%; }
+        .planet-26 { left:66%; top:48%; }
+        .planet-27 { left:76%; top:57%; }
+        .planet-28 { left:85%; top:50%; }
+
+        .planet-29 { left:12%; top:69%; }
+        .planet-30 { left:22%; top:76%; }
+        .planet-31 { left:33%; top:68%; }
+        .planet-32 { left:43%; top:76%; }
+        .planet-33 { left:54%; top:68%; }
+        .planet-34 { left:64%; top:76%; }
+        .planet-35 { left:74%; top:69%; }
+        .planet-36 { left:84%; top:77%; }
+
+        .planet-37 { left:7%;  top:84%; }
+        .planet-38 { left:31%; top:88%; }
+        .planet-39 { left:58%; top:89%; }
+        .planet-40 { left:89%; top:84%; }
+        .planet-41 { left:70%; top:85%; }
+        .planet-42 { left:79%; top:92%; }
+
+        /* war worlds glow like a burning front */
+        .planet.war {
+            box-shadow: 0 0 16px 4px rgba(255,110,40,0.85) !important;
+            animation: warPulse 2.4s ease-in-out infinite;
+        }
+        @keyframes warPulse {
+            0%, 100% { box-shadow: 0 0 12px 3px rgba(255,110,40,0.7); }
+            50% { box-shadow: 0 0 22px 7px rgba(255,70,20,0.95); }
+        }
+
+
+        /* ---- WARSHIP FLEET MARKERS ---- */
+        .fleet-marker {
+            width: auto;
+            height: auto;
+            background: none !important;
+            border: none !important;
+            border-radius: 6px;
+            box-shadow: none;
+            filter: drop-shadow(0 0 4px rgba(255,255,255,0.45));
+        }
+        .fleet-marker svg { display: block; }
+        .fleet-marker { box-shadow: none !important; animation: none !important; border-radius: 0 !important; }
+        .fleet-marker.selected { outline: 2px dashed rgba(143,208,255,.9) !important; outline-offset: 2px; border-radius: 8px !important; }
+        .fleet-marker .hull { stroke: none; fill: #f3f5fb; }
+        .fleet-marker .trim { fill: none; stroke: #d9b45a; stroke-width: 0.8; }
+        .fleet-marker .glow { fill: #ffffff; }
+        .fleet-marker svg.fleet-ships { transition: transform 0.4s linear; }
+        .fleet-marker.combine svg.fleet-ships { filter: drop-shadow(0 0 2px #ff3b3b) drop-shadow(0 0 5px #ff3b3b); }
+        .fleet-marker.freedom svg.fleet-ships { filter: drop-shadow(0 0 2px #3b7bff) drop-shadow(0 0 5px #3b7bff); }
+        .fleet-marker.independent svg.fleet-ships { filter: drop-shadow(0 0 3px #ffffff); }
+        .fleet-marker.enemy svg.fleet-ships { opacity: 0.85; }
+        .fleet-marker.engaged svg.fleet-ships { animation: engagedPulse 0.8s ease-in-out infinite alternate; }
+        @keyframes engagedPulse { from { filter: drop-shadow(0 0 3px #ff5a2a); } to { filter: drop-shadow(0 0 9px #ff2a00); } }
+        /* fleets are sent with a right-click on the map, so the old destination picker is hidden */
+        #fleet-destination, #move-fleet-button, label[for="fleet-destination"] { display: none !important; }
+        #fleet-send-hint { color: #8fd0ff; font-size: 12px; letter-spacing: 1px; margin: 6px 0; }
+        .fleet-marker.travelling { filter: drop-shadow(0 0 6px rgba(255,170,60,0.8)); }
+        .fleet-marker .fleet-label { top: 46px; }
+
+        /* ---- CONTESTED PLANET BAR ---- */
+        .planet { overflow: visible; }
+        .contest-bar {
+            position: absolute;
+            left: 50%;
+            top: -11px;
+            transform: translateX(-50%);
+            width: 32px;
+            height: 5px;
+            border: 1px solid rgba(255,255,255,0.7);
+            border-radius: 3px;
+            overflow: hidden;
+            pointer-events: none;
+            box-shadow: 0 0 4px rgba(0,0,0,0.8);
+        }
+        .contest-bar > div { height: 100%; }
+    </style>
+
+</head>
+
+
+<body>
+
+
+<div class="galaxy-page">
+
+
+    <button
+        class="main-menu-button"
+        id="main-menu-button"
+    >
+        MAIN MENU
+    </button>
+
+
+    <div id="player-faction-display"></div>
+
+
+    <div class="map-header">
+
+        <h1>GALACTIC MAP</h1>
+
+        <p>
+            Click a planet to enter its planetary map.
+        </p>
+
+    </div>
+
+
+    <div class="galaxy-map" id="galaxy-map">
+
+
+        <!-- FLEETS -->
+
+        <div
+            class="fleet-layer"
+            id="fleet-layer"
+        ></div>
+
+
+        <!-- PLANETS -->
+
+        <div class="planet combine planet-1"
+            data-name="Ultramars"
+            data-owner="Combine">
+            <span>Ultramars</span>
+        </div>
+
+
+        <div class="planet independent planet-2"
+            data-name="Veyrona"
+            data-owner="Independents">
+            <span>Veyrona</span>
+        </div>
+
+        <div class="planet independent planet-3"
+            data-name="Kharos"
+            data-owner="Independents">
+            <span>Kharos</span>
+        </div>
+
+        <div class="planet independent planet-4"
+            data-name="Novera"
+            data-owner="Independents">
+            <span>Novera</span>
+        </div>
+
+        <div class="planet independent planet-5"
+            data-name="Asteron"
+            data-owner="Independents">
+            <span>Asteron</span>
+        </div>
+
+        <div class="planet independent planet-6"
+            data-name="Veltrix"
+            data-owner="Independents">
+            <span>Veltrix</span>
+        </div>
+
+        <div class="planet independent planet-7"
+            data-name="Orphion"
+            data-owner="Independents">
+            <span>Orphion</span>
+        </div>
+
+        <div class="planet independent planet-8"
+            data-name="Caldris"
+            data-owner="Independents">
+            <span>Caldris</span>
+        </div>
+
+        <div class="planet independent planet-9"
+            data-name="Elyra"
+            data-owner="Independents">
+            <span>Elyra</span>
+        </div>
+
+        <div class="planet independent planet-10"
+            data-name="Dravon"
+            data-owner="Independents">
+            <span>Dravon</span>
+        </div>
+
+        <div class="planet independent planet-11"
+            data-name="Meridia"
+            data-owner="Independents">
+            <span>Meridia</span>
+        </div>
+
+        <div class="planet independent planet-12"
+            data-name="Tarsis"
+            data-owner="Independents">
+            <span>Tarsis</span>
+        </div>
+
+        <div class="planet independent planet-13"
+            data-name="Vandros"
+            data-owner="Independents">
+            <span>Vandros</span>
+        </div>
+
+        <div class="planet independent planet-14"
+            data-name="Kestara"
+            data-owner="Independents">
+            <span>Kestara</span>
+        </div>
+
+        <div class="planet independent planet-15"
+            data-name="Rhyll"
+            data-owner="Independents">
+            <span>Rhyll</span>
+        </div>
+
+        <div class="planet independent planet-16"
+            data-name="Solvara"
+            data-owner="Independents">
+            <span>Solvara</span>
+        </div>
+
+        <div class="planet independent planet-17"
+            data-name="Demeris"
+            data-owner="Independents">
+            <span>Demeris</span>
+        </div>
+
+        <div class="planet independent planet-18"
+            data-name="Voralis"
+            data-owner="Independents">
+            <span>Voralis</span>
+        </div>
+
+        <div class="planet independent planet-19"
+            data-name="Aurelis"
+            data-owner="Independents">
+            <span>Aurelis</span>
+        </div>
+
+        <div class="planet independent planet-20"
+            data-name="Zeraphon"
+            data-owner="Independents">
+            <span>Zeraphon</span>
+        </div>
+
+        <div class="planet independent planet-21"
+            data-name="Mystral"
+            data-owner="Independents">
+            <span>Mystral</span>
+        </div>
+
+        <div class="planet independent planet-22"
+            data-name="Korvax"
+            data-owner="Independents">
+            <span>Korvax</span>
+        </div>
+
+        <div class="planet independent planet-23"
+            data-name="Eryndor"
+            data-owner="Independents">
+            <span>Eryndor</span>
+        </div>
+
+        <div class="planet independent planet-24"
+            data-name="Talvera"
+            data-owner="Independents">
+            <span>Talvera</span>
+        </div>
+
+        <div class="planet independent planet-25"
+            data-name="Ossara"
+            data-owner="Independents">
+            <span>Ossara</span>
+        </div>
+
+        <div class="planet independent planet-26"
+            data-name="Brineth"
+            data-owner="Independents">
+            <span>Brineth</span>
+        </div>
+
+        <div class="planet independent planet-27"
+            data-name="Valcor"
+            data-owner="Independents">
+            <span>Valcor</span>
+        </div>
+
+        <div class="planet independent planet-28"
+            data-name="Nythara"
+            data-owner="Independents">
+            <span>Nythara</span>
+        </div>
+
+        <div class="planet independent planet-29"
+            data-name="Caelus"
+            data-owner="Independents">
+            <span>Caelus</span>
+        </div>
+
+        <div class="planet independent planet-30"
+            data-name="Ravena"
+            data-owner="Independents">
+            <span>Ravena</span>
+        </div>
+
+        <div class="planet independent planet-31"
+            data-name="Thessara"
+            data-owner="Independents">
+            <span>Thessara</span>
+        </div>
+
+        <div class="planet independent planet-32"
+            data-name="Morvane"
+            data-owner="Independents">
+            <span>Morvane</span>
+        </div>
+
+        <div class="planet independent planet-33"
+            data-name="Iskaron"
+            data-owner="Independents">
+            <span>Iskaron</span>
+        </div>
+
+        <div class="planet independent planet-34"
+            data-name="Lunaris"
+            data-owner="Independents">
+            <span>Lunaris</span>
+        </div>
+
+        <div class="planet independent planet-35"
+            data-name="Draxia"
+            data-owner="Independents">
+            <span>Draxia</span>
+        </div>
+
+        <div class="planet independent planet-36"
+            data-name="Seraphis"
+            data-owner="Independents">
+            <span>Seraphis</span>
+        </div>
+
+        <div class="planet independent planet-37"
+            data-name="Oryxen"
+            data-owner="Independents">
+            <span>Oryxen</span>
+        </div>
+
+        <div class="planet independent planet-38"
+            data-name="Virelia"
+            data-owner="Independents">
+            <span>Virelia</span>
+        </div>
+
+        <div class="planet independent planet-39"
+            data-name="Arctyra"
+            data-owner="Independents">
+            <span>Arctyra</span>
+        </div>
+
+        <div class="planet freedom planet-40"
+            data-name="Free Earth"
+            data-owner="Freedom Authority">
+            <span>Free Earth</span>
+        </div>
+
+        <div class="planet independent war planet-41"
+            data-name="Krieg"
+            data-owner="Independents">
+            <span>Krieg</span>
+        </div>
+
+        <div class="planet independent war planet-42"
+            data-name="Vraks"
+            data-owner="Independents">
+            <span>Vraks</span>
+        </div>
+
+
+    </div>
+
+
+    <div id="fleet-status-display">
+        Loading fleets...
+    </div>
+
+
+    <div id="fleet-command-panel">
+
+        <button
+            id="close-fleet-panel"
+            type="button"
+        >
+            ×
+        </button>
+
+
+        <h2 id="fleet-panel-name">
+            Fleet
+        </h2>
+
+
+        <div
+            class="fleet-panel-row"
+            id="fleet-panel-owner"
+        ></div>
+
+
+        <div
+            class="fleet-panel-row"
+            id="fleet-panel-status"
+        ></div>
+
+
+        <div
+            class="fleet-panel-row"
+            id="fleet-panel-location"
+        ></div>
+
+
+        <div
+            class="fleet-panel-row"
+            id="fleet-panel-eta"
+        ></div>
+
+
+        <div id="fleet-send-hint">RIGHT-CLICK ANYWHERE ON THE MAP TO SEND THIS FLEET</div>
+        <label
+            for="fleet-destination"
+            class="fleet-panel-row"
+        >
+            DESTINATION
+        </label>
+
+
+        <select
+            id="fleet-destination"
+        ></select>
+
+
+        <button
+            id="move-fleet-button"
+            type="button"
+        >
+            SEND FLEET
+        </button>
+
+
+        <div id="fleet-message"></div>
+
+
+        <!-- =========================================
+             RECRUITMENT
+        ========================================= -->
+
+        <div id="fleet-recruitment">
+
+            <div id="fleet-recruitment-title">
+                FLEET RECRUITMENT
+            </div>
+
+
+            <div id="fleet-composition">
+                UNITS: —
+            </div>
+
+
+            <div id="fleet-credits">
+                FACTION CREDITS: —
+            </div>
+
+
+            <button
+                class="recruit-button"
+                data-unit="Rifle"
+                type="button"
+            >
+                <strong>+ RIFLE</strong>
+
+                <span class="recruit-cost">
+                    50 CR • 30s
+                </span>
+            </button>
+
+
+            <button
+                class="recruit-button"
+                data-unit="MG"
+                type="button"
+            >
+                <strong>+ MG</strong>
+
+                <span class="recruit-cost">
+                    100 CR • 60s
+                </span>
+            </button>
+
+
+            <button
+                class="recruit-button"
+                data-unit="Assault"
+                type="button"
+            >
+                <strong>+ ASSAULT</strong>
+
+                <span class="recruit-cost">
+                    75 CR • 40s
+                </span>
+            </button>
+
+
+            <button
+                class="recruit-button"
+                data-unit="AT"
+                type="button"
+            >
+                <strong>+ AT</strong>
+
+                <span class="recruit-cost">
+                    150 CR • 90s
+                </span>
+            </button>
+
+
+            <button
+                class="recruit-button"
+                data-unit="Sniper"
+                type="button"
+            >
+                <strong>+ SNIPER</strong>
+
+                <span class="recruit-cost">
+                    125 CR • 75s
+                </span>
+            </button>
+            <button
+                class="recruit-button"
+                data-unit="Tank"
+                type="button"
+                title="Requires a Heavy Vehicle Factory on this planet"
+            >
+                <strong>+ TANK</strong>
+                <span class="recruit-cost">
+                    150 CR • 120s • HEAVY FACTORY
+                </span>
+            </button>
+            <button
+                class="recruit-button"
+                data-unit="Artillery"
+                type="button"
+                title="Requires a Vehicle Factory on this planet"
+            >
+                <strong>+ ARTILLERY</strong>
+                <span class="recruit-cost">
+                    100 CR • 90s • VEHICLE FACTORY
+                </span>
+            </button>
+            <button
+                class="recruit-button"
+                data-unit="Knightmare"
+                type="button"
+                title="Requires a complete Knightmare Facility (with Speeder Wheel, Frame and Controls) on this planet. One squad = 3 mechs."
+            >
+                <strong>+ KNIGHTMARE SQUAD</strong>
+                <span class="recruit-cost">
+                    1500 CR • 120s • KNIGHTMARE FACILITY
+                </span>
+            </button>
+
+        </div>
+
+    </div>
+
+
+</div>
+
+
+<script>
+
+
+/* =========================================
+   PLANETS
+========================================= */
+
+
+const planetData = [
+
+    ["Ultramars", "Combine", 1],
+
+    ["Veyrona", "Independents", 2],
+    ["Kharos", "Independents", 3],
+    ["Novera", "Independents", 4],
+    ["Asteron", "Independents", 5],
+    ["Veltrix", "Independents", 6],
+    ["Orphion", "Independents", 7],
+    ["Caldris", "Independents", 8],
+    ["Elyra", "Independents", 9],
+    ["Dravon", "Independents", 10],
+
+    ["Meridia", "Independents", 11],
+    ["Tarsis", "Independents", 12],
+    ["Vandros", "Independents", 13],
+    ["Kestara", "Independents", 14],
+    ["Rhyll", "Independents", 15],
+    ["Solvara", "Independents", 16],
+    ["Demeris", "Independents", 17],
+    ["Voralis", "Independents", 18],
+    ["Aurelis", "Independents", 19],
+    ["Zeraphon", "Independents", 20],
+
+    ["Mystral", "Independents", 21],
+    ["Korvax", "Independents", 22],
+    ["Eryndor", "Independents", 23],
+    ["Talvera", "Independents", 24],
+    ["Ossara", "Independents", 25],
+    ["Brineth", "Independents", 26],
+    ["Valcor", "Independents", 27],
+    ["Nythara", "Independents", 28],
+
+    ["Caelus", "Independents", 29],
+    ["Ravena", "Independents", 30],
+    ["Thessara", "Independents", 31],
+    ["Morvane", "Independents", 32],
+    ["Iskaron", "Independents", 33],
+    ["Lunaris", "Independents", 34],
+    ["Draxia", "Independents", 35],
+    ["Seraphis", "Independents", 36],
+
+    ["Oryxen", "Independents", 37],
+    ["Virelia", "Independents", 38],
+    ["Arctyra", "Independents", 39],
+
+    ["Free Earth", "Freedom Authority", 40],
+    ["Krieg", "Independents", 41],
+    ["Vraks", "Independents", 42]
+
+];
+
+
+const planetPositions = {
+
+    "Krieg": [70,85],
+    "Vraks": [79,92],
+
+    "Ultramars": [10,19],
+
+    "Veyrona": [19,12],
+    "Kharos": [28,18],
+    "Novera": [36,10],
+    "Asteron": [43,21],
+    "Veltrix": [53,13],
+    "Orphion": [65,10],
+    "Caldris": [74,20],
+    "Elyra": [82,12],
+    "Dravon": [89,25],
+
+    "Meridia": [13,32],
+    "Tarsis": [23,29],
+    "Vandros": [31,38],
+    "Kestara": [41,31],
+    "Rhyll": [49,39],
+    "Solvara": [57,29],
+    "Demeris": [65,37],
+    "Voralis": [75,31],
+    "Aurelis": [85,39],
+    "Zeraphon": [9,48],
+
+    "Mystral": [18,55],
+    "Korvax": [29,48],
+    "Eryndor": [38,57],
+    "Talvera": [47,49],
+    "Ossara": [57,55],
+    "Brineth": [66,48],
+    "Valcor": [76,57],
+    "Nythara": [85,50],
+
+    "Caelus": [12,69],
+    "Ravena": [22,76],
+    "Thessara": [33,68],
+    "Morvane": [43,76],
+    "Iskaron": [54,68],
+    "Lunaris": [64,76],
+    "Draxia": [74,69],
+    "Seraphis": [84,77],
+
+    "Oryxen": [7,84],
+    "Virelia": [31,88],
+    "Arctyra": [58,89],
+
+    "Free Earth": [89,84]
+
+};
+
+
+/* =========================================
+   PLAYER
+========================================= */
+
+
+const playerFaction =
+    localStorage.getItem("playerFaction")
+    || "Independents";
+
+
+const factionDisplay =
+    document.getElementById(
+        "player-faction-display"
+    );
+
+
+if (factionDisplay) {
+
+    factionDisplay.textContent =
+        "FACTION: " +
+        playerFaction.toUpperCase();
+
+}
+
+
+/* =========================================
+   SUPABASE PLAYER
+========================================= */
+
+
+let playerID = null;
+
+let fleets = [];
+
+let selectedFleet = null;
+
+let refreshTimer = null;
+
+
+/* =========================================
+   DOM
+========================================= */
+
+
+const galaxyMap =
+    document.getElementById(
+        "galaxy-map"
+    );
+
+
+const fleetLayer =
+    document.getElementById(
+        "fleet-layer"
+    );
+
+
+const fleetStatusDisplay =
+    document.getElementById(
+        "fleet-status-display"
+    );
+
+
+const fleetPanel =
+    document.getElementById(
+        "fleet-command-panel"
+    );
+
+
+const destinationSelect =
+    document.getElementById(
+        "fleet-destination"
+    );
+
+
+const fleetMessage =
+    document.getElementById(
+        "fleet-message"
+    );
+
+
+const fleetComposition =
+    document.getElementById(
+        "fleet-composition"
+    );
+
+
+const fleetCredits =
+    document.getElementById(
+        "fleet-credits"
+    );
+
+
+const recruitButtons =
+    document.querySelectorAll(
+        ".recruit-button"
+    );
+
+
+/* =========================================
+   RECRUITMENT DATA
+========================================= */
+
+
+const recruitCosts = {
+
+    Rifle: 50,
+
+    MG: 100,
+
+    Assault: 75,
+
+    AT: 150,
+
+    Sniper: 125,
+        Tank: 150,
+    Artillery: 100,
+    Knightmare: 1500
+};
+
+
+const recruitAmounts = {
+    Rifle: 1,
+    MG: 1,
+    Assault: 1,
+    AT: 1,
+    Sniper: 1,
+    Tank: 1,
+    Artillery: 1,
+    Knightmare: 1
+};
+
+
+/* =========================================
+   MAIN MENU
+========================================= */
+
+
+document
+    .getElementById(
+        "main-menu-button"
+    )
+    .addEventListener(
+        "click",
+        function () {
+
+            window.location.href =
+                "index.html";
+
+        }
+    );
+
+
+/* =========================================
+   FLEET COLORS
+========================================= */
+
+
+function factionClass(faction) {
+
+    if (
+        faction ===
+        "Combine"
+    ) {
+
+        return "combine";
+
+    }
+
+
+    if (
+        faction ===
+        "Freedom Authority"
+    ) {
+
+        return "freedom";
+
+    }
+
+
+    return "independent";
+
+}
+
+
+/* =========================================
+   TIME
+========================================= */
+
+
+function formatTime(seconds) {
+
+    seconds =
+        Math.max(
+            0,
+            Math.ceil(seconds)
+        );
+
+
+    const minutes =
+        Math.floor(
+            seconds / 60
+        );
+
+
+    const secs =
+        seconds % 60;
+
+
+    return (
+        String(minutes)
+            .padStart(2,"0")
+        + ":" +
+        String(secs)
+            .padStart(2,"0")
+    );
+
+}
+
+
+/* =========================================
+   PLANET LOCATION
+========================================= */
+
+
+function getPlanetPosition(name) {
+
+    return (
+        planetPositions[name]
+        || [50,50]
+    );
+
+}
+
+
+/* =========================================
+   FLEET LOCATION
+========================================= */
+
+
+function timeMs(t) { return t ? new Date(t).getTime() : NaN; }
+
+/* the point a travelling fleet started from (a planet, or a spot in deep space) */
+function getTripStart(fleet) {
+
+    if (
+        fleet.from_x != null && fleet.from_dep &&
+        timeMs(fleet.from_dep) === timeMs(fleet.departure_time)
+    ) {
+        return [Number(fleet.from_x), Number(fleet.from_y)];
+    }
+
+    return getPlanetPosition(fleet.origin);
+
+}
+
+/* the point a travelling fleet is heading for */
+function getTripEnd(fleet) {
+
+    if (fleet.status === "cruising" && fleet.dest_x != null) {
+        return [Number(fleet.dest_x), Number(fleet.dest_y)];
+    }
+
+    return getPlanetPosition(fleet.destination);
+
+}
+
+function getFleetPosition(fleet) {
+
+    if ((fleet.status === "in_space" || fleet.status === "engaged") && fleet.space_x != null) {
+        return [Number(fleet.space_x), Number(fleet.space_y)];
+    }
+
+    const moving = fleet.status === "travelling" || fleet.status === "cruising";
+
+    if (
+        !moving ||
+        (fleet.status === "travelling" && !fleet.destination) ||
+        !fleet.departure_time ||
+        !fleet.arrival_time
+    ) {
+        return getPlanetPosition(fleet.origin);
+    }
+
+    const start = getTripStart(fleet);
+    const end = getTripEnd(fleet);
+
+    const departure = timeMs(fleet.departure_time);
+    const arrival = timeMs(fleet.arrival_time);
+    const total = arrival - departure;
+
+    if (total <= 0) { return end; }
+
+    const progress = Math.max(0, Math.min(1, (Date.now() - departure) / total));
+
+    return [
+        start[0] + (end[0] - start[0]) * progress,
+        start[1] + (end[1] - start[1]) * progress
+    ];
+
+}
+
+/* CSS transform that turns the ship group towards where it is flying */
+function getFleetTurn(fleet) {
+
+    let dx = 0;
+    let dy = 0;
+
+    const map = document.getElementById("galaxy-map");
+    const w = map ? map.clientWidth : 1;
+    const h = map ? map.clientHeight : 1;
+
+    if (fleet.status === "travelling" || fleet.status === "cruising") {
+
+        if (fleet.status === "travelling" && !fleet.destination) { return ""; }
+
+        const a = getTripStart(fleet);
+        const b = getTripEnd(fleet);
+
+        dx = (b[0] - a[0]) * w / 100;
+        dy = (b[1] - a[1]) * h / 100;
+
+    }
+    else if ((fleet.status === "in_space" || fleet.status === "engaged") && fleet.heading != null) {
+
+        const r = Number(fleet.heading) * Math.PI / 180;
+
+        dx = Math.cos(r);
+        dy = Math.sin(r);
+
+    }
+    else {
+        return "";
+    }
+
+    if (Math.abs(dx) + Math.abs(dy) < 0.0001) { return ""; }
+
+    /* the art faces right (pointed end first). Flying left: mirror it so it is never upside down. */
+    if (dx >= 0) {
+        return "rotate(" + (Math.atan2(dy, dx) * 180 / Math.PI).toFixed(1) + "deg)";
+    }
+
+    return "scaleX(-1) rotate(" + (Math.atan2(dy, -dx) * 180 / Math.PI).toFixed(1) + "deg)";
+
+}
+
+/* =========================================
+   TRAVEL TIME
+========================================= */
+
+
+function calculateTravelSeconds(
+    origin,
+    destination
+) {
+
+    const a =
+        getPlanetPosition(
+            origin
+        );
+
+
+    const b =
+        getPlanetPosition(
+            destination
+        );
+
+
+    const dx =
+        b[0] - a[0];
+
+
+    const dy =
+        b[1] - a[1];
+
+
+    const distance =
+        Math.sqrt(
+            dx * dx +
+            dy * dy
+        );
+
+
+    return Math.max(
+        60,
+        Math.round(
+            distance * 6
+        )
+    );
+
+}
+
+
+/* =========================================
+   GET CURRENT FLEET LOCATION
+========================================= */
+
+
+function getCurrentLocation(fleet) {
+
+    if (fleet.status === "in_space") { return "Deep space"; }
+    if (fleet.status === "cruising") { return "Deep space (under way)"; }
+
+
+    if (
+        fleet.status ===
+        "travelling"
+    ) {
+
+        const now =
+            Date.now();
+
+
+        const arrival =
+            new Date(
+                fleet.arrival_time
+            ).getTime();
+
+
+        if (
+            arrival <= now &&
+            fleet.destination
+        ) {
+
+            return fleet.destination;
+
+        }
+
+
+        return fleet.origin;
+
+    }
+
+
+    return fleet.origin;
+
+}
+
+
+/* =========================================
+   FINALIZE EXPIRED FLEETS
+========================================= */
+
+
+async function finalizeExpiredFleets() {
+
+    for (
+        const fleet
+        of fleets
+    ) {
+
+        if (
+            !fleet.arrival_time
+        ) {
+
+            continue;
+
+        }
+
+
+        const arrival =
+            new Date(
+                fleet.arrival_time
+            ).getTime();
+
+
+        if (
+            arrival > Date.now()
+        ) {
+
+            continue;
+
+        }
+
+
+                if (fleet.status === "cruising") {
+
+            await supabaseClient.rpc("finalize_point_arrival", { p_fleet: String(fleet.id) });
+            continue;
+
+        }
+
+        if (
+            fleet.status !==
+            "building"
+            &&
+            fleet.status !==
+            "travelling"
+        ) {
+            continue;
+        }
+
+
+        const { error } =
+            await supabaseClient
+                .rpc(
+                    "finalize_fleet_arrival",
+                    {
+                        fleet_id:
+                            fleet.id
+                    }
+                );
+
+
+        if (error) {
+
+            console.error(
+                "Fleet finalization error:",
+                error
+            );
+
+        }
+
+    }
+
+}
+
+
+/* =========================================
+   LOAD FLEETS
+========================================= */
+
+
+/* a fleet built under another faction is dormant until you switch back */
+function isUsableFleet(f) {
+    return !(f.player_id === playerID && f.faction && f.faction !== playerFaction);
+}
+
+async function loadFleets() {
+
+    /* move finished recruits into their fleets */
+    await supabaseClient.rpc("finalize_recruits");
+    await supabaseClient.rpc("fire_planetary_cannons");
+
+
+    const {
+        data: userData,
+        error: userError
+    } =
+        await supabaseClient.auth.getUser();
+
+
+    if (userError) {
+
+        console.error(
+            "Auth error:",
+            userError
+        );
+
+        fleetStatusDisplay.textContent =
+            "AUTH ERROR";
+
+        return;
+
+    }
+
+
+    if (
+        !userData ||
+        !userData.user
+    ) {
+
+        fleetStatusDisplay.textContent =
+            "NOT AUTHENTICATED";
+
+        return;
+
+    }
+
+
+    playerID =
+        userData.user.id;
+
+
+    const {
+        data,
+        error
+    } =
+        await supabaseClient
+            .from("fleets")
+            .select("*");
+
+
+    if (error) {
+
+        console.error(
+            "Fleet loading error:",
+            error
+        );
+
+        fleetStatusDisplay.textContent =
+            "FLEET DATABASE ERROR";
+
+        return;
+
+    }
+
+
+    fleets = (data || []).filter(isUsableFleet);
+
+
+    await finalizeExpiredFleets();
+
+
+    const {
+        data: refreshed,
+        error: refreshError
+    } =
+        await supabaseClient
+            .from("fleets")
+            .select("*");
+
+
+    if (!refreshError) {
+
+        fleets = (refreshed || []).filter(isUsableFleet);
+
+    }
+
+    /* enemy fleets close enough to one of ours (or to our planets) are visible */
+    try {
+
+        const seen = await supabaseClient.rpc("visible_enemy_fleets");
+
+        if (!seen.error && Array.isArray(seen.data)) {
+
+            const known = new Set(fleets.map(f => String(f.id)));
+
+            for (const f of seen.data) {
+                if (!known.has(String(f.id))) { fleets.push(f); }
+            }
+
+        }
+
+    }
+    catch (e) {
+        console.warn("Could not look for enemy fleets:", e);
+    }
+
+
+    renderFleets();
+
+
+    if (
+        selectedFleet
+    ) {
+
+        const updatedFleet =
+            fleets.find(
+                function(fleet) {
+
+                    return (
+                        fleet.id ===
+                        selectedFleet.id
+                    );
+
+                }
+            );
+
+
+        if (updatedFleet) {
+
+            selectedFleet =
+                updatedFleet;
+
+            selectFleet(
+                updatedFleet
+            );
+
+        }
+
+    }
+
+}
+
+
+/* =========================================
+   RENDER FLEETS
+========================================= */
+
+
+function renderFleets() {
+
+    fleetLayer.innerHTML = "";
+
+
+    let activeCount = 0;
+const orbitSlots = {};
+
+
+    for (
+        const fleet
+        of fleets
+    ) {
+
+        /*
+         BUILDING FLEETS DO NOT
+         APPEAR ON GALACTIC MAP.
+        */
+
+        if (
+            fleet.status ===
+            "building"
+        ) {
+
+            continue;
+
+        }
+
+
+        activeCount++;
+
+
+        const marker =
+            document.createElement(
+                "div"
+            );
+
+
+        marker.className =
+            "fleet-marker " +
+            factionClass(
+                fleet.faction
+            );
+
+
+                if (
+            fleet.status ===
+            "travelling" ||
+            fleet.status === "cruising"
+        ) {
+            marker.classList.add(
+                "travelling"
+            );
+        }
+        if (fleet.status === "engaged") { marker.classList.add("engaged"); }
+
+
+        const isOwner =
+            fleet.player_id ===
+            playerID;
+
+
+        if (!isOwner) {
+
+            marker.classList.add(
+                "enemy"
+            );
+
+        }
+
+
+        if (
+            selectedFleet &&
+            selectedFleet.id ===
+            fleet.id
+        ) {
+
+            marker.classList.add(
+                "selected"
+            );
+
+        }
+
+
+        const position =
+            getFleetPosition(
+                fleet
+            );
+
+
+        marker.style.left =
+            position[0] + "%";
+
+
+        marker.style.top = position[1] + "%";
+
+                if (fleet.status === "stationed" || (fleet.status === "engaged" && fleet.space_x == null)) {
+            const slot = orbitSlots[fleet.origin] = (orbitSlots[fleet.origin] ?? -1) + 1;
+            const angle = (-40 + slot * 55) * Math.PI / 180;
+
+            marker.style.marginLeft = Math.cos(angle) * 72 + "px";
+            marker.style.marginTop = Math.sin(angle) * 72 + "px";
+
+        }
+
+
+        marker.dataset.fleetID =
+            fleet.id;
+
+
+        marker.innerHTML =
+            `
+                ${fleetShipsSVG(fleet)}
+
+                <div class="fleet-label">
+                    ${escapeHTML(
+                        fleet.name
+                    )}
+                </div>
+            `;
+
+
+                const turn = getFleetTurn(fleet);
+        const shipsSvg = marker.querySelector("svg.fleet-ships");
+        if (turn && shipsSvg) { shipsSvg.style.transform = turn; }
+        const labelEl = marker.querySelector(".fleet-label");
+        if (labelEl && shipsSvg) { labelEl.style.top = (parseFloat(shipsSvg.getAttribute("height")) + 4) + "px"; }
+        marker.addEventListener(
+            "click",
+            function(event) {
+                event.stopPropagation();
+                selectFleet(
+                    fleet
+                );
+            }
+        );
+        fleetLayer.appendChild(
+            marker
+        );
+
+    }
+
+
+    fleetStatusDisplay.textContent =
+        activeCount +
+        " ACTIVE FLEET" +
+        (
+            activeCount === 1
+            ? ""
+            : "S"
+        );
+
+}
+
+
+/* =========================================
+   ESCAPE HTML
+========================================= */
+
+
+function escapeHTML(value) {
+
+    return String(value)
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
+
+}
+
+
+/* =========================================
+   FLEET UNIT COUNT
+========================================= */
+
+
+function getFleetUnitCount(fleet) {
+
+    if (
+        !fleet ||
+        !fleet.squads ||
+        !Array.isArray(
+            fleet.squads
+        )
+    ) {
+
+        return 0;
+
+    }
+
+
+    return fleet.squads.reduce(
+        function(total, squad) {
+
+            return (
+                total +
+                Number(
+                    squad.amount || 0
+                )
+            );
+
+        },
+        0
+    );
+
+}
+
+
+/* =========================================
+   FLEET COMPOSITION TEXT
+========================================= */
+
+
+function getFleetCompositionText(fleet) {
+
+    if (
+        !fleet ||
+        !fleet.squads ||
+        !Array.isArray(
+            fleet.squads
+        ) ||
+        fleet.squads.length === 0
+    ) {
+
+        return "UNITS: 0 / 20";
+
+    }
+
+
+    const parts =
+        fleet.squads.map(
+            function(squad) {
+
+                return (
+                    squad.type +
+                    ": " +
+                    squad.amount
+                );
+
+            }
+        );
+
+
+    return (
+        "UNITS: " +
+        getFleetUnitCount(
+            fleet
+        ) +
+        " / 20 — " +
+        parts.join(" • ")
+    );
+
+}
+
+
+/* =========================================
+   LOAD PLAYER CREDITS
+========================================= */
+
+
+async function loadPlayerCredits() {
+
+    if (!playerID) {
+        return null;
+    }
+
+    /* Faction pool (also pays out any income that is due) */
+    const { data, error } =
+        await supabaseClient.rpc("get_faction_credits");
+
+    if (error) {
+        console.error("Credit loading error:", error);
+        return null;
+    }
+
+    return Number(data);
+
+}
+
+
+/* =========================================
+   UPDATE RECRUITMENT PANEL
+========================================= */
+
+
+async function updateRecruitmentPanel() {
+
+    if (
+        !selectedFleet
+    ) {
+
+        return;
+
+    }
+
+
+    const isOwner =
+        selectedFleet.player_id ===
+        playerID;
+
+
+    const stationed =
+        selectedFleet.status ===
+        "stationed";
+
+
+    /* units still training count towards the 20-unit limit */
+    const { data: pendingRows } =
+        await supabaseClient
+            .from("fleet_recruits")
+            .select("squad_type, ready_at")
+            .eq("fleet_id", selectedFleet.id)
+            .order("ready_at");
+
+    const pending = pendingRows || [];
+
+    const unitCount =
+        getFleetUnitCount(selectedFleet) + pending.length;
+
+    let compositionText =
+        getFleetCompositionText(selectedFleet);
+
+    if (pending.length > 0) {
+
+        const secs = Math.max(
+            0,
+            Math.ceil(
+                (new Date(pending[0].ready_at).getTime() - Date.now()) / 1000
+            )
+        );
+
+        compositionText +=
+            " | TRAINING: " +
+            pending.map(p => p.squad_type).join(", ") +
+            " (next in " + secs + "s)";
+
+    }
+
+    fleetComposition.textContent = compositionText;
+
+
+    const credits =
+        await loadPlayerCredits();
+
+
+    fleetCredits.textContent =
+        credits === null
+        ? "FACTION CREDITS: —"
+        : "FACTION CREDITS: " +
+          credits;
+
+
+    recruitButtons.forEach(
+        function(button) {
+
+            const type =
+                button.dataset.unit;
+
+
+            const cost =
+                recruitCosts[type];
+
+
+            const amount =
+                recruitAmounts[type];
+
+
+            button.disabled =
+                !isOwner ||
+                !stationed ||
+                credits === null ||
+                credits < cost ||
+                unitCount + amount > 20;
+
+        }
+    );
+
+}
+
+
+/* =========================================
+   SELECT FLEET
+========================================= */
+
+
+function selectFleet(fleet) {
+
+    selectedFleet =
+        fleet;
+
+
+    const isOwner =
+        fleet.player_id ===
+        playerID;
+
+
+    document
+        .getElementById(
+            "fleet-panel-name"
+        )
+        .textContent =
+            fleet.name;
+
+
+    document
+        .getElementById(
+            "fleet-panel-owner"
+        )
+        .innerHTML =
+            "<strong>Faction:</strong> " +
+            escapeHTML(
+                fleet.faction
+            );
+
+
+    document
+        .getElementById(
+            "fleet-panel-status"
+        )
+        .innerHTML =
+            "<strong>Status:</strong> " +
+            fleet.status.replace("_", " ").toUpperCase() + (shipComposition(fleet.squads).flagship ? "  •  FLAGSHIP: KNIGHTMARE CARRIER" : "");
+
+
+    const currentLocation =
+        getCurrentLocation(
+            fleet
+        );
+
+
+    document
+        .getElementById(
+            "fleet-panel-location"
+        )
+        .innerHTML =
+            "<strong>Location:</strong> " +
+            escapeHTML(
+                currentLocation
+            );
+
+
+    const eta =
+        getETA(
+            fleet
+        );
+
+
+    document
+        .getElementById(
+            "fleet-panel-eta"
+        )
+        .innerHTML =
+            "<strong>ETA:</strong> " +
+            eta;
+
+
+    destinationSelect.innerHTML =
+        "";
+
+
+    if (isOwner) {
+
+        for (
+            const [name]
+            of planetData
+        ) {
+
+            if (
+                name ===
+                currentLocation
+            ) {
+
+                continue;
+
+            }
+
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                name;
+
+
+            option.textContent =
+                name;
+
+
+            destinationSelect.appendChild(
+                option
+            );
+
+        }
+
+    }
+
+
+    destinationSelect.disabled =
+        !isOwner ||
+        fleet.status !==
+        "stationed";
+
+
+    document
+        .getElementById(
+            "move-fleet-button"
+        )
+        .disabled =
+            !isOwner ||
+            fleet.status !==
+            "stationed";
+
+
+    document
+        .getElementById(
+            "move-fleet-button"
+        )
+        .style.opacity =
+            (
+                isOwner &&
+                fleet.status ===
+                "stationed"
+            )
+            ? "1"
+            : "0.5";
+
+
+    fleetMessage.textContent =
+        isOwner
+        ? ""
+        : "You do not command this fleet.";
+
+
+    fleetPanel.classList.add(
+        "visible"
+    );
+
+
+    highlightSelectedFleet();
+
+
+    updateRecruitmentPanel();
+
+}
+
+
+/* =========================================
+   ETA
+========================================= */
+
+
+function getETA(fleet) {
+
+    if (fleet.status === "in_space" || fleet.status === "stationed") { return "—"; }
+
+
+    if (
+        !fleet.arrival_time
+    ) {
+
+        return "—";
+
+    }
+
+
+    const remaining =
+        Math.max(
+            0,
+            (
+                new Date(
+                    fleet.arrival_time
+                ).getTime()
+                -
+                Date.now()
+            ) / 1000
+        );
+
+
+    if (
+        remaining <= 0
+    ) {
+
+        return "ARRIVED";
+
+    }
+
+
+    return formatTime(
+        remaining
+    );
+
+}
+
+
+/* =========================================
+   HIGHLIGHT
+========================================= */
+
+
+function highlightSelectedFleet() {
+
+    document
+        .querySelectorAll(
+            ".fleet-marker"
+        )
+        .forEach(
+            function(marker) {
+
+                marker.classList.toggle(
+                    "selected",
+                    selectedFleet &&
+                    marker.dataset.fleetID ===
+                    selectedFleet.id
+                );
+
+            }
+        );
+
+}
+
+
+/* =========================================
+   RECRUIT UNITS
+========================================= */
+
+
+recruitButtons.forEach(
+    function(button) {
+
+        button.addEventListener(
+            "click",
+            async function() {
+
+                if (
+                    !selectedFleet
+                ) {
+
+                    return;
+
+                }
+
+
+                if (
+                    selectedFleet.player_id !==
+                    playerID
+                ) {
+
+                    fleetMessage.textContent =
+                        "You do not command this fleet.";
+
+                    return;
+
+                }
+
+
+                if (
+                    selectedFleet.status !==
+                    "stationed"
+                ) {
+
+                    fleetMessage.textContent =
+                        "Fleet must be stationed.";
+
+                    return;
+
+                }
+
+
+                const type =
+                    button.dataset.unit;
+
+
+                const amount =
+                    recruitAmounts[type];
+
+
+                const currentUnits =
+                    getFleetUnitCount(
+                        selectedFleet
+                    );
+
+
+                if (
+                    currentUnits + amount >
+                    20
+                ) {
+
+                    fleetMessage.textContent =
+                        "Fleet capacity is 20 units.";
+
+                    return;
+
+                }
+
+
+                button.disabled =
+                    true;
+
+
+                fleetMessage.textContent =
+                    "Recruiting " +
+                    type +
+                    "...";
+
+
+                const {
+                    error
+                } =
+                    await supabaseClient
+                        .rpc(
+                            "recruit_to_fleet",
+                            {
+                                fleet_id:
+                                    selectedFleet.id,
+
+                                squad_type:
+                                    type
+                            }
+                        );
+
+
+                if (error) {
+
+                    console.error(
+                        "Recruitment error:",
+                        error
+                    );
+
+                    fleetMessage.textContent =
+                        error.message;
+
+                    await updateRecruitmentPanel();
+
+                    return;
+
+                }
+
+
+                fleetMessage.textContent = type + " training started.";
+
+
+                await loadFleets();
+
+
+                const updatedFleet =
+                    fleets.find(
+                        function(fleet) {
+
+                            return (
+                                fleet.id ===
+                                selectedFleet.id
+                            );
+
+                        }
+                    );
+
+
+                if (
+                    updatedFleet
+                ) {
+
+                    selectedFleet =
+                        updatedFleet;
+
+                    selectFleet(
+                        updatedFleet
+                    );
+
+                }
+
+            }
+        );
+
+    });
+
+
+/* =========================================
+   MOVE FLEET
+========================================= */
+
+
+document
+    .getElementById(
+        "move-fleet-button"
+    )
+    .addEventListener(
+        "click",
+        async function() {
+
+            if (
+                !selectedFleet
+            ) {
+
+                return;
+
+            }
+
+
+            if (
+                selectedFleet.player_id !==
+                playerID
+            ) {
+
+                return;
+
+            }
+
+
+            if (
+                selectedFleet.status !==
+                "stationed"
+            ) {
+
+                fleetMessage.textContent =
+                    "Fleet is not stationed.";
+
+                return;
+
+            }
+
+
+            const destination =
+                destinationSelect.value;
+
+
+            if (!destination) {
+
+                return;
+
+            }
+
+
+            const origin =
+                getCurrentLocation(
+                    selectedFleet
+                );
+
+
+            const travelSeconds =
+                calculateTravelSeconds(
+                    origin,
+                    destination
+                );
+
+
+            fleetMessage.textContent =
+                "Sending fleet...";
+
+
+            const {
+                error
+            } =
+                await supabaseClient
+                    .rpc(
+                        "move_fleet",
+                        {
+                            fleet_id:
+                                selectedFleet.id,
+
+                            new_destination:
+                                destination,
+
+                            travel_seconds:
+                                travelSeconds
+                        }
+                    );
+
+
+            if (error) {
+
+                console.error(
+                    error
+                );
+
+                fleetMessage.textContent =
+                    error.message;
+
+                return;
+
+            }
+
+
+            fleetMessage.textContent =
+                "Fleet travelling. ETA " +
+                formatTime(
+                    travelSeconds
+                );
+
+
+            selectedFleet =
+                null;
+
+
+            fleetPanel.classList.remove(
+                "visible"
+            );
+
+
+            await loadFleets();
+
+        }
+    );
+
+
+/* =========================================
+   SPACE BATTLES
+   Hostile fleets that meet in space fight on their own (resolved by the
+   server). Every open galaxy map asks for battles every 8 seconds and
+   shows the ones that just happened.
+========================================= */
+let lastSpaceBattleId = null;
+
+function showSpaceBattle(b) {
+
+    const map = document.getElementById("galaxy-map");
+
+    const flash = document.createElement("div");
+    flash.style.cssText =
+        "position:absolute;left:" + Number(b.x) + "%;top:" + Number(b.y) + "%;width:10px;height:10px;margin:-5px 0 0 -5px;" +
+        "border-radius:50%;background:#fff;box-shadow:0 0 30px 14px #ff9a4a;pointer-events:none;z-index:50;" +
+        "transition:all 2.4s ease-out;opacity:1;";
+    map.appendChild(flash);
+    requestAnimationFrame(function() {
+        flash.style.transform = "scale(7)";
+        flash.style.opacity = "0";
+    });
+    setTimeout(function() { flash.remove(); }, 2600);
+
+    let box = document.getElementById("space-battle-feed");
+
+    if (!box) {
+        box = document.createElement("div");
+        box.id = "space-battle-feed";
+        box.style.cssText =
+            "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:900;display:flex;flex-direction:column;gap:6px;align-items:center;";
+        document.body.appendChild(box);
+    }
+
+    const row = document.createElement("div");
+    row.style.cssText =
+        "padding:8px 16px;background:rgba(18,8,4,.93);border:1px solid #ff9a4a;color:#ffe2cc;font:bold 12px Arial;letter-spacing:1px;";
+    row.textContent =
+        "⚔ SPACE BATTLE: " + b.a_name + " (" + b.a_faction + ") vs " + b.b_name + " (" + b.b_faction + ") — " +
+        b.winner_faction + " wins. Losses: " + Number(b.a_lost).toLocaleString() + " / " + Number(b.b_lost).toLocaleString() + " soldiers.";
+    box.appendChild(row);
+    setTimeout(function() { row.remove(); }, 12000);
+
+}
+
+async function pollSpaceBattles() {
+
+    if (window.gameStatus && !window.gameStatus.started) { return; }
+
+    const scan = await supabaseClient.rpc("space_battle_scan");
+
+    if (scan.data && scan.data.length) { await loadFleets(); }
+
+    const { data, error } = await supabaseClient
+        .from("space_battle_log")
+        .select("*")
+        .order("id", { ascending: false })
+        .limit(5);
+
+    if (error || !data) { return; }
+
+    const newest = data.length ? Number(data[0].id) : 0;
+
+    if (lastSpaceBattleId === null) {
+        /* first look: do not replay old battles */
+        lastSpaceBattleId = newest;
+        return;
+    }
+
+    const fresh = data.filter(b => Number(b.id) > lastSpaceBattleId).reverse();
+
+    lastSpaceBattleId = Math.max(lastSpaceBattleId, newest);
+
+    if (!fresh.length) { return; }
+
+    fresh.forEach(showSpaceBattle);
+
+    await loadFleets();
+
+}
+
+setInterval(pollSpaceBattles, 8000);
+setTimeout(pollSpaceBattles, 2500);
+
+/* =========================================
+   RIGHT-CLICK ORDERS
+   With one of your fleets selected, right-click anywhere on the
+   map: a planet sends it there, empty space parks it in deep space.
+========================================= */
+(function() {
+
+    const map = document.getElementById("galaxy-map");
+
+    map.addEventListener("contextmenu", async function(event) {
+
+        event.preventDefault();
+
+        const fleet = selectedFleet;
+
+        if (!fleet || fleet.player_id !== playerID) { return; }
+
+        if (fleet.faction && fleet.faction !== playerFaction) {
+            fleetMessage.textContent = "This fleet belongs to the " + fleet.faction + ": you cannot command it in another faction.";
+            return;
+        }
+
+        const movable = ["stationed", "in_space", "cruising"];
+
+        if (!movable.includes(fleet.status)) {
+            fleetMessage.textContent = fleet.status === "travelling"
+                ? "Fleet is on a planetary route and cannot be redirected."
+                : fleet.status === "engaged"
+                    ? "Fleet is locked in a space battle."
+                    : "Fleet cannot move right now.";
+            return;
+        }
+
+        const rect = map.getBoundingClientRect();
+        const x = Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100));
+        const y = Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100));
+
+        /* did the click land on a planet? (within about 36 px) */
+        let planet = null;
+        let best = 36;
+
+        for (const [name, pos] of Object.entries(planetPositions)) {
+            const d = Math.hypot((pos[0] - x) * rect.width / 100, (pos[1] - y) * rect.height / 100);
+            if (d < best) { best = d; planet = name; }
+        }
+
+        const start = getFleetPosition(fleet);
+        const end = planet ? getPlanetPosition(planet) : [x, y];
+
+        const dist = Math.hypot(end[0] - start[0], end[1] - start[1]);
+        const seconds = Math.max(planet ? 60 : 20, Math.round(dist * 6));
+
+        const heading = Math.atan2(
+            (end[1] - start[1]) * rect.height / 100,
+            (end[0] - start[0]) * rect.width / 100
+        ) * 180 / Math.PI;
+
+        fleetMessage.textContent = "Sending fleet...";
+
+        let error;
+
+        if (planet && fleet.status === "stationed") {
+
+            if (planet === fleet.origin) { fleetMessage.textContent = "Fleet is already there."; return; }
+
+            ({ error } = await supabaseClient.rpc("move_fleet", {
+                fleet_id: fleet.id,
+                new_destination: planet,
+                travel_seconds: seconds
+            }));
+
+        }
+        else if (planet) {
+
+            ({ error } = await supabaseClient.rpc("fleet_move_to_planet", {
+                p_fleet: String(fleet.id),
+                p_planet: planet,
+                p_from_x: start[0],
+                p_from_y: start[1],
+                p_seconds: seconds,
+                p_heading: heading
+            }));
+
+        }
+        else {
+
+            ({ error } = await supabaseClient.rpc("fleet_move_to_point", {
+                p_fleet: String(fleet.id),
+                p_from_x: start[0],
+                p_from_y: start[1],
+                p_x: end[0],
+                p_y: end[1],
+                p_heading: heading
+            }));
+
+        }
+
+        if (error) {
+            console.error(error);
+            fleetMessage.textContent = error.message;
+            return;
+        }
+
+        fleetMessage.textContent = "Fleet under way. ETA " + formatTime(seconds);
+
+        await loadFleets();
+
+    });
+
+})();
+
+/* =========================================
+   CLOSE PANEL
+========================================= */
+
+
+document
+    .getElementById(
+        "close-fleet-panel"
+    )
+    .addEventListener(
+        "click",
+        function() {
+
+            selectedFleet =
+                null;
+
+            fleetPanel.classList.remove(
+                "visible"
+            );
+
+            highlightSelectedFleet();
+
+        }
+    );
+
+
+/* =========================================
+   PLANET CLICK
+========================================= */
+
+
+document
+    .querySelectorAll(
+        ".planet"
+    )
+    .forEach(
+        function(planet) {
+
+            planet.addEventListener(
+                "click",
+                function() {
+
+                    const name =
+                        planet.dataset.name;
+
+
+                    const owner =
+                        planet.dataset.owner;
+
+
+                    enterPlanet(
+                        name,
+                        owner,
+                        planet
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+/* =========================================
+   ENTER PLANET
+========================================= */
+
+
+function enterPlanet(
+    name,
+    owner,
+    planet
+) {
+
+    const rect =
+        planet.getBoundingClientRect();
+
+
+    const planetX =
+        rect.left +
+        rect.width / 2;
+
+
+    const planetY =
+        rect.top +
+        rect.height / 2;
+
+
+    const centerX =
+        window.innerWidth / 2;
+
+
+    const centerY =
+        window.innerHeight / 2;
+
+
+    const zoom =
+        8;
+
+
+    const moveX =
+        centerX -
+        planetX * zoom +
+        centerX *
+        (zoom - 1);
+
+
+    const moveY =
+        centerY -
+        planetY * zoom +
+        centerY *
+        (zoom - 1);
+
+
+    galaxyMap.style.setProperty(
+        "--zoom-x",
+        moveX + "px"
+    );
+
+
+    galaxyMap.style.setProperty(
+        "--zoom-y",
+        moveY + "px"
+    );
+
+
+    galaxyMap.classList.add(
+        "camera-zoom"
+    );
+
+
+    setTimeout(
+        function() {
+
+            window.location.href =
+                "planet.html?name=" +
+                encodeURIComponent(
+                    name
+                ) +
+                "&owner=" +
+                encodeURIComponent(
+                    owner
+                );
+
+        },
+        1000
+    );
+
+}
+
+
+/* =========================================
+   LIVE MAP UPDATE
+========================================= */
+
+
+function updateFleetDisplay() {
+
+    renderFleets();
+
+
+    if (
+        selectedFleet
+    ) {
+
+        const current =
+            fleets.find(
+                function(fleet) {
+
+                    return (
+                        fleet.id ===
+                        selectedFleet.id
+                    );
+
+                }
+            );
+
+
+        if (current) {
+
+            selectFleet(
+                current
+            );
+
+        }
+
+    }
+
+}
+
+
+/* =========================================
+   REFRESH DATABASE
+========================================= */
+
+
+async function refreshFleets() {
+
+    await loadFleets();
+
+}
+
+
+/* =========================================
+   REALTIME
+========================================= */
+
+
+const fleetChannel =
+    supabaseClient
+        .channel(
+            "galactic-fleet-updates"
+        )
+        .on(
+            "postgres_changes",
+            {
+                event: "*",
+                schema: "public",
+                table: "fleets"
+            },
+            function() {
+
+                loadFleets();
+
+            }
+        )
+        .subscribe(
+            function(status) {
+
+                console.log(
+                    "Fleet realtime:",
+                    status
+                );
+
+            }
+        );
+
+
+/* =========================================
+   START
+========================================= */
+
+
+loadFleets();
+
+
+/* =========================================
+   SMOOTH FLEET UPDATES
+========================================= */
+
+
+setInterval(
+    function() {
+
+        renderFleets();
+
+
+        if (
+            selectedFleet
+        ) {
+
+            const current =
+                fleets.find(
+                    function(fleet) {
+
+                        return (
+                            fleet.id ===
+                            selectedFleet.id
+                        );
+
+                    }
+                );
+
+
+            if (current) {
+
+                document
+                    .getElementById(
+                        "fleet-panel-status"
+                    )
+                    .innerHTML =
+                        "<strong>Status:</strong> " +
+                        current.status.toUpperCase();
+
+
+                document
+                    .getElementById(
+                        "fleet-panel-location"
+                    )
+                    .innerHTML =
+                        "<strong>Location:</strong> " +
+                        escapeHTML(
+                            getCurrentLocation(
+                                current
+                            )
+                        );
+
+
+                document
+                    .getElementById(
+                        "fleet-panel-eta"
+                    )
+                    .innerHTML =
+                        "<strong>ETA:</strong> " +
+                        getETA(
+                            current
+                        );
+
+
+                selectedFleet =
+                    current;
+
+
+                updateRecruitmentPanel();
+
+            }
+
+        }
+
+    },
+    1000
+);
+
+
+/* =========================================
+   DATABASE REFRESH FALLBACK
+========================================= */
+
+
+refreshTimer =
+    setInterval(
+        refreshFleets,
+        5000
+    );
+
+
+
+/* Keep training progress and finished recruits up to date */
+setInterval(async function() {
+
+    await loadFleets();
+
+    if (selectedFleet) {
+
+        const current = fleets.find(f => f.id === selectedFleet.id);
+
+        if (current) {
+            selectedFleet = current;
+        }
+
+        await updateRecruitmentPanel();
+
+    }
+
+}, 5000);
+
+/* =========================================
+   PLANET OWNERSHIP + CONTESTED BARS
+   A planet is contested while at least one of its
+   cities is held by another faction. The bar shows
+   the share of cities taken, in the attacker's colour,
+   over the owner's colour. It disappears once the
+   planet changes hands (all cities captured).
+========================================= */
+const FACTION_BAR_COLORS = {
+    "Combine": "#d52b2b",
+    "Freedom Authority": "#347cff",
+    "Independents": "#eeeeee"
+};
+
+async function loadPlanetStatus() {
+
+    const { data, error } = await supabaseClient.rpc("get_planet_status");
+
+    if (error) {
+        console.error("Planet status error:", error);
+        return;
+    }
+
+    const byId = {};
+
+    for (const row of data || []) {
+        row.faction = (row.faction || "").trim();
+        row.attacker_faction = (row.attacker_faction || "").trim();
+        byId[row.planet_id] = row;
+    }
+
+    document.querySelectorAll(".planet").forEach(function(el) {
+
+        const row = byId[el.dataset.name];
+
+        if (!row) { return; }
+
+        el.dataset.owner = row.faction;
+        el.classList.remove("combine", "freedom", "independent");
+        el.classList.add(factionClass(row.faction));
+
+        let bar = el.querySelector(".contest-bar");
+
+        if (row.enemy_cities > 0 && row.total_cities > 0) {
+
+            if (!bar) {
+                bar = document.createElement("div");
+                bar.className = "contest-bar";
+                bar.innerHTML = "<div></div>";
+                el.appendChild(bar);
+            }
+
+            bar.style.background = FACTION_BAR_COLORS[row.faction] || "#999";
+
+            const fill = bar.firstChild;
+
+            fill.style.width = (100 * row.enemy_cities / row.total_cities) + "%";
+            fill.style.background = FACTION_BAR_COLORS[row.attacker_faction] || "#fff";
+
+            bar.title =
+                "CONTESTED: " + row.enemy_cities + "/" + row.total_cities +
+                " cities held by " + row.attacker_faction;
+
+        }
+        else if (bar) {
+            bar.remove();
+        }
+
+    });
+
+    drawSectors();
+
+}
+
+/* =========================================
+   SECTOR AURAS
+   Every planet tints the space around it in its owner's colour.
+   Each point of space belongs to its nearest planet, so a sector
+   stops where the next planet's sector begins (thin border line).
+========================================= */
+const SECTOR_RGB = {
+    "Combine": [213, 43, 43],
+    "Freedom Authority": [52, 124, 255],
+    "Independents": [170, 175, 190]
+};
+
+/* neutral space stays quiet so the two real factions stand out */
+const SECTOR_STRENGTH = {
+    "Combine": 1.0,
+    "Freedom Authority": 1.0,
+    "Independents": 0.5
+};
+
+function drawSectors() {
+
+    const map = document.getElementById("galaxy-map");
+
+    if (!map || !map.offsetWidth) { return; }
+
+    let canvas = document.getElementById("sector-canvas");
+
+    if (!canvas) {
+        canvas = document.createElement("canvas");
+        canvas.id = "sector-canvas";
+        canvas.style.cssText =
+            "position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0;";
+        map.insertBefore(canvas, map.firstChild);
+    }
+
+    const W = map.offsetWidth;
+    const H = map.offsetHeight;
+    const S = 3;
+    const w = Math.ceil(W / S);
+    const h = Math.ceil(H / S);
+
+    const planets = Array.from(document.querySelectorAll(".planet")).map(function(el) {
+        const pos = getPlanetPosition(el.dataset.name);
+        const owner = (el.dataset.owner || "").trim();
+        const war = el.classList.contains("war");
+        return {
+            x: pos[0] / 100 * W / S,
+            y: pos[1] / 100 * H / S,
+            rgb: war ? [235, 95, 35] : (SECTOR_RGB[owner] || SECTOR_RGB.Independents),
+            k: war ? 1.0 : (SECTOR_STRENGTH[owner] ?? SECTOR_STRENGTH.Independents)
+        };
+    });
+
+    const R = 0.095 * W / S;
+
+    const smooth = function(a, b, x) {
+        const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+        return t * t * (3 - 2 * t);
+    };
+
+    const small = document.createElement("canvas");
+    small.width = w;
+    small.height = h;
+
+    const sctx = small.getContext("2d");
+    const img = sctx.createImageData(w, h);
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+
+            /* nearest and second-nearest planet: Voronoi sectors */
+            let d1 = Infinity, d2 = Infinity, i1 = -1;
+
+            for (let i = 0; i < planets.length; i++) {
+                const d = Math.hypot(planets[i].x - x, planets[i].y - y);
+                if (d < d1) { d2 = d1; d1 = d; i1 = i; }
+                else if (d < d2) { d2 = d; }
+            }
+
+            if (i1 < 0 || d1 >= R) { continue; }
+
+            const p = planets[i1];
+            const t = d1 / R;
+
+            /* bright core, soft fade to the edge of the aura */
+            let a = (0.025 + 0.30 * Math.pow(1 - t, 2.0)) * smooth(R, R * 0.72, d1) * p.k;
+
+            /* soft ridge where the next sector begins */
+            const line = d2 < R * 1.05 ? 1 - smooth(0, 3.4, d2 - d1) : 0;
+
+            a += 0.13 * line * Math.max(p.k, 0.7);
+
+            const k = (y * w + x) * 4;
+            const mix = 0.35 * line;
+
+            img.data[k] = p.rgb[0] + (255 - p.rgb[0]) * mix;
+            img.data[k + 1] = p.rgb[1] + (255 - p.rgb[1]) * mix;
+            img.data[k + 2] = p.rgb[2] + (255 - p.rgb[2]) * mix;
+            img.data[k + 3] = Math.min(255, Math.round(a * 255));
+
+        }
+    }
+
+    sctx.putImageData(img, 0, 0);
+
+    canvas.width = W;
+    canvas.height = H;
+
+    const cctx = canvas.getContext("2d");
+    cctx.clearRect(0, 0, W, H);
+    cctx.imageSmoothingEnabled = true;
+    cctx.imageSmoothingQuality = "high";
+    cctx.filter = "blur(2.5px)"; /* extra softness (ignored by browsers without canvas filters) */
+    cctx.drawImage(small, 0, 0, W, H);
+    cctx.filter = "none";
+
+}
+
+loadPlanetStatus();
+setInterval(loadPlanetStatus, 10000);
+
+/* the planetary wars on Krieg and Vraks only advance while someone has the game open */
+supabaseClient.rpc("advance_war").then(function() {});
+setInterval(function() { supabaseClient.rpc("advance_war").then(function() {}); }, 30000);
+window.addEventListener("resize", drawSectors);
+document.addEventListener("visibilitychange", function() {
+    if (!document.hidden) { loadPlanetStatus(); }
+});
+
+/* live updates when cities or planets change in the database */
+supabaseClient
+    .channel("map-sync")
+    .on("postgres_changes", { event: "*", schema: "public", table: "cities" }, loadPlanetStatus)
+    .on("postgres_changes", { event: "*", schema: "public", table: "planets" }, loadPlanetStatus)
+    .subscribe();
+
+</script>
+
+
+</body>
+</html>
