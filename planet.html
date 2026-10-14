@@ -2065,6 +2065,16 @@ async function startAttack(city) {
 
 
     
+    /* Freedom Authority needs a declaration of war from Congress */
+    {
+        const war = await supabaseClient.rpc("congress_can_attack", { p_planet: planetName });
+
+        if (!war.error && war.data === false) {
+            gameNotice("Congress has not declared war on " + planetName + ". Put a Declaration of War before Congress first.");
+            return;
+        }
+    }
+
     /*
      * Enemy fleets in orbit must be defeated first:
      * the attack becomes a space battle.
@@ -3839,6 +3849,7 @@ function warRenderFactionPanel(counts) {
                     '<div style="margin-top:5px;color:#8fb0c0;">Strength</div>' +
                     '<div style="height:6px;background:#10202c;"><div style="height:100%;width:' + Math.round(100 * Number(f.power) / maxPower) +
                     "%;background:" + f.color + ';"></div></div>' +
+                    (f.supportable ? warRelationBar(f.id) : "") +
                     '<div style="margin-top:5px;color:#8fb0c0;">Backed by: ' + (backers.length ? '<b style="color:#fff;">' + backers.join(" · ") + "</b>" : "nobody yet") + "</div>";
 
                 if (!f.supportable) {
@@ -4103,6 +4114,24 @@ async function warAnswer(fid, dec, index) {
 function warPick(list) { return list[Math.floor(Math.random() * list.length)]; }
 
 /* credits you backed this faction with + chat rapport */
+/* RELATIONSHIP: money you backed them with plus what you won in conversation. 600 = trusted ally. */
+function warRelationBar(fid) {
+
+    const n = Math.round(warStanding(fid));
+    const tiers = ["Hostile", "Wary", "Acquainted", "Friendly", "Trusted ally"];
+    const name = tiers[warStandingTier(n)];
+    const pct = Math.max(0, Math.min(100, (n + 150) / 750 * 100));
+    const col = n < 0 ? "#d9534f" : n < 100 ? "#b7a24c" : n < 300 ? "#6fb7c9" : n < 600 ? "#4cae6a" : "#5bff9a";
+
+    return '<div style="margin-top:6px;color:#8fb0c0;">Relationship with you: <b style="color:#fff;">' + name + "</b> (" + n + " / 600)</div>" +
+        '<div style="position:relative;height:8px;background:#10202c;">' +
+        '<div style="height:100%;width:' + pct.toFixed(1) + "%;background:" + col + ';"></div>' +
+        '<div title="neutral" style="position:absolute;left:' + (150 / 750 * 100) + '%;top:-2px;width:1px;height:12px;background:#9ab;"></div>' +
+        '<div title="trusted ally (600)" style="position:absolute;left:' + (750 / 750 * 100 - 0.3) + '%;top:-2px;width:2px;height:12px;background:#5bff9a;"></div></div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:9px;color:#6f8696;"><span>-150</span><span>0</span><span>600</span></div>';
+
+}
+
 function warStanding(fid) {
 
     const pf = localStorage.getItem("playerFaction");

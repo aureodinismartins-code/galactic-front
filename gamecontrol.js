@@ -53,7 +53,7 @@
 
         resetButton = document.createElement("button");
         resetButton.type = "button";
-        resetButton.textContent = "⟲ RESET GAME";
+        resetButton.textContent = "\u27f2 RESET GAME";
         resetButton.title = "Host only: puts the whole game back to the start";
         resetButton.style.cssText =
             "position:fixed;left:25px;bottom:78px;z-index:9000;padding:7px 12px;background:#2a0f0f;color:#ff9b9b;" +
@@ -89,6 +89,97 @@
 
     }
 
+
+    /* ---------- maintenance mode (host closes the game for everybody else) ---------- */
+    let maintOverlay = null;
+    let maintButton = null;
+    let lastMaintenance = null;
+
+    function ensureMaintOverlay() {
+
+        if (maintOverlay) { return maintOverlay; }
+
+        maintOverlay = document.createElement("div");
+        maintOverlay.id = "game-maintenance-overlay";
+        /* on the main menu it sits below the account panel so the host can still log in */
+        maintOverlay.style.cssText =
+            "position:fixed;inset:0;z-index:" + (window.GC_NO_OVERLAY ? 40 : 99998) + ";display:none;flex-direction:column;align-items:center;" +
+            "justify-content:center;gap:16px;background:rgba(3,5,10,.97);color:#e8eef5;font-family:Arial,sans-serif;text-align:center;";
+        maintOverlay.innerHTML =
+            '<div style="font-size:13px;letter-spacing:6px;color:#8fa3b8;">GALACTIC WARS</div>' +
+            '<div style="font-size:34px;font-weight:900;letter-spacing:8px;color:#e8c46a;">UNDER MAINTENANCE</div>' +
+            '<div style="max-width:560px;color:#9fb0c2;letter-spacing:1px;">The game is temporarily closed. Everything is saved and frozen exactly as you left it: ' +
+            'nothing moves, nothing is lost. It reopens when the host says so.</div>' +
+            '<div id="gc-maint-msg" style="max-width:560px;color:#e8c46a;font-weight:bold;"></div>';
+        document.body.appendChild(maintOverlay);
+
+        return maintOverlay;
+
+    }
+
+    function ensureMaintButton() {
+
+        if (maintButton) { return maintButton; }
+
+        maintButton = document.createElement("button");
+        maintButton.type = "button";
+        maintButton.style.cssText =
+            "position:fixed;left:25px;bottom:120px;z-index:99999;padding:7px 12px;color:#fff;cursor:pointer;" +
+            "font:bold 11px Arial;letter-spacing:2px;display:none;";
+        document.body.appendChild(maintButton);
+
+        maintButton.addEventListener("click", async function() {
+
+            const on = !(window.gameStatus && window.gameStatus.maintenance);
+            let message = null;
+
+            if (on) {
+                message = window.prompt(
+                    "CLOSE THE GAME for every player?\n\n" +
+                    "They will see a maintenance screen. Everything is saved and frozen, and nothing is lost.\n" +
+                    "Finish or announce any live battles first.\n\n" +
+                    "Optional message for the players (or leave empty):", "");
+                if (message === null) { return; }
+            }
+            else if (!window.confirm("OPEN THE GAME again? Every timer continues from where it stopped.")) { return; }
+
+            const { data, error } = await supabaseClient.rpc("game_set_maintenance", { p_on: on, p_message: message });
+
+            if (error) { alert("Could not change maintenance mode: " + error.message); return; }
+
+            location.reload();
+
+        });
+
+        return maintButton;
+
+    }
+
+    function applyMaintenance(status) {
+
+        if (lastMaintenance === null) { lastMaintenance = !!status.maintenance; }
+
+        /* the host reopened the game while a player was waiting: back in */
+        if (lastMaintenance !== !!status.maintenance && !status.is_host) { location.reload(); return; }
+
+        const o = ensureMaintOverlay();
+
+        o.style.display = status.maintenance && !status.is_host ? "flex" : "none";
+        o.querySelector("#gc-maint-msg").textContent = status.maintenance_message || "";
+
+        if (status.is_host && window.GC_HOST_TOOLS) {
+
+            const b = ensureMaintButton();
+
+            b.style.display = "block";
+            b.textContent = status.maintenance ? "\ud83d\udd27 MAINTENANCE IS ON - OPEN THE GAME" : "\ud83d\udd27 CLOSE THE GAME (MAINTENANCE)";
+            b.style.background = status.maintenance ? "#6a1212" : "#3a2f10";
+            b.style.border = status.maintenance ? "2px solid #ff6a6a" : "1px solid #b08a2c";
+
+        }
+
+    }
+
     async function beat() {
 
         let result;
@@ -106,6 +197,8 @@
 
         window.gameStatus = status;
 
+        applyMaintenance(status);
+
         if (lastStarted === null) { lastStarted = status.started; }
 
         /* the host reset the game while we were playing, or started it: reload once */
@@ -115,7 +208,7 @@
 
             const o = ensureOverlay();
 
-            o.style.display = status.started ? "none" : "flex";
+            o.style.display = status.started || (status.maintenance && !status.is_host) ? "none" : "flex";
 
             const start = o.querySelector("#gc-start");
             const text = o.querySelector("#gc-text");
@@ -165,7 +258,7 @@
 
             const where = b.kind === "orbit" ? "above " + b.planet : "in deep space";
 
-            row.textContent = "⚔ SPACE BATTLE " + where + ": " + (b.mine || "your fleet") + " vs " + (b.against || "unknown") + "   ";
+            row.textContent = "\u2694 SPACE BATTLE " + where + ": " + (b.mine || "your fleet") + " vs " + (b.against || "unknown") + "   ";
 
             const btn = document.createElement("button");
             btn.type = "button";
@@ -185,6 +278,12 @@
         setInterval(beat, 20000);
         setTimeout(pollBattles, 3000);
         setInterval(pollBattles, 8000);
+        /* Congress, taxes and occupations advance with game time wherever somebody is online */
+        const congressTick = function() {
+            try { supabaseClient.rpc("congress_tick").then(function() {}, function() {}); } catch (e) {}
+        };
+        setTimeout(congressTick, 6000);
+        setInterval(congressTick, 60000);
     });
 
 })();

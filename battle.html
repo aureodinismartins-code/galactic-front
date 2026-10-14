@@ -277,6 +277,10 @@ const damageNumbers = [];
 const BASE_CITY_WIDTH = 620;
 const BASE_CITY_HEIGHT = 440;
 
+/* how much bigger than the authored 620 x 440 the city is drawn: ranges and speeds grow with it,
+   otherwise units cross a big city too slowly and the AI never sees anybody */
+function mapScale() { return Math.max(1, cityScale()); }
+
 /* the city fills most of the screen (layouts are authored at 620 x 440) */
 function cityScale() {
     return Math.max(1, Math.min(canvas.width * 0.8 / BASE_CITY_WIDTH, canvas.height * 0.86 / BASE_CITY_HEIGHT, 1.9));
@@ -652,17 +656,49 @@ function findPath(startX, startY, targetX, targetY) {
     const cols = Math.floor(canvas.width / GRID_SIZE);
     const rows = Math.floor(canvas.height / GRID_SIZE);
 
-    const open = [];
+    /* binary heap of {x, y, f}: the old version scanned the whole open list every step,
+       which stopped working once the city (and so the grid) became large */
+    const heap = [];
+
+    const heapPush = function(node) {
+        heap.push(node);
+        let i = heap.length - 1;
+        while (i > 0) {
+            const p = (i - 1) >> 1;
+            if (heap[p].f <= heap[i].f) { break; }
+            const t = heap[p]; heap[p] = heap[i]; heap[i] = t;
+            i = p;
+        }
+    };
+
+    const heapPop = function() {
+        const top = heap[0];
+        const last = heap.pop();
+        if (heap.length > 0) {
+            heap[0] = last;
+            let i = 0;
+            for (;;) {
+                const l = i * 2 + 1, r = l + 1;
+                let m = i;
+                if (l < heap.length && heap[l].f < heap[m].f) { m = l; }
+                if (r < heap.length && heap[r].f < heap[m].f) { m = r; }
+                if (m === i) { break; }
+                const t = heap[m]; heap[m] = heap[i]; heap[i] = t;
+                i = m;
+            }
+        }
+        return top;
+    };
+
     const cameFrom = new Map();
     const gScore = new Map();
-    const fScore = new Map();
+    const closed = new Set();
 
     const startKey = gridKey(start.x, start.y);
     const targetKey = gridKey(target.x, target.y);
 
     gScore.set(startKey, 0);
-    fScore.set(startKey, heuristic(start, target));
-    open.push({ x: start.x, y: start.y });
+    heapPush({ x: start.x, y: start.y, f: heuristic(start, target) });
 
     const directions = [
         { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
@@ -670,23 +706,17 @@ function findPath(startX, startY, targetX, targetY) {
     ];
 
     let iterations = 0;
+    const maxIterations = Math.max(20000, cols * rows * 3);
 
-    while (open.length > 0 && iterations < 5000) {
+    while (heap.length > 0 && iterations < maxIterations) {
 
         iterations++;
 
-        let bestIndex = 0;
-
-        for (let i = 1; i < open.length; i++) {
-            const currentKey = gridKey(open[i].x, open[i].y);
-            const bestKey = gridKey(open[bestIndex].x, open[bestIndex].y);
-            if ((fScore.get(currentKey) ?? Infinity) < (fScore.get(bestKey) ?? Infinity)) {
-                bestIndex = i;
-            }
-        }
-
-        const current = open.splice(bestIndex, 1)[0];
+        const current = heapPop();
         const currentKey = gridKey(current.x, current.y);
+
+        if (closed.has(currentKey)) { continue; }
+        closed.add(currentKey);
 
         if (currentKey === targetKey) {
 
@@ -737,6 +767,9 @@ function findPath(startX, startY, targetX, targetY) {
             }
 
             const neighbourKey = gridKey(nx, ny);
+
+            if (closed.has(neighbourKey)) { continue; }
+
             const movementCost = (direction.x !== 0 && direction.y !== 0) ? 1.414 : 1;
             const tentativeG = (gScore.get(currentKey) ?? Infinity) + movementCost;
 
@@ -744,11 +777,7 @@ function findPath(startX, startY, targetX, targetY) {
 
                 cameFrom.set(neighbourKey, currentKey);
                 gScore.set(neighbourKey, tentativeG);
-                fScore.set(neighbourKey, tentativeG + heuristic({ x: nx, y: ny }, target));
-
-                if (!open.some(node => node.x === nx && node.y === ny)) {
-                    open.push({ x: nx, y: ny });
-                }
+                heapPush({ x: nx, y: ny, f: tentativeG + heuristic({ x: nx, y: ny }, target) });
 
             }
 
@@ -786,9 +815,9 @@ function createUnit(x, y, faction, id, type, soldiers) {
         maxHealth: stats.health,
 
         damage: stats.damage,
-        range: stats.range,
+        range: stats.range * mapScale(),
         fireRate: stats.fireRate,
-        speed: stats.speed,
+        speed: stats.speed * mapScale(),
         accuracy: stats.accuracy,
         indirect: !!stats.indirect,
         facing: 0,
@@ -912,10 +941,33 @@ function drawKnightmareUnit(unit) {
 
     const img = knSprite(unit);
 
+    /* the squad turns the way it drives (the sprite faces north), and towards what it shoots at */
+    if (unit.kAng === undefined) { unit.kAng = -Math.PI / 2; unit.kx = unit.x; unit.ky = unit.y; }
+
+    const moved = Math.hypot(unit.x - unit.kx, unit.y - unit.ky);
+    let want = unit.kAng;
+
+    if (unit.fxUntil > performance.now() && unit.facing !== undefined) { want = unit.facing; }
+    else if (moved > 0.25) { want = Math.atan2(unit.y - unit.ky, unit.x - unit.kx); }
+
+    unit.kx = unit.x;
+    unit.ky = unit.y;
+
+    let dAng = want - unit.kAng;
+    while (dAng > Math.PI) { dAng -= 2 * Math.PI; }
+    while (dAng < -Math.PI) { dAng += 2 * Math.PI; }
+    unit.kAng += dAng * 0.18;
+
     if (img.complete && img.naturalWidth > 0) {
+        ctx.save();
+        ctx.translate(unit.x, unit.y);
+        ctx.rotate(unit.kAng + Math.PI / 2);
+        /* a little rocking while driving, like wheels over rough ground */
+        if (moved > 0.25) { ctx.translate(0, Math.sin(performance.now() / 70) * 0.9); }
         ctx.globalAlpha = unit.hitFlash > 0 ? 0.65 : 1;
-        ctx.drawImage(img, unit.x - w / 2, unit.y - h / 2, w, h);
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
         ctx.globalAlpha = 1;
+        ctx.restore();
     }
     else {
         ctx.fillStyle = factionColor(unit.faction);
@@ -2319,7 +2371,7 @@ function calculateHitChance(attacker, target) {
 function knightmareShoot(attacker, target, now) {
 
     if (!target || target.health <= 0) { return; }
-    if (distance(attacker, target) > KN_RIFLE_RANGE && !(now >= attacker.cannonReady && distance(attacker, target) <= KN_CANNON.range)) { return; }
+    if (distance(attacker, target) > (KN_RIFLE_RANGE * mapScale()) && !(now >= attacker.cannonReady && distance(attacker, target) <= (KN_CANNON.range * mapScale()))) { return; }
     if (!lineOfSight(attacker, target)) { return; }
 
     const alive = attacker.members.filter(hp => hp > 0).length;
@@ -2329,7 +2381,7 @@ function knightmareShoot(attacker, target, now) {
     attacker.facing = Math.atan2(target.y - attacker.y, target.x - attacker.x);
 
     /* shoulder cannon: a short windup, then every living mech fires a splash shell */
-    if (now >= attacker.cannonReady && distance(attacker, target) <= KN_CANNON.range) {
+    if (now >= attacker.cannonReady && distance(attacker, target) <= (KN_CANNON.range * mapScale())) {
 
         attacker.cannonReady = now + KN_CANNON.cooldown + KN_CANNON.windup;
         attacker.lastShot = now;
@@ -2345,7 +2397,7 @@ function knightmareShoot(attacker, target, now) {
                 const jx = (Math.random() - 0.5) * 18;
                 const jy = (Math.random() - 0.5) * 18;
                 spawnProjectile(attacker, target, hit ? target.x + jx : target.x + (Math.random() * 60 - 30), hit ? target.y + jy : target.y + (Math.random() * 60 - 30), hit,
-                    { type: "KnightCannon", damage: KN_CANNON.damage, splash: KN_CANNON.splash });
+                    { type: "KnightCannon", damage: KN_CANNON.damage, splash: (KN_CANNON.splash * mapScale()) });
             }
 
         }, KN_CANNON.windup);
@@ -2356,7 +2408,7 @@ function knightmareShoot(attacker, target, now) {
 
     /* rifles: one shot per living mech */
     if (now - attacker.lastShot < attacker.fireRate) { return; }
-    if (distance(attacker, target) > KN_RIFLE_RANGE) { return; }
+    if (distance(attacker, target) > (KN_RIFLE_RANGE * mapScale())) { return; }
 
     attacker.lastShot = now;
     attacker.fxKind = "rifle";

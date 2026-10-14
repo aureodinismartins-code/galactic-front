@@ -21,7 +21,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase.js"></script>
-        <script>window.GC_NO_OVERLAY = true;</script>
+        <script>window.GC_NO_OVERLAY = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js"></script>
 
 </head>
@@ -145,6 +145,13 @@
         <div id="account-panel" style="position:fixed;left:20px;bottom:20px;z-index:50;width:290px;background:rgba(0,0,0,.85);border:1px solid #555;padding:12px 14px;color:#ccc;font:12px Arial,sans-serif;line-height:1.5;">
         <strong style="color:#fff;letter-spacing:1px;">COMMANDER ACCOUNT</strong>
         <div id="account-status" style="margin:4px 0 8px;color:#aaa;"></div>
+        <div style="border-top:1px solid #444;border-bottom:1px solid #444;padding:7px 0;margin-bottom:8px;">
+            <strong style="color:#fff;letter-spacing:1px;">USERNAME</strong>
+            <span id="username-current" style="color:#8fd0ff;margin-left:6px;"></span>
+            <input id="username-input" placeholder="your name in the game (3-20)" maxlength="20" style="width:100%;margin:5px 0;padding:5px;background:#111;color:#fff;border:1px solid #555;">
+            <button type="button" onclick="saveUsername()" style="padding:5px 9px;">SET USERNAME</button>
+            <span id="username-message" style="color:#e8c46a;margin-left:6px;"></span>
+        </div>
         <input id="acc-name" placeholder="commander name or email" autocomplete="username" style="width:100%;margin-bottom:5px;padding:5px;background:#111;color:#fff;border:1px solid #555;">
         <input id="acc-pass" type="password" placeholder="password (6+ characters)" autocomplete="current-password" style="width:100%;margin-bottom:6px;padding:5px;background:#111;color:#fff;border:1px solid #555;">
         <button type="button" onclick="saveAccount()" style="padding:5px 9px;">SAVE / CREATE</button>
@@ -220,14 +227,13 @@
 
             if (!user) {
 
-                if (
-                    localStorage.getItem("playerID") &&
-                    !confirm(
-                        "Your previous session could not be restored.\n\n" +
-                        "OK = continue as a NEW player (new ID)\n" +
-                        "Cancel = log in to your commander account instead"
-                    )
-                ) {
+                if (localStorage.getItem("playerID")) {
+                    /* this browser already had a player: never invent a second one */
+                    alert(
+                        "Your session expired.\n\n" +
+                        "Please LOG IN with your commander name and password (bottom-left) " +
+                        "to keep your player ID, faction and fleets."
+                    );
                     return null;
                 }
 
@@ -270,20 +276,13 @@
             }
 
 
-            const {
-                error
-            } =
-                await supabaseClient
-                    .from("players")
-                    .upsert({
+                        let { error } = await supabaseClient.rpc("set_player_faction", { p_faction: faction });
 
-                        id: user.id,
+            /* stage16.sql not installed yet: update the row without resetting anything else */
+            if (error && /function|schema cache/i.test(error.message)) {
+                ({ error } = await supabaseClient.from("players").upsert({ id: user.id, faction: faction }));
+            }
 
-                        faction: faction,
-
-                        credits: 500
-
-                    });
 
 
             if (error) {
@@ -480,21 +479,12 @@
             }
 
 
-            const {
-                error
-            } =
-                await supabaseClient
-                    .from("players")
-                    .update({
+                        let { error } = await supabaseClient.rpc("set_player_faction", { p_faction: "Independents" });
 
-                        faction:
-                            "Independents"
+            if (error && /function|schema cache/i.test(error.message)) {
+                ({ error } = await supabaseClient.from("players").update({ faction: "Independents" }).eq("id", playerID));
+            }
 
-                    })
-                    .eq(
-                        "id",
-                        playerID
-                    );
 
 
             if (error) {
@@ -682,6 +672,39 @@
             document.getElementById("account-message").textContent = text;
         }
 
+        /* the username is the name every other player sees (Congress, battles...) */
+        async function loadUsername() {
+
+            const el = document.getElementById("username-current");
+
+            try {
+                const { data, error } = await supabaseClient.rpc("my_identity");
+                if (error || !data) { el.textContent = ""; return null; }
+                el.textContent = data.username ? data.username : "(not set)";
+                return data.username || null;
+            }
+            catch (e) { return null; }
+
+        }
+
+        async function saveUsername() {
+
+            const msg = document.getElementById("username-message");
+            const name = document.getElementById("username-input").value.trim();
+
+            msg.textContent = "";
+
+            const { data, error } = await supabaseClient.rpc("set_username", { p_name: name });
+
+            if (error) { msg.textContent = error.message; return; }
+
+            msg.textContent = "Saved.";
+            document.getElementById("username-input").value = "";
+            document.getElementById("username-current").textContent = data;
+            refreshAccountStatus();
+
+        }
+
         async function refreshAccountStatus() {
 
             const { data: { session } } = await supabaseClient.auth.getSession();
@@ -690,7 +713,8 @@
             const logout = document.getElementById("acc-logout");
 
             if (user && !user.is_anonymous && user.email) {
-                status.textContent = "Logged in as " + (isAliasEmail(user.email) ? user.email.slice(3).split("@")[0] : user.email);
+                const uname = await loadUsername();
+                status.textContent = "Logged in as " + (uname || (isAliasEmail(user.email) ? user.email.slice(3).split("@")[0] : user.email));
                 logout.style.display = "inline-block";
             }
             else {
@@ -812,6 +836,7 @@
 
         initializeMenu();
         refreshAccountStatus();
+        loadUsername();
 
 
     </script>

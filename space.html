@@ -202,6 +202,14 @@ const CLASSES = {
     }
 };
 
+/* handling: ships were too sluggish to steer, so they turn, accelerate and brake faster */
+for (const key of Object.keys(CLASSES)) {
+    const c = CLASSES[key];
+    c.turn *= 1.9;
+    c.accel *= 1.9;
+    c.speed *= 1.15;
+}
+
 function classOf(type) { return CLASSES[type] || CLASSES.Rifle; }
 
 /* the oldest Knightmare squad of a fleet rides the flagship */
@@ -914,7 +922,7 @@ function steerShip(s, dt) {
         /* stopping distance with the ship's own braking */
         const brake = (s.speed * s.speed) / (2 * c.accel * 1.4) + 20;
 
-        if (d < 22 && s.speed < 14) {
+        if (d < 40 && s.speed < 30) {
             s.dest = null;
             if (s.destHeading !== null) { s.face = s.destHeading; }
             s.destHeading = null;
@@ -986,16 +994,16 @@ function steerShip(s, dt) {
     if (wantSpeed > 0) { wantHead = avoidObstacles(s, wantHead); }
 
     /* turn: slower at speed, a ship needs room to manoeuvre */
-    const turnRate = c.turn * mode.turn * (s.engineHit > simTime ? 0.6 : 1) * (0.55 + 0.45 * (1 - Math.min(1, s.speed / (c.speed * 1.4))));
+    const turnRate = c.turn * mode.turn * (s.engineHit > simTime ? 0.6 : 1) * (0.8 + 0.2 * (1 - Math.min(1, s.speed / (c.speed * 1.4))));
     const diff = wrapPi(wantHead - s.angle);
 
     s.angle += clamp(diff, -turnRate * dt, turnRate * dt);
 
     /* a ship that is pointing the wrong way cannot burn hard */
-    const align = Math.max(0.15, 1 - Math.abs(diff) / 1.9);
+    const align = Math.max(0.4, 1 - Math.abs(diff) / 2.8);
     const target = wantSpeed * align;
 
-    const acc = c.accel * (target > s.speed ? 1 : 1.4);
+    const acc = c.accel * (target > s.speed ? 1 : 2.2);
     s.speed += clamp(target - s.speed, -acc * dt, acc * dt);
 
     s.x += Math.cos(s.angle) * s.speed * dt;
@@ -1692,6 +1700,12 @@ window.addEventListener("keydown", function(ev) {
     else if (k === "2") { command("power", { mode: 2 }); }
     else if (k === "3") { command("power", { mode: 3 }); }
     else if (k === "0" || k === "q") { command("power", { mode: 0 }); }
+    else if (k === "f") {
+        /* turn the selected ships to face the cursor */
+        const cx = mine.reduce((n, s) => n + s.x, 0) / mine.length;
+        const cy = mine.reduce((n, s) => n + s.y, 0) / mine.length;
+        command("face", { h: +Math.atan2(mouse.y - cy, mouse.x - cx).toFixed(3) });
+    }
 
 });
 
@@ -2247,7 +2261,7 @@ function drawHud() {
     ctx.font = "11px Arial";
     ctx.fillStyle = "rgba(140,163,184,.9)";
     ctx.textAlign = "left";
-    ctx.fillText("CLICK/DRAG select · RIGHT-CLICK move · RIGHT-DRAG move and set final heading · RIGHT-CLICK enemy attack · SHIFT+RIGHT-CLICK turn on the spot", 14, H - (sel.length ? 176 : 40));
+    ctx.fillText("CLICK/DRAG select · RIGHT-CLICK move · RIGHT-DRAG move and set final heading · RIGHT-CLICK enemy attack · SHIFT+RIGHT-CLICK or F turn to face the cursor", 14, H - (sel.length ? 176 : 40));
     ctx.fillText("B brace (-50% damage, no fire) · 1 weapons · 2 shields · 3 engines · 0 balanced · S stop · SPACE centre · wheel zoom · middle-drag pan", 14, H - (sel.length ? 162 : 24));
 
     /* minimap */

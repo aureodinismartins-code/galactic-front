@@ -22,7 +22,7 @@
     ></script>
 
     <script src="supabase.js"></script>
-        <script>window.GC_RESET = true;</script>
+        <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js"></script>
     <script src="ships.js"></script>
 
@@ -1405,12 +1405,21 @@ function getPlanetPosition(name) {
 
 function timeMs(t) { return t ? new Date(t).getTime() : NaN; }
 
+/* two timestamps that mean the same moment, even if one column has no time zone (they then differ by
+   a whole number of quarter hours): this stopped travelling fleets from jumping back to their start */
+function sameInstant(a, b) {
+    const d = Math.abs(timeMs(a) - timeMs(b));
+    if (isNaN(d)) { return false; }
+    const r = d % 900000;
+    return r < 2500 || 900000 - r < 2500;
+}
+
 /* the point a travelling fleet started from (a planet, or a spot in deep space) */
 function getTripStart(fleet) {
 
     if (
         fleet.from_x != null && fleet.from_dep &&
-        timeMs(fleet.from_dep) === timeMs(fleet.departure_time)
+        sameInstant(fleet.from_dep, fleet.departure_time)
     ) {
         return [Number(fleet.from_x), Number(fleet.from_y)];
     }
@@ -1788,6 +1797,9 @@ async function loadFleets() {
         const seen = await supabaseClient.rpc("visible_enemy_fleets");
 
         if (!seen.error && Array.isArray(seen.data)) {
+
+            /* nothing of another faction is shown unless the server says it is within sensor range */
+            fleets = fleets.filter(f => f.player_id === playerID || !f.faction || f.faction === playerFaction);
 
             const known = new Set(fleets.map(f => String(f.id)));
 
@@ -2850,6 +2862,24 @@ async function pollSpaceBattles() {
 
 setInterval(pollSpaceBattles, 8000);
 setTimeout(pollSpaceBattles, 2500);
+
+/* =========================================
+   CONGRESS (Freedom Authority only)
+========================================= */
+(function() {
+
+    if (playerFaction !== "Freedom Authority") { return; }
+
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = "CONGRESS";
+    b.style.cssText =
+        "position:fixed;top:78px;right:20px;z-index:60;padding:12px 26px;background:#10213f;color:#cfe3ff;" +
+        "border:1px solid #3b6fd0;font:bold 13px Arial;letter-spacing:3px;cursor:pointer;";
+    b.addEventListener("click", function() { window.location.href = "congress.html"; });
+    document.body.appendChild(b);
+
+})();
 
 /* =========================================
    RIGHT-CLICK ORDERS

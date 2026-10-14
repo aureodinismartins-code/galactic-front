@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Freedom Authority Congress</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script>window.GC_NO_BANNER = false;</script>
+<script src="gamecontrol.js"></script>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: #070b14; color: #e3ebf5; font-family: Arial, sans-serif; }
+body { background: radial-gradient(ellipse at 50% -10%, #14233f 0%, #070b14 60%); }
+button { font-family: inherit; }
+#top { display: flex; align-items: center; gap: 22px; padding: 12px 22px; background: #0a1220; border-bottom: 1px solid #1f3354; position: sticky; top: 0; z-index: 20; }
+#top h1 { margin: 0; font-size: 18px; letter-spacing: 5px; font-weight: 900; color: #cfe3ff; }
+#top .grow { flex: 1; }
+.stat { font-size: 12px; letter-spacing: 1px; color: #8fa6c4; }
+.stat b { color: #fff; font-size: 15px; letter-spacing: 0; }
+.back { padding: 8px 16px; background: #101c30; color: #cfe3ff; border: 1px solid #2c4a78; cursor: pointer; letter-spacing: 2px; font-weight: bold; font-size: 12px; text-decoration: none; }
+.back:hover { background: #172a47; }
+#main { display: grid; grid-template-columns: minmax(520px, 1.1fr) minmax(480px, 1fr); gap: 18px; padding: 18px 22px; }
+.panel { background: #0b1424; border: 1px solid #1f3354; padding: 14px 16px; }
+.panel h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: 3px; color: #8fb4e8; font-weight: 800; }
+#chamber svg { width: 100%; height: auto; display: block; }
+.seat { cursor: pointer; transition: opacity .15s; }
+.seat:hover { stroke: #fff; stroke-width: 2; }
+#legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 4px; font-size: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid #2a3f63; background: #0e1a2f; font-size: 11px; letter-spacing: .5px; }
+.dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+#tip { position: fixed; pointer-events: none; z-index: 50; background: #050a14f0; border: 1px solid #3a5a8f; padding: 7px 10px; font-size: 12px; display: none; max-width: 240px; }
+#regionbar { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+.rchip { font-size: 10px; letter-spacing: .5px; padding: 3px 7px; border: 1px solid #28406a; background: #0d182b; color: #9bb4d6; cursor: pointer; }
+.rchip.on { background: #1d3a6b; color: #fff; border-color: #5b8bd6; }
+#member { margin-top: 10px; min-height: 120px; font-size: 13px; }
+.bar { height: 9px; background: #14223a; position: relative; margin: 3px 0; }
+.bar > i { position: absolute; left: 0; top: 0; bottom: 0; display: block; }
+.tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+.tab { padding: 8px 14px; background: #0e1a2f; border: 1px solid #28406a; color: #9bb4d6; cursor: pointer; font-size: 11px; letter-spacing: 2px; font-weight: 700; }
+.tab.on { background: #1d3a6b; color: #fff; border-color: #5b8bd6; }
+.card { border: 1px solid #25406b; background: #0d192d; padding: 11px 13px; margin-bottom: 10px; }
+.card.mine { border-left: 3px solid #4cc2ff; }
+.card.active { border-color: #d6a84b; }
+.card.sel { box-shadow: 0 0 0 2px #7dff9d inset; }
+.card h3 { margin: 0 0 4px; font-size: 14px; }
+.sub { font-size: 11px; color: #8fa6c4; letter-spacing: .5px; }
+.badge { font-size: 10px; letter-spacing: 1.5px; padding: 2px 7px; border: 1px solid #3a5a8f; margin-right: 6px; font-weight: 700; }
+.pass { color: #7dff9d; border-color: #2c8f4f; }
+.fail { color: #ff8a8a; border-color: #8f2c2c; }
+.live { color: #ffd37a; border-color: #8f6a2c; }
+.btn { padding: 9px 16px; background: #14305a; color: #fff; border: 1px solid #4d7fd0; cursor: pointer; font-weight: 800; letter-spacing: 2px; font-size: 11px; }
+.btn:hover { background: #1c4381; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.red { background: #4a1818; border-color: #a04444; }
+.btn.small { padding: 5px 10px; font-size: 10px; }
+select, input[type=number] { background: #0a1424; color: #fff; border: 1px solid #355690; padding: 7px 9px; font-size: 13px; min-width: 200px; }
+label.row { display: block; margin: 10px 0 4px; font-size: 11px; letter-spacing: 2px; color: #8fb4e8; font-weight: 700; }
+.spons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.spons .opt { padding: 8px 10px; border: 1px solid #28406a; background: #0d182b; cursor: pointer; font-size: 12px; }
+.spons .opt.on { border-color: #7dff9d; background: #12301f; }
+.spons .opt small { display: block; color: #8fa6c4; margin-top: 3px; font-size: 10px; }
+.fc { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 11px; }
+.fc .nm { width: 96px; color: #b9cae3; }
+.fc .bar { flex: 1; }
+#toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 90; background: #14305a; border: 1px solid #5b8bd6; padding: 10px 20px; font-size: 13px; display: none; max-width: 70vw; }
+#toast.err { background: #4a1818; border-color: #c05555; }
+.log { font-size: 12px; line-height: 1.5; padding: 5px 0; border-bottom: 1px solid #14223a; }
+.log time { color: #6f87aa; margin-right: 8px; }
+.steps { display: flex; gap: 4px; margin: 6px 0; }
+.steps div { flex: 1; text-align: center; font-size: 9px; letter-spacing: 1px; padding: 5px 2px; border: 1px solid #28406a; color: #7b93b8; }
+.steps div.done { background: #17402a; color: #bff5d1; border-color: #2c8f4f; }
+.steps div.cur { background: #3a2f12; color: #ffe39a; border-color: #8f6a2c; }
+.tokens { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.token { padding: 10px 14px; border: 1px solid #355690; background: #0e1b33; font-size: 12px; min-width: 120px; }
+.token b { font-size: 20px; display: block; }
+@media (max-width: 1150px) { #main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="top">
+    <a class="back" href="galaxy.html">&larr; GALAXY</a>
+    <h1>FREEDOM AUTHORITY CONGRESS</h1>
+    <div class="grow"></div>
+    <div class="stat">CREDITS<br><b id="st-credits">-</b></div>
+    <div class="stat">POPULARITY<br><b id="st-pop">-</b></div>
+    <div class="stat">TAX LEVEL<br><b id="st-tax">-</b></div>
+    <div class="stat">SEATS<br><b id="st-seats">-</b></div>
+    <div class="stat">NEEDED<br><b id="st-need">-</b></div>
+</div>
+
+<div id="main">
+
+    <div>
+        <div class="panel" id="chamber">
+            <h2>THE CHAMBER</h2>
+            <div id="legend"></div>
+            <div id="regionbar"></div>
+            <svg id="hemi" viewBox="0 0 760 420"></svg>
+            <div id="member"></div>
+        </div>
+    </div>
+
+    <div>
+        <div class="panel">
+            <div class="tabs" id="tabs"></div>
+            <div id="tabbody"></div>
+        </div>
+    </div>
+
+</div>
+
+<div id="tip"></div>
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+   FREEDOM AUTHORITY CONGRESS (screen)
+   Everything is decided by the server (stage15.sql); this page
+   shows the chamber and sends proposals and bribes.
+========================================================= */
+
+const TYPES = {
+    military_action: { name: "Declaration of War on Planet", votes: "majority", cost: 500, desc: "Authorize a military strike on a specific planet. Without it Freedom Authority fleets cannot attack." },
+    fleet_construction: { name: "Authorize New Fleet Construction", votes: "supermajority", cost: 2000, desc: "Approve one new military fleet (build it from the galaxy map afterwards)." },
+    knightmare_construction: { name: "Authorize Knightmare Squad Formation", votes: "supermajority", cost: 1500, desc: "Approve one elite Knightmare squad (the Knightmare Facility chain is still needed)." },
+    resource_allocation: { name: "Emergency Economic Relief", votes: "majority", cost: 300, desc: "Civilian relief for occupied worlds: stability +10." },
+    diplomacy: { name: "Diplomatic Mission Proposal", votes: "majority", cost: 200, desc: "Send envoys to another faction: relations +10." },
+    taxation: { name: "Taxation Increase Proposal", votes: "supermajority", cost: 0, desc: "Raise taxes on the member worlds: 300-500 credits every 15 minutes per level (max 2), popularity -5." },
+    fleet_revocation: { name: "Military Asset Recall and Decommission", votes: "supermajority", cost: 0, desc: "Recall and dismantle one of your fleets for 500 credits of salvage." }
+};
+
+let ov = null;
+let tab = "proposals";
+let selMember = null;
+let selProposal = null;
+let regionFilter = null;
+let skew = 0;            /* server time minus browser time */
+let draft = { type: "military_action", planet: "", fleet: "", target: "Combine", sponsor: "" };
+let positions = [];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = n => Number(n || 0).toLocaleString();
+
+function toast(text, err) {
+    const t = $("toast");
+    t.textContent = text;
+    t.className = err ? "err" : "";
+    t.style.display = "block";
+    clearTimeout(toast.h);
+    toast.h = setTimeout(() => { t.style.display = "none"; }, 5200);
+}
+
+function factionById(id) { return (ov.factions || []).find(f => f.id === id) || { name: "?", color: "#888", priorities: [] }; }
+
+function secondsLeft(ts) { return Math.max(0, Math.round((new Date(ts).getTime() - (Date.now() + skew)) / 1000)); }
+function mmss(s) { return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+
+/* ---------------------------------------------------------
+   LOAD
+--------------------------------------------------------- */
+async function load() {
+
+    const { data, error } = await supabaseClient.rpc("congress_overview");
+
+    if (error) {
+        $("tabbody").innerHTML = '<div class="card"><h3>Congress is not available</h3><div class="sub">' + esc(error.message) +
+            '<br><br>Only Freedom Authority players have a Congress, and stage15.sql must have been run.</div></div>';
+        return;
+    }
+
+    ov = data;
+    skew = new Date(ov.now).getTime() - Date.now();
+
+    if (!draft.sponsor) { draft.sponsor = "old_guard"; }
+    if (!draft.planet && ov.targets.length) { draft.planet = ov.targets[0].planet; }
+    if (!draft.fleet && ov.my_fleets.length) { draft.fleet = ov.my_fleets[0].id; }
+    if (selProposal && !ov.proposals.find(p => p.id === selProposal)) { selProposal = null; }
+
+    render();
+
+}
+
+function render() {
+
+    $("st-credits").textContent = fmt(ov.credits);
+    $("st-pop").textContent = Math.round(ov.state.popularity) + "%";
+    $("st-tax").textContent = ov.state.tax_level + " / 2";
+    $("st-seats").textContent = ov.seats;
+    $("st-need").textContent = ov.majority + " / " + ov.supermajority;
+    $("st-need").title = "votes needed: majority / supermajority";
+
+    renderLegend();
+    renderRegions();
+    renderHemicycle();
+    renderMember();
+    renderTabs();
+
+}
+
+/* ---------------------------------------------------------
+   THE CHAMBER
+--------------------------------------------------------- */
+function renderLegend() {
+    $("legend").innerHTML = ov.factions.map(f =>
+        '<span class="chip"><span class="dot" style="background:' + esc(f.color) + '"></span>' + esc(f.name) + ' &middot; <b>' + f.seats + '</b> seats &middot; loyalty ' + f.loyalty + '</span>'
+    ).join("") + '<span class="chip"><span class="dot" style="background:transparent;border:2px dashed #ffd37a"></span>suspected of corruption</span>';
+}
+
+function renderRegions() {
+    const regions = [];
+    for (const m of ov.members) { if (regions.indexOf(m.region) === -1) { regions.push(m.region); } }
+    $("regionbar").innerHTML = '<span class="rchip' + (regionFilter ? "" : " on") + '" data-r="">ALL</span>' +
+        regions.map(r => '<span class="rchip' + (regionFilter === r ? " on" : "") + '" data-r="' + esc(r) + '">' + esc(r) + ' (' + ov.members.filter(m => m.region === r).length + ')</span>').join("");
+    $("regionbar").querySelectorAll(".rchip").forEach(el => el.addEventListener("click", function() {
+        regionFilter = el.dataset.r || null;
+        renderRegions(); renderHemicycle();
+    }));
+}
+
+/* seats sit on concentric half-rings; sorted by angle so every region is a wedge */
+function layoutSeats(n) {
+
+    const rows = n > 190 ? 9 : 8;
+    const r0 = 150, r1 = 360;
+    const radii = [];
+    for (let i = 0; i < rows; i++) { radii.push(r0 + (r1 - r0) * i / (rows - 1)); }
+    const sum = radii.reduce((a, b) => a + b, 0);
+
+    const counts = radii.map(r => Math.round(n * r / sum));
+    let diff = n - counts.reduce((a, b) => a + b, 0);
+    for (let i = rows - 1; diff !== 0; i = (i - 1 + rows) % rows) { counts[i] += diff > 0 ? 1 : -1; diff += diff > 0 ? -1 : 1; }
+
+    const pts = [];
+
+    radii.forEach(function(r, i) {
+        for (let j = 0; j < counts[i]; j++) {
+            const a = Math.PI - Math.PI * (j + 0.5) / counts[i];
+            pts.push({ x: 380 + Math.cos(a) * r, y: 395 - Math.sin(a) * r, a: a, r: r });
+        }
+    });
+
+    pts.sort((p, q) => (q.a - p.a) || (p.r - q.r));
+    return pts;
+
+}
+
+function renderHemicycle() {
+
+    const members = ov.members;
+
+    if (positions.length !== members.length) { positions = layoutSeats(members.length); }
+
+    const bribed = new Set();
+    const pr = ov.proposals.find(p => p.id === selProposal);
+    if (pr) { for (const b of pr.bribes) { bribed.add(b.member); } }
+
+    let svg = '<path d="M20 395 A360 360 0 0 1 740 395" fill="none" stroke="#1b2f52" stroke-width="1"/>';
+
+    members.forEach(function(m, i) {
+        const p = positions[i];
+        const f = factionById(m.faction);
+        const dim = regionFilter && m.region !== regionFilter;
+        svg += '<circle class="seat" data-i="' + i + '" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + (m.planet ? 8 : 7.2) + '" fill="' + esc(f.color) + '" opacity="' + (dim ? 0.15 : 1) + '"' +
+            (selMember === m.id ? ' stroke="#fff" stroke-width="3"' : m.suspect ? ' stroke="#ffd37a" stroke-width="2.2" stroke-dasharray="3 2"' : bribed.has(m.id) ? ' stroke="#7dff9d" stroke-width="2.5"' : m.planet ? ' stroke="#4cc2ff" stroke-width="2"' : '') + '/>';
+    });
+
+    svg += '<text x="380" y="360" text-anchor="middle" fill="#8fb4e8" font-size="15" letter-spacing="4" font-weight="800">CONGRESS</text>' +
+        '<text x="380" y="380" text-anchor="middle" fill="#6f87aa" font-size="11" letter-spacing="2">' + ov.seats + ' DELEGATES</text>';
+
+    $("hemi").innerHTML = svg;
+
+    $("hemi").querySelectorAll(".seat").forEach(function(el) {
+        const m = members[Number(el.dataset.i)];
+        el.addEventListener("click", function() { selMember = m.id; render(); });
+        el.addEventListener("mousemove", function(ev) {
+            const f = factionById(m.faction);
+            const t = $("tip");
+            t.style.display = "block";
+            t.style.left = (ev.clientX + 14) + "px";
+            t.style.top = (ev.clientY + 14) + "px";
+            t.innerHTML = '<b>' + esc(m.name) + '</b><br><span style="color:' + esc(f.color) + '">' + esc(f.name) + '</span><br>' +
+                esc(m.planet ? "Delegate of " + m.planet : m.region + ", area " + m.area) + '<br>Loyalty ' + m.loyalty + (m.suspect ? "<br>Rumours of corruption" : "");
+        });
+        el.addEventListener("mouseleave", function() { $("tip").style.display = "none"; });
+    });
+
+}
+
+function renderMember() {
+
+    const box = $("member");
+    const m = ov.members.find(x => x.id === selMember);
+
+    if (!m) { box.innerHTML = '<div class="sub" style="padding:10px 0">Click a delegate to see who they are. While a proposal is in debate you can try to win their vote.</div>'; return; }
+
+    const f = factionById(m.faction);
+    const pr = ov.proposals.find(p => p.id === selProposal);
+    const debate = pr && pr.status === "debate" ? pr : null;
+
+    let have = 0;
+
+    let h = '<div class="card"><h3><span class="dot" style="background:' + esc(f.color) + '"></span> ' + esc(m.name) + '</h3>' +
+        '<div class="sub">' + esc(f.name) + ' &middot; ' + esc(m.planet ? "delegate of the occupied world " + m.planet : m.region + ", area " + m.area + ", seat " + m.seat) + '</div>' +
+        '<div class="sub" style="margin-top:6px">LOYALTY ' + m.loyalty + '%</div><div class="bar"><i style="width:' + m.loyalty + '%;background:#4cc2ff"></i></div>' +
+        (m.suspect ? '<div class="sub" style="color:#ffd37a">Rumours of corruption surround this delegate.</div>' : "");
+
+    if (debate) {
+
+        const mine = debate.bribes.filter(b => b.member === m.id);
+        have = mine.reduce((n, b) => n + b.amount, 0);
+        const stance = mine.length ? mine[0].stance : "yes";
+
+        h += '<hr style="border:0;border-top:1px solid #1f3354;margin:10px 0"><div class="sub">BRIBE FOR: <b style="color:#fff">' + esc(debate.title) + '</b></div>' +
+            (have ? '<div class="sub">Already offered: ' + fmt(have) + ' credits (vote ' + esc(stance.toUpperCase()) + ')</div>' : "") +
+            '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">' +
+            '<select id="b-stance" style="min-width:110px"' + (mine.length ? " disabled" : "") + '><option value="yes"' + (stance === "yes" ? " selected" : "") + '>buy a YES</option><option value="no"' + (stance === "no" ? " selected" : "") + '>buy a NO</option></select>' +
+            '<select id="b-amount" style="min-width:110px"><option>100</option><option>250</option><option selected>500</option><option>1000</option><option>1500</option></select>' +
+            '<button class="btn small" id="b-go">OFFER</button></div><div class="sub" id="b-info" style="margin-top:6px"></div>';
+
+    }
+    else if (pr) { h += '<div class="sub" style="margin-top:8px">Bribes can only be offered while the selected proposal is in debate.</div>'; }
+    else { h += '<div class="sub" style="margin-top:8px">Select a proposal in debate (PROPOSALS tab) to bribe this delegate.</div>'; }
+
+    box.innerHTML = h + '</div>';
+
+    if (debate) {
+
+        const info = function() {
+            const add = Number($("b-amount").value);
+            const total = have + add;
+            const eff = Math.min(1, total / 1000 * (1 - m.loyalty / 100));
+            $("b-info").innerHTML = 'Chance the bribe works: <b>' + Math.round(eff * 100) + '%</b> &middot; risk of a scandal: <b>' + Math.min(95, Math.round(total / 100 * 5)) + '%</b>. A bribe that fails is still lost.';
+        };
+
+        $("b-amount").addEventListener("change", info);
+        info();
+
+        $("b-go").addEventListener("click", async function() {
+            const { data, error } = await supabaseClient.rpc("congress_bribe", {
+                p_proposal: debate.id, p_member: m.id, p_amount: Number($("b-amount").value), p_stance: $("b-stance").value
+            });
+            if (error) { toast(error.message, true); return; }
+            toast("Offer made (" + fmt(data.total) + " credits in total on this delegate).");
+            await load();
+        });
+
+    }
+
+}
+
+/* ---------------------------------------------------------
+   TABS
+--------------------------------------------------------- */
+function renderTabs() {
+
+    const tabs = [["proposals", "PROPOSALS"], ["new", "NEW PROPOSAL"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
+
+    $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + t[1] + '</div>').join("");
+    $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
+
+    const body = $("tabbody");
+
+    if (tab === "proposals") { body.innerHTML = proposalsHtml(); wireProposals(); }
+    else if (tab === "new") { body.innerHTML = newHtml(); wireNew(); }
+    else if (tab === "occupied") { body.innerHTML = occupiedHtml(); wireOccupied(); }
+    else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
+    else { body.innerHTML = ov.log.map(l => '<div class="log"><time>' + new Date(l.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + '</time>' + esc(l.text) + '</div>').join("") || '<div class="sub">Nothing has happened yet.</div>'; }
+
+}
+
+/* ---- proposals ---- */
+function proposalsHtml() {
+
+    if (!ov.proposals.length) { return '<div class="sub">Congress has no proposals yet. Write one in NEW PROPOSAL; delegates also bring proposals of their own.</div>'; }
+
+    return ov.proposals.map(function(p) {
+
+        const t = TYPES[p.type] || { name: p.type, votes: "majority" };
+        const spons = factionById(p.sponsor);
+        const live = p.status === "introduction" || p.status === "debate";
+        const need = t.votes === "supermajority" ? ov.supermajority : ov.majority;
+
+        let h = '<div class="card' + (p.mine ? " mine" : "") + (live ? " active" : "") + (selProposal === p.id ? " sel" : "") + '" data-p="' + p.id + '">' +
+            '<h3>' + esc(p.title) + '</h3>' +
+            '<div class="sub"><span class="badge ' + (p.status === "passed" ? "pass" : live ? "live" : "fail") + '">' + esc(p.status === "failed_funds" ? "NO FUNDS" : p.status.toUpperCase()) + '</span>' +
+            esc(t.votes) + ' &middot; ' + (p.cost ? fmt(p.cost) + ' credits' : 'free') + ' &middot; by ' + esc(p.proposer) +
+            ' &middot; spoken for by <span style="color:' + esc(spons.color) + '">' + esc(spons.name) + '</span></div>';
+
+        if (live) {
+
+            const secs = p.status === "introduction" ? secondsLeft(p.debate_at) : secondsLeft(p.vote_at);
+            h += '<div class="sub" style="margin:6px 0"><b class="cd" data-p="' + p.id + '" data-s="' + p.status + '" style="color:#ffd37a">' +
+                (p.status === "introduction" ? "Debate opens in " : "Vote in ") + mmss(secs) + '</b> &middot; needs ' + need + ' yes votes of ' + ov.seats + '</div>';
+
+            let expected = 0;
+            for (const fc of (p.forecast || [])) {
+                const f = factionById(fc.faction);
+                expected += f.seats * fc.p / 100;
+                h += '<div class="fc"><span class="nm">' + esc(f.name) + '</span><div class="bar"><i style="width:' + fc.p + '%;background:' + esc(f.color) + '"></i></div><span>' + fc.p + '%</span></div>';
+            }
+            h += '<div class="sub">Forecast: about <b style="color:' + (expected >= need ? "#7dff9d" : "#ff8a8a") + '">' + Math.round(expected) + '</b> yes votes (chance of a YES per faction, before bribes and surprises).</div>';
+
+            if (p.bribes.length) {
+                h += '<div class="sub" style="margin-top:4px">Your bribes: ' + p.bribes.length + ' (' + fmt(p.bribes.reduce((n, b) => n + b.amount, 0)) + ' credits)</div>';
+            }
+
+            h += '<div style="margin-top:8px"><button class="btn small sel-btn" data-p="' + p.id + '">' + (selProposal === p.id ? "SELECTED FOR BRIBES" : "SELECT TO BRIBE DELEGATES") + '</button></div>';
+
+        }
+        else {
+
+            const tot = Math.max(1, (p.yes || 0) + (p.no || 0) + (p.abstain || 0));
+            h += '<div style="display:flex;height:11px;margin:8px 0 3px;background:#14223a"><i style="width:' + (p.yes / tot * 100) + '%;background:#2fbf6a"></i><i style="width:' + (p.no / tot * 100) + '%;background:#c44"></i><i style="width:' + (p.abstain / tot * 100) + '%;background:#667"></i></div>' +
+                '<div class="sub">YES ' + p.yes + ' &middot; NO ' + p.no + ' &middot; ABSTAIN ' + p.abstain + ' &middot; needed ' + p.required + '</div>';
+
+            if (p.result) {
+                if (p.result.effect) { h += '<div style="margin-top:6px;font-size:12px;color:#cfe3ff">' + esc(p.result.effect) + '</div>'; }
+                for (const d of p.result.defections || []) { h += '<div class="sub">Defection: ' + esc(d) + '</div>'; }
+                for (const r of p.result.removed || []) { h += '<div class="sub" style="color:#ff9a7a">Scandal: ' + esc(r) + '</div>'; }
+            }
+
+        }
+
+        return h + '</div>';
+
+    }).join("");
+
+}
+
+function wireProposals() {
+    $("tabbody").querySelectorAll(".sel-btn").forEach(el => el.addEventListener("click", function() {
+        selProposal = Number(el.dataset.p);
+        render();
+    }));
+}
+
+/* ---- new proposal ---- */
+function newHtml() {
+
+    const t = TYPES[draft.type];
+    const need = t.votes === "supermajority" ? ov.supermajority : ov.majority;
+
+    let h = '<label class="row">WHAT DO YOU WANT CONGRESS TO DO?</label><select id="n-type" style="width:100%">' +
+        Object.keys(TYPES).map(k => '<option value="' + k + '"' + (draft.type === k ? " selected" : "") + '>' + esc(TYPES[k].name) + '</option>').join("") + '</select>' +
+        '<div class="sub" style="margin-top:6px">' + esc(t.desc) + '</div>';
+
+    if (draft.type === "military_action") {
+        h += '<label class="row">TARGET PLANET</label><select id="n-planet" style="width:100%">' +
+            (ov.targets.map(x => '<option value="' + esc(x.planet) + '"' + (draft.planet === x.planet ? " selected" : "") + (x.declared ? " disabled" : "") + '>' + esc(x.planet) + ' (' + esc(x.owners) + ')' + (x.declared ? " - war declared" : "") + '</option>').join("") || '<option value="">no targets</option>') + '</select>';
+    }
+    else if (draft.type === "resource_allocation") {
+        h += '<label class="row">WHICH WORLD?</label><select id="n-planet" style="width:100%"><option value="">all occupied worlds</option>' +
+            ov.occupations.map(o => '<option value="' + esc(o.planet) + '"' + (draft.planet === o.planet ? " selected" : "") + '>' + esc(o.planet) + ' (stability ' + o.stability + ')</option>').join("") + '</select>';
+    }
+    else if (draft.type === "diplomacy") {
+        h += '<label class="row">ENVOYS TO</label><select id="n-target" style="width:100%"><option' + (draft.target === "Combine" ? " selected" : "") + '>Combine</option><option' + (draft.target === "Independents" ? " selected" : "") + '>Independents</option></select>';
+    }
+    else if (draft.type === "fleet_revocation") {
+        h += '<label class="row">FLEET TO DECOMMISSION</label><select id="n-fleet" style="width:100%">' +
+            (ov.my_fleets.map(f => '<option value="' + esc(f.id) + '"' + (draft.fleet === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>').join("") || '<option value="">you have no fleets</option>') + '</select>';
+    }
+
+    h += '<label class="row">WHICH FACTION SPEAKS FOR IT?</label><div class="spons">' +
+        ov.factions.map(f => {
+            const appeal = (f.priorities || []).some(x => ({ military_action: ["military_action", "territorial_control"], fleet_construction: ["fleet_construction"], knightmare_construction: ["fleet_construction"], resource_allocation: ["resource_allocation", "civilian_relief", "infrastructure"], diplomacy: ["diplomacy"], taxation: ["taxation_reform", "taxation"] }[draft.type] || []).indexOf(x) !== -1);
+            return '<div class="opt' + (draft.sponsor === f.key ? " on" : "") + '" data-k="' + f.key + '"><span class="dot" style="background:' + esc(f.color) + '"></span> <b>' + esc(f.name) + '</b> (' + f.seats + ')' +
+                '<small>' + (appeal ? "&#9733; this is one of their priorities" : "not a priority for them") + '</small></div>';
+        }).join("") + '</div><div class="sub" style="margin-top:6px">Delegates of the sponsoring faction vote for it far more often; factions near it in outlook tend to follow, distant ones oppose.</div>';
+
+    h += '<div class="card" style="margin-top:14px"><div class="sub">COST WHEN PASSED: <b style="color:#fff">' + (t.cost ? fmt(t.cost) + " credits" : "free") + '</b> &middot; VOTES NEEDED: <b style="color:#fff">' + need + ' of ' + ov.seats + ' (' + t.votes + ')</b></div>' +
+        '<div class="sub" style="margin-top:4px">Introduction 1 minute, then 5 minutes of debate (bribes are possible), then the vote. You can have 3 proposals before Congress at once.</div></div>' +
+        '<button class="btn" id="n-go">PUT BEFORE CONGRESS</button>';
+
+    return h;
+
+}
+
+function wireNew() {
+
+    $("n-type").addEventListener("change", function() { draft.type = $("n-type").value; renderTabs(); });
+    if ($("n-planet")) { $("n-planet").addEventListener("change", function() { draft.planet = $("n-planet").value; }); }
+    if ($("n-target")) { $("n-target").addEventListener("change", function() { draft.target = $("n-target").value; }); }
+    if ($("n-fleet")) { $("n-fleet").addEventListener("change", function() { draft.fleet = $("n-fleet").value; }); }
+
+    $("tabbody").querySelectorAll(".spons .opt").forEach(el => el.addEventListener("click", function() { draft.sponsor = el.dataset.k; renderTabs(); }));
+
+    $("n-go").addEventListener("click", async function() {
+
+        $("n-go").disabled = true;
+
+        const { error } = await supabaseClient.rpc("congress_submit", {
+            p_type: draft.type,
+            p_planet: draft.type === "military_action" || draft.type === "resource_allocation" ? (draft.planet || null) : null,
+            p_fleet: draft.type === "fleet_revocation" ? (draft.fleet || null) : null,
+            p_target: draft.type === "diplomacy" ? draft.target : null,
+            p_sponsor: draft.sponsor
+        });
+
+        $("n-go").disabled = false;
+
+        if (error) { toast(error.message, true); return; }
+
+        toast("Your proposal is before Congress.");
+        tab = "proposals";
+        await load();
+
+    });
+
+}
+
+/* ---- occupied worlds ---- */
+function occupiedHtml() {
+
+    if (!ov.occupations.length) {
+        return '<div class="sub">The Authority holds no occupied worlds. When Freedom Authority fleets conquer every city of a planet, it is placed under occupation and moves through four stages: <b>occupied</b>, <b>civilian administration</b>, <b>protected</b> and finally <b>integrated</b>. Each stage takes time and enough stability (relief proposals raise it), and each earns the planet delegates in Congress.</div>';
+    }
+
+    const names = ["OCCUPIED", "CIVILIAN ADMIN", "PROTECTED", "INTEGRATED"];
+
+    return ov.occupations.map(function(o) {
+
+        return '<div class="card"><h3>' + esc(o.planet) + '</h3><div class="sub">' + esc(o.stage_name) + ' &middot; ' + o.seats + ' of ' + o.seats_target + ' delegates seated</div>' +
+            '<div class="steps">' + names.map((n, i) => '<div class="' + (i < o.stage ? "done" : i === o.stage ? "cur" : "") + '">' + n + '</div>').join("") + '</div>' +
+            '<div class="sub">STABILITY ' + o.stability + ' / needed ' + (o.stage < 3 ? o.threshold : "-") + '</div>' +
+            '<div class="bar"><i style="width:' + o.stability + '%;background:' + (o.stability >= o.threshold ? "#2fbf6a" : "#d6a84b") + '"></i></div>' +
+            (o.stage < 3 ? '<div class="sub">STAGE PROGRESS ' + o.progress + ' / ' + o.duration + ' turns (5 minutes each, only counted while stability is high enough)</div>' +
+                '<div class="bar"><i style="width:' + (o.duration ? o.progress / o.duration * 100 : 0) + '%;background:#4cc2ff"></i></div>' : '<div class="sub" style="color:#7dff9d">Fully integrated into the Authority.</div>') +
+            '<div style="margin-top:8px"><button class="btn small relief" data-p="' + esc(o.planet) + '">PROPOSE RELIEF (+10 stability)</button></div></div>';
+
+    }).join("");
+
+}
+
+function wireOccupied() {
+    $("tabbody").querySelectorAll(".relief").forEach(el => el.addEventListener("click", function() {
+        draft.type = "resource_allocation"; draft.planet = el.dataset.p; tab = "new"; renderTabs();
+    }));
+}
+
+/* ---- authority ---- */
+function authorityHtml() {
+
+    const a = ov.authorizations;
+    const rel = ov.state.relations || {};
+
+    let h = '<div class="tokens">' +
+        '<div class="token">AUTHORISED FLEETS<b>' + a.fleet + '</b><span class="sub">build from the galaxy map</span></div>' +
+        '<div class="token">AUTHORISED KNIGHTMARE SQUADS<b>' + a.knightmare + '</b><span class="sub">recruit into a fleet</span></div>' +
+        '<div class="token">WAR DECLARATIONS<b>' + a.war.length + '</b><span class="sub">' + (a.war.length ? esc(a.war.join(", ")) : "none") + '</span></div></div>';
+
+    h += '<div class="card"><h3>Standing</h3><div class="sub">POPULARITY ' + Math.round(ov.state.popularity) + '% (it shifts every vote by up to &plusmn;10 points: a popular Authority gets its way more often)</div>' +
+        '<div class="bar"><i style="width:' + ov.state.popularity + '%;background:#4cc2ff"></i></div>' +
+        '<div class="sub" style="margin-top:8px">TAX LEVEL ' + ov.state.tax_level + ' of 2 &middot; relations: Combine ' + (rel.Combine || 0) + ', Independents ' + (rel.Independents || 0) + '</div></div>';
+
+    h += '<div class="card"><h3>Planets you could declare war on</h3>' +
+        (ov.targets.map(x => '<div class="sub" style="padding:3px 0;color:#cfe3ff"><b>' + esc(x.planet) + '</b> &middot; held by ' + esc(x.owners) + (x.declared ? ' &middot; <span style="color:#7dff9d">WAR DECLARED</span>' : ' <button class="btn small decl" data-p="' + esc(x.planet) + '">PROPOSE WAR</button>') + '</div>').join("") || '<div class="sub">No targets.</div>') + '</div>';
+
+    h += '<div class="card"><h3>The four factions</h3>' + ov.factions.map(f =>
+        '<div class="sub" style="padding:4px 0"><span class="dot" style="background:' + esc(f.color) + '"></span> <b style="color:#fff">' + esc(f.name) + '</b> (' + f.seats + ' seats): ' + esc(f.description) + '</div>').join("") + '</div>';
+
+    return h;
+
+}
+
+function wireAuthority() {
+    $("tabbody").querySelectorAll(".decl").forEach(el => el.addEventListener("click", function() {
+        draft.type = "military_action"; draft.planet = el.dataset.p; tab = "new"; renderTabs();
+    }));
+}
+
+/* ---------------------------------------------------------
+   TIMERS + REFRESH
+--------------------------------------------------------- */
+setInterval(function() {
+
+    if (!ov) { return; }
+
+    document.querySelectorAll(".cd").forEach(function(el) {
+        const p = ov.proposals.find(x => x.id === Number(el.dataset.p));
+        if (!p) { return; }
+        const intro = p.status === "introduction";
+        const s = secondsLeft(intro ? p.debate_at : p.vote_at);
+        el.textContent = (intro ? "Debate opens in " : "Vote in ") + mmss(s);
+        if (s === 0) { load(); }
+    });
+
+}, 1000);
+
+setInterval(function() { if (document.visibilityState === "visible") { load(); } }, 9000);
+
+load();
+</script>
+</body>
+</html>
