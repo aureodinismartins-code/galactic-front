@@ -136,6 +136,7 @@
         "NEEDED": "NECESSÁRIOS",
         "CREATE": "CRIAR",
         "CANCEL": "CANCELAR",
+        "NOTICE": "AVISO",
         "BATTLE IN PROGRESS": "BATALHA EM ANDAMENTO",
         "RETURN": "VOLTAR",
         "LEAVE": "SAIR",

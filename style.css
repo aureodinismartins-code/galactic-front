@@ -314,17 +314,13 @@ body {
 
 
 /* =========================================================
-   WORLD LAYER — planets and fleets live below the header band,
-   so the legend never sits on top of a world
+   WORLD LAYER — planets and fleets, on the whole map
 ========================================================= */
 
 .planet-layer {
     position: absolute;
 
-    left: 0;
-    right: 0;
-    top: 112px;
-    bottom: 0;
+    inset: 0;
 
     z-index: 2;
 }
@@ -337,27 +333,33 @@ body {
 .map-header {
     position: absolute;
 
-    top: 20px;
-    left: 40px;
+    top: 10px;
+    left: 22px;
 
     z-index: 50;
 
     pointer-events: none;
+
+    /* one short row: it stays clear of the first row of planets */
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
 .map-header h1 {
     margin: 0;
 
-    font-size: 32px;
-    letter-spacing: 6px;
+    font-size: 17px;
+    letter-spacing: 3px;
 }
 
 .map-header p {
-    margin-top: 10px;
+    margin: 0;
 
-    color: #777777;
+    color: #7f8b99;
 
-    font-size: 13px;
+    font-size: 11px;
 }
 
 
@@ -368,12 +370,16 @@ body {
 #player-faction-display {
     position: absolute;
 
-    top: 84px;
-    left: 40px;
+    top: 32px;
+    left: 22px;
 
     z-index: 50;
 
     pointer-events: none;
+
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: #93a6ba;
 }
 
 
@@ -579,10 +585,7 @@ body {
 .fleet-layer {
     position: absolute;
 
-    left: 0;
-    right: 0;
-    top: 112px;
-    bottom: 0;
+    inset: 0;
 
     z-index: 200;
 
@@ -1545,22 +1548,24 @@ button {
 @media (max-width: 800px) {
 
     .map-header {
-        top: 20px;
-        left: 20px;
+        top: 8px;
+        left: 14px;
+        gap: 8px;
     }
 
     .map-header h1 {
-        font-size: 23px;
-        letter-spacing: 4px;
+        font-size: 15px;
+        letter-spacing: 2px;
     }
 
     .map-header p {
-        font-size: 11px;
+        font-size: 10px;
     }
 
     #player-faction-display {
-        top: 85px;
-        left: 20px;
+        top: 28px;
+        left: 14px;
+        font-size: 10px;
     }
 
     .main-menu-button {

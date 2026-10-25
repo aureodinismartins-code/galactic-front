@@ -6,7 +6,7 @@
 <title>Galactic Wars - City Battle</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=5"></script>
+<script src="i18n.js?v=6"></script>
 <script src="gamecontrol.js"></script>
 <script src="knightmare_sprites.js"></script>
 <style>
@@ -3603,60 +3603,47 @@ document.getElementById("battle-return-button").addEventListener("click", functi
 
 });
 
-/* the game's own confirmation box, in the same style as the victory screen
-   (the browser's confirm() cannot be styled and breaks the look) */
-function gameConfirm(message, title, danger) {
+/* the game's own confirmation box, drawn exactly like the NOTICE card the
+   rest of the game shows (the browser's confirm() cannot be styled) */
+function gameConfirm(message, title) {
 
     return new Promise(function(resolve) {
 
         const old = document.getElementById("game-confirm");
         if (old) { old.remove(); }
 
-        const accent = danger ? "#ff7a4a" : "#7fdcff";
-
         const overlay = document.createElement("div");
         overlay.id = "game-confirm";
         overlay.style.cssText =
-            "position:fixed;inset:0;z-index:5000;background:rgba(2,4,7,.82);display:flex;align-items:center;justify-content:center;";
+            "position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;";
 
         const card = document.createElement("div");
         card.style.cssText =
-            "width:420px;max-width:calc(100vw - 40px);background:rgba(6,9,14,.98);" +
-            "border:2px solid " + (danger ? "#8a3030" : "#39465a") + ";" +
-            "box-shadow:0 0 40px " + (danger ? "rgba(255,90,40,.28)" : "rgba(60,140,220,.22)") + ", 0 18px 50px rgba(0,0,0,.7);" +
-            "padding:26px 30px 22px;color:#dfeaf2;font:14px Arial,sans-serif;line-height:1.6;text-align:center;";
+            "width:380px;max-width:90vw;background:rgba(8,12,22,.97);border:1px solid #7fdcff;" +
+            "box-shadow:0 0 24px rgba(80,200,255,.35);padding:18px 20px;color:#dfeaf2;" +
+            "font:14px Arial,sans-serif;line-height:1.5;";
 
         const h = document.createElement("div");
-        h.style.cssText =
-            "font-size:15px;font-weight:900;letter-spacing:4px;color:" + accent + ";margin-bottom:14px;" +
-            "padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.09);";
-        h.textContent = (title || "CONFIRM").toUpperCase();
+        h.style.cssText = "font-weight:bold;letter-spacing:2px;color:#7fdcff;margin-bottom:8px;";
+        h.textContent = (title || "NOTICE").toUpperCase();
 
         const p = document.createElement("div");
-        p.style.cssText = "color:#c3cfdc;";
         p.textContent = message;
 
         const row = document.createElement("div");
-        row.style.cssText = "display:flex;gap:10px;justify-content:center;margin-top:22px;";
+        row.style.cssText = "display:flex;gap:8px;margin-top:14px;";
+
+        const yes = document.createElement("button");
+        yes.type = "button";
+        yes.textContent = "OK";
+        yes.style.cssText =
+            "padding:7px 26px;background:#10202e;color:#fff;border:1px solid #7fdcff;cursor:pointer;font-weight:bold;";
 
         const no = document.createElement("button");
         no.type = "button";
         no.textContent = "CANCEL";
         no.style.cssText =
-            "min-width:120px;padding:10px 20px;background:transparent;color:#9fb4c9;border:1px solid #39465a;" +
-            "cursor:pointer;font-weight:bold;letter-spacing:2px;";
-
-        const yes = document.createElement("button");
-        yes.type = "button";
-        yes.textContent = "MAIN MENU";
-        yes.style.cssText =
-            "min-width:120px;padding:10px 20px;background:" + (danger ? "#2a0f08" : "#10202e") + ";color:#fff;" +
-            "border:1px solid " + accent + ";cursor:pointer;font-weight:bold;letter-spacing:2px;";
-
-        no.addEventListener("mouseenter", function() { no.style.background = "rgba(255,255,255,.06)"; no.style.color = "#fff"; });
-        no.addEventListener("mouseleave", function() { no.style.background = "transparent"; no.style.color = "#9fb4c9"; });
-        yes.addEventListener("mouseenter", function() { yes.style.filter = "brightness(1.35)"; });
-        yes.addEventListener("mouseleave", function() { yes.style.filter = ""; });
+            "padding:7px 20px;background:transparent;color:#cfe3ff;border:1px solid #355690;cursor:pointer;font-weight:bold;";
 
         const finish = function(ok) {
             overlay.remove();
@@ -3669,19 +3656,19 @@ function gameConfirm(message, title, danger) {
             else if (e.key === "Enter") { finish(true); }
         };
 
-        no.addEventListener("click", function() { finish(false); });
         yes.addEventListener("click", function() { finish(true); });
+        no.addEventListener("click", function() { finish(false); });
         overlay.addEventListener("click", function(e) { if (e.target === overlay) { finish(false); } });
         document.addEventListener("keydown", onKey);
 
-        row.appendChild(no);
         row.appendChild(yes);
+        row.appendChild(no);
         card.appendChild(h);
         card.appendChild(p);
         card.appendChild(row);
         overlay.appendChild(card);
         document.body.appendChild(overlay);
-        no.focus();
+        yes.focus();
 
     });
 
@@ -3695,8 +3682,7 @@ document.getElementById("main-menu-button").addEventListener("click", async func
         fighting
             ? "A battle is still in progress. If you leave now it is abandoned. Return to the main menu anyway?"
             : "Return to the main menu?",
-        fighting ? "Battle in progress" : "Main menu",
-        fighting
+        "Notice"
     );
 
     if (!ok) { return; }
