@@ -14,7 +14,7 @@
 
     <link
         rel="stylesheet"
-        href="style.css?v=4"
+        href="style.css?v=5"
     >
 
     <script
@@ -22,7 +22,7 @@
     ></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=4"></script>
+    <script src="i18n.js?v=5"></script>
         <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js"></script>
     <script src="ships.js"></script>
@@ -596,6 +596,8 @@
 
         <!-- PLANETS -->
 
+        <div class="planet-layer" id="planet-layer">
+
         <div class="planet combine planet-1"
             data-name="Ultramars"
             data-owner="Combine">
@@ -847,6 +849,8 @@
             data-name="Vraks"
             data-owner="Independents">
             <span>Vraks</span>
+        </div>
+
         </div>
 
 
@@ -1477,15 +1481,24 @@ function getFleetPosition(fleet) {
 
 }
 
+/* planets and fleets sit in #planet-layer, which starts below the header
+   band: every percentage is measured against that box, not the whole map */
+function worldLayer() {
+
+    return document.getElementById("planet-layer")
+        || document.getElementById("galaxy-map");
+
+}
+
 /* CSS transform that turns the ship group towards where it is flying */
 function getFleetTurn(fleet) {
 
     let dx = 0;
     let dy = 0;
 
-    const map = document.getElementById("galaxy-map");
-    const w = map ? map.clientWidth : 1;
-    const h = map ? map.clientHeight : 1;
+    const layer = worldLayer();
+    const w = layer ? layer.clientWidth : 1;
+    const h = layer ? layer.clientHeight : 1;
 
     if (fleet.status === "travelling" || fleet.status === "cruising") {
 
@@ -2799,7 +2812,7 @@ function showSpaceBattle(b) {
         "position:absolute;left:" + Number(b.x) + "%;top:" + Number(b.y) + "%;width:10px;height:10px;margin:-5px 0 0 -5px;" +
         "border-radius:50%;background:#fff;box-shadow:0 0 30px 14px #ff9a4a;pointer-events:none;z-index:50;" +
         "transition:all 2.4s ease-out;opacity:1;";
-    map.appendChild(flash);
+    (document.getElementById("planet-layer") || map).appendChild(flash);
     requestAnimationFrame(function() {
         flash.style.transform = "scale(7)";
         flash.style.opacity = "0";
@@ -2952,7 +2965,7 @@ setTimeout(pollSpaceBattles, 2500);
             return;
         }
 
-        const rect = map.getBoundingClientRect();
+        const rect = (document.getElementById("planet-layer") || map).getBoundingClientRect();
         const x = Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100));
         const y = Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100));
 
@@ -3501,13 +3514,19 @@ function drawSectors() {
     const w = Math.ceil(W / S);
     const h = Math.ceil(H / S);
 
+    /* the worlds start below the header band, so their pixel positions are
+       offset by it — otherwise the sectors drift up away from the planets */
+    const layer = document.getElementById("planet-layer");
+    const band = layer ? layer.offsetTop : 0;
+    const worldH = layer ? layer.offsetHeight : H;
+
     const planets = Array.from(document.querySelectorAll(".planet")).map(function(el) {
         const pos = getPlanetPosition(el.dataset.name);
         const owner = (el.dataset.owner || "").trim();
         const war = el.classList.contains("war");
         return {
             x: pos[0] / 100 * W / S,
-            y: pos[1] / 100 * H / S,
+            y: (band + pos[1] / 100 * worldH) / S,
             rgb: war ? [235, 95, 35] : (SECTOR_RGB[owner] || SECTOR_RGB.Independents),
             k: war ? 1.0 : (SECTOR_STRENGTH[owner] ?? SECTOR_STRENGTH.Independents)
         };
