@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=8"></script>
+<script src="i18n.js?v=9"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -150,6 +150,9 @@ let propError = null;     /* set when the propaganda functions are not installed
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = n => Number(n || 0).toLocaleString();
+/* translate a fragment while the sentence is being built (a label glued to a
+   number is never a text node of its own, so the page translator cannot see it) */
+const T = s => (typeof window.t === "function" ? window.t(s) : s);
 
 function toast(text, err) {
     const t = $("toast");
@@ -415,6 +418,65 @@ function renderHemicycle() {
 
 }
 
+/* ---------------------------------------------------------
+   A DELEGATE'S VOTING RECORD (read only, from cg_votes)
+--------------------------------------------------------- */
+let memberHistory = {};   /* member id -> the last votes, kept between renders */
+
+async function loadMemberHistory(id) {
+
+    const known = memberHistory[id];
+    if (known && (known.loading || known.votes || known.error)) { return; }
+
+    memberHistory[id] = { loading: true };
+
+    const { data, error } = await supabaseClient.rpc("congress_member_history", { p_member: id });
+
+    memberHistory[id] = error ? { error: error.message } : data;
+    paintMemberHistory(id);
+
+}
+
+function paintMemberHistory(id) {
+
+    const box = $("m-hist");
+    if (!box || selMember !== id) { return; }
+
+    const rec = memberHistory[id];
+
+    if (!rec || rec.loading) {
+        box.innerHTML = '<div class="sub">' + esc(T("Loading the voting record...")) + '</div>';
+        return;
+    }
+
+    if (rec.error) {
+        box.innerHTML = '<div class="sub">' +
+            esc(T("The voting record is not installed yet: run sql/2026-10-27_delegate_history.sql in the Supabase SQL editor.")) +
+            '</div><div class="sub" style="color:#ff8a8a;margin-top:4px">' + esc(rec.error) + '</div>';
+        return;
+    }
+
+    const rows = rec.votes || [];
+
+    let h = '<div class="sub">' + T("YES") + ' ' + rec.yes + ' &middot; ' + T("NO") + ' ' + rec.no + ' &middot; ' +
+        T("ABSTAIN") + ' ' + rec.abstain + ' &middot; ' + T("bribes taken:") + ' ' + rec.bribed + '</div>';
+
+    if (!rows.length) {
+        return void (box.innerHTML = h + '<div class="sub" style="margin-top:6px">' + esc(T("This delegate has not voted yet.")) + '</div>');
+    }
+
+    h += rows.map(function(v) {
+        const word = v.vote === "yes" ? T("YES") : v.vote === "no" ? T("NO") : T("ABSTAIN");
+        const colour = v.vote === "yes" ? "#7dff9d" : v.vote === "no" ? "#ff8a8a" : "#8fa6c4";
+        return '<div class="log"><b style="color:' + colour + '">' + esc(word) + '</b>' +
+            (v.bribed ? ' <span class="badge live">' + esc(T("BOUGHT")) + '</span>' : "") +
+            ' ' + esc(v.title) + '</div>';
+    }).join("");
+
+    box.innerHTML = h;
+
+}
+
 function renderMember() {
 
     const box = $("member");
@@ -429,8 +491,8 @@ function renderMember() {
     let have = 0;
 
     let h = '<div class="card"><h3><span class="dot" style="background:' + esc(f.color) + '"></span> ' + esc(m.name) + '</h3>' +
-        '<div class="sub">' + esc(f.name) + ' &middot; ' + esc(m.planet ? "delegate of the occupied world " + m.planet : m.region + ", area " + m.area + ", seat " + m.seat) + '</div>' +
-        '<div class="sub" style="margin-top:6px">LOYALTY ' + m.loyalty + '%</div><div class="bar"><i style="width:' + m.loyalty + '%;background:#4cc2ff"></i></div>' +
+        '<div class="sub">' + esc(f.name) + ' &middot; ' + esc(m.planet ? T("delegate of the occupied world") + " " + m.planet : m.region + ", " + T("area") + " " + m.area + ", " + T("seat") + " " + m.seat) + '</div>' +
+        '<div class="sub" style="margin-top:6px">' + T("LOYALTY") + ' ' + m.loyalty + '%</div><div class="bar"><i style="width:' + m.loyalty + '%;background:#4cc2ff"></i></div>' +
         (m.suspect ? '<div class="sub" style="color:#ffd37a">Rumours of corruption surround this delegate.</div>' : "");
 
     if (debate) {
@@ -439,12 +501,12 @@ function renderMember() {
         have = mine.reduce((n, b) => n + b.amount, 0);
         const stance = mine.length ? mine[0].stance : "yes";
 
-        h += '<hr style="border:0;border-top:1px solid #1f3354;margin:10px 0"><div class="sub">BRIBE FOR: <b style="color:#fff">' + esc(debate.title) + '</b></div>' +
-            (have ? '<div class="sub">Already offered: ' + fmt(have) + ' credits (vote ' + esc(stance.toUpperCase()) + ')</div>' : "") +
+        h += '<hr style="border:0;border-top:1px solid #1f3354;margin:10px 0"><div class="sub">' + T("BRIBE FOR:") + ' <b style="color:#fff">' + esc(debate.title) + '</b></div>' +
+            (have ? '<div class="sub">' + T("Already offered:") + ' ' + fmt(have) + ' ' + T("credits") + ' (' + T("vote") + ' ' + esc(T(stance.toUpperCase())) + ')</div>' : "") +
             '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">' +
-            '<select id="b-stance" style="min-width:110px"' + (mine.length ? " disabled" : "") + '><option value="yes"' + (stance === "yes" ? " selected" : "") + '>buy a YES</option><option value="no"' + (stance === "no" ? " selected" : "") + '>buy a NO</option></select>' +
+            '<select id="b-stance" style="min-width:110px"' + (mine.length ? " disabled" : "") + '><option value="yes"' + (stance === "yes" ? " selected" : "") + '>' + T("buy a YES") + '</option><option value="no"' + (stance === "no" ? " selected" : "") + '>' + T("buy a NO") + '</option></select>' +
             '<select id="b-amount" style="min-width:110px"><option>100</option><option>250</option><option selected>500</option><option>1000</option><option>1500</option></select>' +
-            '<button class="btn small" id="b-go">OFFER</button></div><div class="sub" id="b-info" style="margin-top:6px"></div>';
+            '<button class="btn small" id="b-go">' + T("OFFER") + '</button></div><div class="sub" id="b-info" style="margin-top:6px"></div>';
 
     }
     else if (pr) { h += '<div class="sub" style="margin-top:8px">Bribes can only be offered while the selected proposal is in debate.</div>'; }
@@ -452,13 +514,22 @@ function renderMember() {
 
     box.innerHTML = h + '</div>';
 
+    /* the delegate's record: what they voted and how often they were bought */
+    const histCard = document.createElement("div");
+    histCard.className = "card";
+    histCard.innerHTML = '<h3>' + esc(T("VOTING HISTORY")) + '</h3><div id="m-hist"></div>';
+    box.appendChild(histCard);
+    paintMemberHistory(m.id);
+    loadMemberHistory(m.id);
+
     if (debate) {
 
         const info = function() {
             const add = Number($("b-amount").value);
             const total = have + add;
             const eff = Math.min(1, total / 1000 * (1 - m.loyalty / 100));
-            $("b-info").innerHTML = 'Chance the bribe works: <b>' + Math.round(eff * 100) + '%</b> &middot; risk of a scandal: <b>' + Math.min(95, Math.round(total / 100 * 5)) + '%</b>. A bribe that fails is still lost.';
+            $("b-info").innerHTML = T("Chance the bribe works:") + ' <b>' + Math.round(eff * 100) + '%</b> &middot; ' + T("risk of a scandal:") + ' <b>' +
+                Math.min(95, Math.round(total / 100 * 5)) + '%</b>. ' + T("A bribe that fails is still lost.");
         };
 
         $("b-amount").addEventListener("change", info);
@@ -515,29 +586,29 @@ function proposalsHtml() {
 
         let h = '<div class="card' + (p.mine ? " mine" : "") + (live ? " active" : "") + (selProposal === p.id ? " sel" : "") + '" data-p="' + p.id + '">' +
             '<h3>' + esc(p.title) + '</h3>' +
-            '<div class="sub"><span class="badge ' + (p.status === "passed" ? "pass" : live ? "live" : "fail") + '">' + esc(p.status === "failed_funds" ? "NO FUNDS" : p.status.toUpperCase()) + '</span>' +
-            (p.by_president ? '<span class="badge live">PRESIDENTIAL</span>' : "") +
-            esc(t.votes) + ' &middot; ' + (p.cost ? fmt(p.cost) + ' credits' : 'free') + ' &middot; by ' + esc(p.proposer) +
-            ' &middot; spoken for by <span style="color:' + esc(spons.color) + '">' + esc(spons.name) + '</span></div>';
+            '<div class="sub"><span class="badge ' + (p.status === "passed" ? "pass" : live ? "live" : "fail") + '">' + esc(T(p.status === "failed_funds" ? "NO FUNDS" : p.status.toUpperCase())) + '</span>' +
+            (p.by_president ? '<span class="badge live">' + esc(T("PRESIDENTIAL")) + '</span>' : "") +
+            esc(T(t.votes)) + ' &middot; ' + (p.cost ? fmt(p.cost) + ' ' + T("credits") : T("free")) + ' &middot; ' + T("by") + ' ' + esc(p.proposer) +
+            ' &middot; ' + T("spoken for by") + ' <span style="color:' + esc(spons.color) + '">' + esc(spons.name) + '</span></div>';
 
         if (live) {
 
-            /* what the vote itself will do, which the forecast above cannot show:
-               cg_resolve carries the first fleet and pushes the next four */
+            /* cg_resolve carries the first fleet and pushes the next four, so the
+               bars and the expected count show the odds the vote will really use */
             const fleets = propState ? Number(propState.fleets) : NaN;
-
-            if (p.type === "fleet_construction" && Number.isFinite(fleets)) {
-                if (fleets === 0) {
-                    h += '<div class="sub" style="color:#7dff9d;margin-top:6px">GUARANTEED: the Authority has no fleet, so every delegate votes yes.</div>';
-                }
-                else if (fleets < 5) {
-                    h += '<div class="sub" style="color:#7dff9d;margin-top:6px">FAVOURED: the real odds are 35 points above the forecast while the Authority has fewer than five fleets.</div>';
-                }
-            }
+            const fleetRule = p.type === "fleet_construction" && Number.isFinite(fleets) && fleets < 5;
 
             const secs = p.status === "introduction" ? secondsLeft(p.debate_at) : secondsLeft(p.vote_at);
-            h += '<div class="sub" style="margin:6px 0"><b class="cd" data-p="' + p.id + '" data-s="' + p.status + '" style="color:#ffd37a">' +
-                (p.status === "introduction" ? "Debate opens in " : "Vote in ") + mmss(secs) + '</b> &middot; needs ' + need + ' yes votes of ' + ov.seats + '</div>';
+            h += '<div class="sub" style="margin:6px 0"><b class="cd" data-p="' + p.id + '" data-s="' + p.status + '"' +
+                ' data-intro="' + esc(T("Debate opens in")) + '" data-vote="' + esc(T("Vote in")) + '" style="color:#ffd37a">' +
+                (p.status === "introduction" ? T("Debate opens in") : T("Vote in")) + ' ' + mmss(secs) + '</b> &middot; ' +
+                T("needs") + ' ' + need + ' ' + T("of") + ' ' + ov.seats + ' ' + T("votes") + '</div>';
+
+            if (fleetRule) {
+                h += '<div class="sub" style="color:#7dff9d">' + esc(T(fleets === 0
+                    ? "GUARANTEED: the Authority has no fleet, so every delegate votes yes."
+                    : "These bars already include the opening fleet rule.")) + '</div>';
+            }
 
             if (p.cost) {
                 h += '<div class="sub">Bringing this bill forward costs nothing. The price is paid from the treasury only if it passes.</div>';
@@ -546,29 +617,32 @@ function proposalsHtml() {
             let expected = 0;
             for (const fc of (p.forecast || [])) {
                 const f = factionById(fc.faction);
-                expected += f.seats * fc.p / 100;
-                h += '<div class="fc"><span class="nm">' + esc(f.name) + '</span><div class="bar"><i style="width:' + fc.p + '%;background:' + esc(f.color) + '"></i></div><span>' + fc.p + '%</span></div>';
+                const chance = fleetRule ? (fleets === 0 ? 100 : Math.min(100, fc.p + 35)) : fc.p;
+                expected += f.seats * chance / 100;
+                h += '<div class="fc"><span class="nm">' + esc(f.name) + '</span><div class="bar"><i style="width:' + chance + '%;background:' + esc(f.color) + '"></i></div><span>' + chance + '%</span></div>';
             }
-            h += '<div class="sub">Forecast: about <b style="color:' + (expected >= need ? "#7dff9d" : "#ff8a8a") + '">' + Math.round(expected) + '</b> yes votes (chance of a YES per faction, before bribes and surprises).</div>';
+            h += '<div class="sub">' + T("Forecast: about") + ' <b style="color:' + (expected >= need ? "#7dff9d" : "#ff8a8a") + '">' + Math.round(expected) + '</b> ' +
+                T("yes votes (chance of a YES per faction, before bribes and surprises).") + '</div>';
 
             if (p.bribes.length) {
-                h += '<div class="sub" style="margin-top:4px">Your bribes: ' + p.bribes.length + ' (' + fmt(p.bribes.reduce((n, b) => n + b.amount, 0)) + ' credits)</div>';
+                h += '<div class="sub" style="margin-top:4px">' + T("Your bribes:") + ' ' + p.bribes.length + ' (' + fmt(p.bribes.reduce((n, b) => n + b.amount, 0)) + ' ' + T("credits") + ')</div>';
             }
 
-            h += '<div style="margin-top:8px"><button class="btn small sel-btn" data-p="' + p.id + '">' + (selProposal === p.id ? "SELECTED FOR BRIBES" : "SELECT TO BRIBE DELEGATES") + '</button>' +
-                (ov.president && ov.president.me && !ov.president.veto_used && !p.mine ? ' <button class="btn small red veto-btn" data-p="' + p.id + '">VETO</button>' : "") + '</div>';
+            h += '<div style="margin-top:8px"><button class="btn small sel-btn" data-p="' + p.id + '">' + T(selProposal === p.id ? "SELECTED FOR BRIBES" : "SELECT TO BRIBE DELEGATES") + '</button>' +
+                (ov.president && ov.president.me && !ov.president.veto_used && !p.mine ? ' <button class="btn small red veto-btn" data-p="' + p.id + '">' + T("VETO") + '</button>' : "") + '</div>';
 
         }
         else {
 
             const tot = Math.max(1, (p.yes || 0) + (p.no || 0) + (p.abstain || 0));
             h += '<div style="display:flex;height:11px;margin:8px 0 3px;background:#14223a"><i style="width:' + (p.yes / tot * 100) + '%;background:#2fbf6a"></i><i style="width:' + (p.no / tot * 100) + '%;background:#c44"></i><i style="width:' + (p.abstain / tot * 100) + '%;background:#667"></i></div>' +
-                '<div class="sub">YES ' + p.yes + ' &middot; NO ' + p.no + ' &middot; ABSTAIN ' + p.abstain + (p.required ? ' &middot; needed ' + p.required : '') + '</div>';
+                '<div class="sub">' + T("YES") + ' ' + p.yes + ' &middot; ' + T("NO") + ' ' + p.no + ' &middot; ' + T("ABSTAIN") + ' ' + p.abstain +
+                (p.required ? ' &middot; ' + T("needed") + ' ' + p.required : '') + '</div>';
 
             if (p.result) {
                 if (p.result.effect) { h += '<div style="margin-top:6px;font-size:12px;color:#cfe3ff">' + esc(p.result.effect) + '</div>'; }
-                for (const d of p.result.defections || []) { h += '<div class="sub">Defection: ' + esc(d) + '</div>'; }
-                for (const r of p.result.removed || []) { h += '<div class="sub" style="color:#ff9a7a">Scandal: ' + esc(r) + '</div>'; }
+                for (const d of p.result.defections || []) { h += '<div class="sub">' + T("Defection:") + ' ' + esc(d) + '</div>'; }
+                for (const r of p.result.removed || []) { h += '<div class="sub" style="color:#ff9a7a">' + T("Scandal:") + ' ' + esc(r) + '</div>'; }
             }
 
         }
@@ -1001,7 +1075,7 @@ setInterval(function() {
         if (!p) { return; }
         const intro = p.status === "introduction";
         const s = secondsLeft(intro ? p.debate_at : p.vote_at);
-        el.textContent = (intro ? "Debate opens in " : "Vote in ") + mmss(s);
+        el.textContent = (intro ? el.dataset.intro : el.dataset.vote) + " " + mmss(s);
         if (s === 0) { load(); }
     });
 

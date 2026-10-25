@@ -102,6 +102,70 @@
         "TREASURY": "TESOURO",
         "Bringing this bill forward costs nothing. The price is paid from the treasury only if it passes.":
             "Levar esta proposta ao Congresso não custa nada. O preço só é pago pelo tesouro se ela for aprovada.",
+
+        /* ---------- congress: the pieces a card builds itself ---------- */
+        "supermajority": "maioria qualificada",
+        "majority": "maioria simples",
+        "free": "grátis",
+        "by": "por",
+        "spoken for by": "apresentada por",
+        "INTRODUCTION": "APRESENTAÇÃO",
+        "DEBATE": "DEBATE",
+        "PASSED": "APROVADA",
+        "REJECTED": "REJEITADA",
+        "NO FUNDS": "SEM FUNDOS",
+        "PRESIDENTIAL": "PRESIDENCIAL",
+        "Debate opens in": "O debate abre em",
+        "Vote in": "Votação em",
+        "needs": "precisa de",
+        "of": "de",
+        "votes": "votos",
+        "Forecast: about": "Previsão: cerca de",
+        "yes votes (chance of a YES per faction, before bribes and surprises).":
+            "votos sim (chance de SIM por facção, antes de subornos e surpresas).",
+        "Your bribes:": "Seus subornos:",
+        "These bars already include the opening fleet rule.":
+            "Estas barras já incluem a regra das primeiras frotas.",
+        "YES": "SIM",
+        "NO": "NÃO",
+        "ABSTAIN": "ABSTENÇÃO",
+        "needed": "necessários",
+        "Defection:": "Deserção:",
+        "Scandal:": "Escândalo:",
+        "SELECT TO BRIBE DELEGATES": "SELECIONAR PARA SUBORNAR DELEGADOS",
+        "SELECTED FOR BRIBES": "SELECIONADA PARA SUBORNOS",
+        "VETO": "VETAR",
+
+        /* ---------- congress: the delegate panel ---------- */
+        "delegate of the occupied world": "delegado do mundo ocupado",
+        "area": "área",
+        "seat": "cadeira",
+        "BRIBE FOR:": "SUBORNO PARA:",
+        "Already offered:": "Já oferecido:",
+        "vote": "voto",
+        "buy a YES": "comprar um SIM",
+        "buy a NO": "comprar um NÃO",
+        "OFFER": "OFRECER",
+        "Chance the bribe works:": "Chance de o suborno funcionar:",
+        "risk of a scandal:": "risco de escândalo:",
+        "A bribe that fails is still lost.": "Um suborno que falha é perdido mesmo assim.",
+
+        /* ---------- congress: the voting record ---------- */
+        "VOTING HISTORY": "HISTÓRICO DE VOTOS",
+        "Loading the voting record...": "Carregando o histórico de votos...",
+        "The voting record is not installed yet: run sql/2026-10-27_delegate_history.sql in the Supabase SQL editor.":
+            "O histórico de votos ainda não está instalado: execute sql/2026-10-27_delegate_history.sql no editor SQL do Supabase.",
+        "bribes taken:": "subornos aceitos:",
+        "This delegate has not voted yet.": "Este delegado ainda não votou.",
+        "BOUGHT": "COMPRADO",
+
+        /* ---------- congress: the tabs ---------- */
+        "PROPOSALS": "PROPOSTAS",
+        "ELECTION": "ELEIÇÃO",
+        "NEW PROPOSAL": "NOVA PROPOSTA",
+        "OCCUPIED WORLDS": "MUNDOS OCUPADOS",
+        "AUTHORITY": "AUTORIDADE",
+        "NEWS": "NOTÍCIAS",
         "GUARANTEED: the Authority has no fleet, so every delegate votes yes.":
             "GARANTIDA: a Autoridade não tem frota, então todos os delegados votam sim.",
         "FAVOURED: the real odds are 35 points above the forecast while the Authority has fewer than five fleets.":
