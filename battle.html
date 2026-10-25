@@ -3603,14 +3603,86 @@ document.getElementById("battle-return-button").addEventListener("click", functi
 
 });
 
-document.getElementById("main-menu-button").addEventListener("click", function() {
+/* the game's own confirmation box, drawn like the in-game notices
+   (the browser's confirm() cannot be styled and breaks the look) */
+function gameConfirm(message, title) {
+
+    return new Promise(function(resolve) {
+
+        const old = document.getElementById("game-confirm");
+        if (old) { old.remove(); }
+
+        const overlay = document.createElement("div");
+        overlay.id = "game-confirm";
+        overlay.style.cssText =
+            "position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;";
+
+        const card = document.createElement("div");
+        card.style.cssText =
+            "width:400px;max-width:90vw;background:rgba(8,12,22,.97);border:1px solid #7fdcff;" +
+            "box-shadow:0 0 24px rgba(80,200,255,.35);padding:18px 20px;color:#dfeaf2;" +
+            "font:14px Arial,sans-serif;line-height:1.5;";
+
+        const h = document.createElement("div");
+        h.style.cssText = "font-weight:bold;letter-spacing:2px;color:#7fdcff;margin-bottom:8px;";
+        h.textContent = (title || "CONFIRM").toUpperCase();
+
+        const p = document.createElement("div");
+        p.textContent = message;
+
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;margin-top:16px;";
+
+        const no = document.createElement("button");
+        no.type = "button";
+        no.textContent = "CANCEL";
+        no.style.cssText =
+            "padding:7px 18px;background:transparent;color:#cfe3ff;border:1px solid #355690;cursor:pointer;font-weight:bold;";
+
+        const yes = document.createElement("button");
+        yes.type = "button";
+        yes.textContent = "MAIN MENU";
+        yes.style.cssText =
+            "padding:7px 18px;background:#10202e;color:#fff;border:1px solid #7fdcff;cursor:pointer;font-weight:bold;";
+
+        const finish = function(ok) {
+            overlay.remove();
+            document.removeEventListener("keydown", onKey);
+            resolve(ok);
+        };
+
+        const onKey = function(e) {
+            if (e.key === "Escape") { finish(false); }
+            else if (e.key === "Enter") { finish(true); }
+        };
+
+        no.addEventListener("click", function() { finish(false); });
+        yes.addEventListener("click", function() { finish(true); });
+        overlay.addEventListener("click", function(e) { if (e.target === overlay) { finish(false); } });
+        document.addEventListener("keydown", onKey);
+
+        row.appendChild(no);
+        row.appendChild(yes);
+        card.appendChild(h);
+        card.appendChild(p);
+        card.appendChild(row);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+        no.focus();
+
+    });
+
+}
+
+document.getElementById("main-menu-button").addEventListener("click", async function() {
 
     const fighting = typeof battleResult !== "undefined" && battleResult === null;
 
-    const ok = window.confirm(
+    const ok = await gameConfirm(
         fighting
             ? "A battle is still in progress. If you leave now it is abandoned. Return to the main menu anyway?"
-            : "Return to the main menu?"
+            : "Return to the main menu?",
+        "Main menu"
     );
 
     if (!ok) { return; }
