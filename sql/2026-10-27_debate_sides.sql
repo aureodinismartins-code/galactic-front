@@ -18,6 +18,7 @@
 --     painted and the bill can show its real tally;
 --   * the vote at the end is the side the chamber reached —
 --     a bribe still overrides everything;
+--   * a bill costs the treasury nothing, whether it passes or not;
 --   * when a bill crosses the votes it needs (or loses them) the
 --     Congress log says so, once;
 --   * the opening fleet rule still holds: a bill for the very first
@@ -313,7 +314,6 @@ declare
     v_passed boolean;
     v_status text;
     v_effect text := '';
-    v_cred bigint;
     v_delta numeric := 0;
     v_fleets integer;
     v_force boolean := false;
@@ -441,22 +441,9 @@ begin
     v_passed := v_yes >= v_req;
     v_status := case when v_passed then 'passed' else 'rejected' end;
 
-    /* the proposal's price is paid when it passes */
-    if v_passed and p.cost > 0 then
-
-        perform public.collect_faction_income();
-
-        select ft.credits into v_cred from public.faction_treasury as ft where ft.faction = 'Freedom Authority' for update;
-
-        if v_cred is null or v_cred < p.cost then
-            v_passed := false;
-            v_status := 'failed_funds';
-            v_effect := 'Congress approved, but the Authority could not pay ' || p.cost || ' credits.';
-        else
-            update public.faction_treasury as ft set credits = ft.credits - p.cost where ft.faction = 'Freedom Authority';
-        end if;
-
-    end if;
+    /* a bill does not cost the treasury anything: passing it is what puts the
+       authorisation, the war, the relief or the tax in place, and that is all.
+       (The fleet itself is still paid for when it is built from the map.) */
 
     if v_passed then v_effect := public.cg_execute(p.id); end if;
 
@@ -526,7 +513,54 @@ $function$;
 
 
 -- ---------------------------------------------------------
--- 5. sanity output
+-- 5. the bills that are already on record: their price is gone
+--
+-- game_guard refuses writes on cg_proposals while the game is closed,
+-- and this repair is not gameplay, so the user triggers are off for
+-- this one statement and back on immediately after.
+-- ---------------------------------------------------------
+
+alter table public.cg_proposals disable trigger user;
+
+update public.cg_proposals as p
+set cost = 0
+where p.cost is distinct from 0;
+
+alter table public.cg_proposals enable trigger user;
+
+
+-- ---------------------------------------------------------
+-- 6. and no bill ever carries a price again
+--
+-- A trigger rather than a rewrite of congress_submit and cg_npc_proposal:
+-- every bill, whoever writes it, is stored with cost 0, so the screen and
+-- the database agree and nothing can start charging again by accident.
+-- ---------------------------------------------------------
+
+create or replace function public.cg_bills_are_free()
+returns trigger
+language plpgsql
+security definer
+set search_path to ''
+as $function$
+begin
+    new.cost := 0;
+    return new;
+end;
+$function$;
+
+
+drop trigger if exists cg_bills_are_free on public.cg_proposals;
+
+create trigger cg_bills_are_free
+before insert or update on public.cg_proposals
+for each row
+when (new.cost is distinct from 0)
+execute function public.cg_bills_are_free();
+
+
+-- ---------------------------------------------------------
+-- 7. sanity output
 -- ---------------------------------------------------------
 
 select
@@ -536,4 +570,5 @@ select
     (select count(*) from information_schema.routines
       where routine_schema = 'public'
         and routine_name in ('cg_debate_tick', 'cg_debate_view', 'cg_resolve')) as functions,
-    (select count(*) from public.cg_proposals as p where p.status in ('introduction', 'debate')) as live_bills;
+    (select count(*) from public.cg_proposals as p where p.status in ('introduction', 'debate')) as live_bills,
+    (select coalesce(sum(p.cost), 0) from public.cg_proposals as p) as credits_charged_by_bills;

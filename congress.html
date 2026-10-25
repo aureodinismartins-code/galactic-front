@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=11"></script>
+<script src="i18n.js?v=12"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -635,7 +635,7 @@ function proposalsHtml() {
             '<h3>' + esc(p.title) + '</h3>' +
             '<div class="sub"><span class="badge ' + (p.status === "passed" ? "pass" : live ? "live" : "fail") + '">' + esc(T(p.status === "failed_funds" ? "NO FUNDS" : p.status.toUpperCase())) + '</span>' +
             (p.by_president ? '<span class="badge live">' + esc(T("PRESIDENTIAL")) + '</span>' : "") +
-            esc(T(t.votes)) + ' &middot; ' + (p.cost ? fmt(p.cost) + ' ' + T("credits") : T("free")) + ' &middot; ' + T("by") + ' ' + esc(p.proposer) +
+            esc(T(t.votes)) + ' &middot; ' + T("free") + ' &middot; ' + T("by") + ' ' + esc(p.proposer) +
             ' &middot; ' + T("spoken for by") + ' <span style="color:' + esc(spons.color) + '">' + esc(spons.name) + '</span></div>';
 
         if (live) {
@@ -655,10 +655,6 @@ function proposalsHtml() {
                 h += '<div class="sub" style="color:#7dff9d">' + esc(T(fleets === 0
                     ? "GUARANTEED: the Authority has no fleet, so every delegate votes yes."
                     : "These bars already include the opening fleet rule.")) + '</div>';
-            }
-
-            if (p.cost) {
-                h += '<div class="sub">' + T("Bringing this bill forward costs nothing. The price is paid from the treasury only if it passes.") + '</div>';
             }
 
             const dv = liveDebateFor(p.id);
@@ -923,7 +919,7 @@ function newHtml() {
                 '<small>' + (appeal ? "&#9733; this is one of their priorities" : "not a priority for them") + '</small></div>';
         }).join("") + '</div><div class="sub" style="margin-top:6px">Delegates of the sponsoring faction vote for it far more often; factions near it in outlook tend to follow, distant ones oppose.</div>';
 
-    h += '<div class="card" style="margin-top:14px"><div class="sub">COST WHEN PASSED: <b style="color:#fff">' + (t.cost ? fmt(t.cost) + " credits" : "free") + '</b> &middot; VOTES NEEDED: <b style="color:#fff">' + need + ' of ' + ov.seats + ' (' + t.votes + ')</b></div>' +
+    h += '<div class="card" style="margin-top:14px"><div class="sub">' + T("COST:") + ' <b style="color:#7dff9d">' + T("free") + '</b> &middot; ' + T("VOTES NEEDED:") + ' <b style="color:#fff">' + need + ' ' + T("of") + ' ' + ov.seats + ' (' + esc(T(t.votes)) + ')</b></div>' +
         '<div class="sub" style="margin-top:4px">Introduction 1 minute, then 5 minutes of debate (bribes are possible), then the vote. You can have 3 proposals before Congress at once.</div></div>' +
         '<button class="btn" id="n-go">PUT BEFORE CONGRESS</button>';
 
@@ -1091,13 +1087,13 @@ function authorityHtml() {
         '<div class="token">WAR DECLARATIONS<b>' + a.war.length + '</b><span class="sub">' + (a.war.length ? esc(a.war.join(", ")) : "none") + '</span></div></div>';
 
     h += '<div class="card active"><h3>War room: declare war on a planet</h3>' +
-        '<div class="sub" style="margin-bottom:8px">Only players write a Declaration of War (the delegates never do); Congress then votes on it (a majority is enough, 500 credits when it passes). Without a passed declaration Freedom Authority fleets cannot attack a planet. Click a planet on the map.</div>' +
+        '<div class="sub" style="margin-bottom:8px">Only players write a Declaration of War (the delegates never do); Congress then votes on it, and a majority is enough. Without a passed declaration Freedom Authority fleets cannot attack a planet. Click a planet on the map.</div>' +
         miniMapHtml("war") +
         '<div style="margin-top:8px;font-size:13px">' + (target ? 'Target: <b style="color:#ffd24c">' + esc(target.planet) + '</b> (held by ' + esc(target.owners) + ')' : 'No target chosen yet.') + '</div>' +
         '<label class="row">WHICH FACTION SPEAKS FOR IT?</label><div class="spons">' +
         ov.factions.map(f => '<div class="opt' + (draft.sponsor === f.key ? " on" : "") + '" data-k="' + f.key + '"><span class="dot" style="background:' + esc(f.color) + '"></span> <b>' + esc(f.name) + '</b> (' + f.seats + ')' +
             '<small>' + ((f.priorities || []).indexOf("military_action") !== -1 ? "&#9733; war is one of their priorities" : "not a priority for them") + '</small></div>').join("") + '</div>' +
-        '<div style="margin-top:10px"><button class="btn" id="war-go"' + (target && !declaredWar.has(target.planet) ? "" : " disabled") + '>PROPOSE WAR (500 credits when passed)</button></div>' +
+        '<div style="margin-top:10px"><button class="btn" id="war-go"' + (target && !declaredWar.has(target.planet) ? "" : " disabled") + '>' + T("PROPOSE WAR") + '</button></div>' +
         '</div>';
 
     h += '<div class="card"><h3>Standing</h3><div class="sub">POPULARITY ' + Math.round(ov.state.popularity) + '% (it shifts every vote by up to &plusmn;10 points: a popular Authority gets its way more often)</div>' +
