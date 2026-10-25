@@ -100,8 +100,6 @@
         /* ---------- congress: propaganda ---------- */
         "PROPAGANDA": "PROPAGANDA",
         "TREASURY": "TESOURO",
-        "Bringing this bill forward costs nothing. The price is paid from the treasury only if it passes.":
-            "Levar esta proposta ao Congresso não custa nada. O preço só é pago pelo tesouro se ela for aprovada.",
 
         /* ---------- congress: the pieces a card builds itself ---------- */
         "supermajority": "maioria qualificada",
@@ -417,6 +415,43 @@
         "voting no": "vota não",
         "UNDECIDED": "INDECISOS",
         "COST:": "CUSTO:",
+
+        /* ---------- congress: election, occupied worlds, authority ---------- */
+        "seats": "cadeiras",
+        "loyalty": "lealdade",
+        "delegates seated": "delegados sentados",
+        "turns (5 minutes each, only counted while stability is high enough)":
+            "turnos (5 minutos cada, contados apenas enquanto a estabilidade for alta o suficiente)",
+        "OCCUPIED": "OCUPADO",
+        "CIVILIAN ADMIN": "ADMINISTRAÇÃO CIVIL",
+        "PROTECTED": "PROTEGIDO",
+        "INTEGRATED": "INTEGRADO",
+        "Target:": "Alvo:",
+        "held by": "controlada por",
+        "No target chosen yet.": "Nenhum alvo escolhido ainda.",
+        "war is one of their priorities": "a guerra é uma das prioridades deles",
+        "not a priority for them": "não é uma prioridade para eles",
+        "(it shifts every vote by up to ±10 points: a popular Authority gets its way more often)":
+            "(muda cada votação em até ±10 pontos: uma Autoridade popular consegue o que quer com mais frequência)",
+        "relations:": "relações:",
+        "term": "mandato",
+        "term ends in": "o mandato termina em",
+        "(you)": "(você)",
+        "left": "restantes",
+        "Players:": "Jogadores:",
+        "none yet": "nenhum ainda",
+        "party members have voted (only players vote)": "membros de partido já votaram (só jogadores votam)",
+        "players declare their candidacy, then everybody votes": "os jogadores declaram a candidatura e depois todos votam",
+        "CAMPAIGN": "CAMPANHA",
+        "VOTING": "VOTAÇÃO",
+        "YOUR VOTE": "SEU VOTO",
+        "VOTE": "VOTAR",
+        "YOU ARE A CANDIDATE": "VOCÊ É CANDIDATO",
+        "RUN FOR PRESIDENT": "CANDIDATAR-SE À PRESIDÊNCIA",
+        "The President may keep 5 proposals before Congress (others 3), has used the veto of this term, and the ruling party's agenda is heard more often. State initiatives for new fleets and squads go to the President.":
+            "O Presidente pode manter 5 propostas no Congresso (os outros 3), já usou o veto deste mandato e a agenda do partido do governo é ouvida com mais frequência. As iniciativas do Estado por novas frotas e esquadrões vão para o Presidente.",
+        "The President may keep 5 proposals before Congress (others 3), may veto one proposal per term, and the ruling party's agenda is heard more often. State initiatives for new fleets and squads go to the President.":
+            "O Presidente pode manter 5 propostas no Congresso (os outros 3), pode vetar uma proposta por mandato e a agenda do partido do governo é ouvida com mais frequência. As iniciativas do Estado por novas frotas e esquadrões vão para o Presidente.",
         "VOTES NEEDED:": "VOTOS NECESSÁRIOS:",
         "PROPOSE WAR": "PROPOR GUERRA",
         "the floor is still moving": "o plenário ainda se mexe",
@@ -446,7 +481,6 @@
         "WHICH FACTION SPEAKS FOR IT?": "QUAL FACÇÃO APRESENTA A PROPOSTA?",
         "Delegates of the sponsoring faction vote for it far more often; factions near it in outlook tend to follow, distant ones oppose.":
             "Os delegados da facção proponente votam a favor com muito mais frequência; facções próximas em ideologia tendem a acompanhar, as distantes se opõem.",
-        "COST WHEN PASSED:": "CUSTO SE APROVADA:",
         "· VOTES NEEDED:": "· VOTOS NECESSÁRIOS:",
         "Introduction 1 minute, then 5 minutes of debate (bribes are possible), then the vote. You can have 3 proposals before Congress at once.":
             "Apresentação de 1 minuto, depois 5 minutos de debate (subornos são possíveis) e então a votação. Você pode ter 3 propostas no Congresso ao mesmo tempo.",
@@ -475,6 +509,40 @@
         "civilian administration": "administração civil",
         "protected": "protegido",
         "integrated": "integrado",
+
+        /* ---------- congress: the kinds of bill, and the small print ---------- */
+        "Declaration of War on Planet": "Declaração de guerra a um planeta",
+        "Authorize New Fleet Construction": "Autorizar a construção de uma nova frota",
+        "Authorize Knightmare Squad Formation": "Autorizar a formação de um esquadrão Knightmare",
+        "Emergency Economic Relief": "Ajuda econômica de emergência",
+        "Diplomatic Mission Proposal": "Missão diplomática",
+        "Taxation Increase Proposal": "Proposta de aumento de impostos",
+        "Military Asset Recall and Decommission": "Recolhimento e desativação de ativo militar",
+        "Authorize a military strike on a specific planet. Without it Freedom Authority fleets cannot attack.":
+            "Autoriza um ataque militar a um planeta específico. Sem isso, as frotas da Freedom Authority não podem atacar.",
+        "Approve one new military fleet (build it from the galaxy map afterwards).":
+            "Aprova uma nova frota militar (construa-a depois no mapa galáctico).",
+        "Approve one elite Knightmare squad (the Knightmare Facility chain is still needed).":
+            "Aprova um esquadrão Knightmare de elite (a cadeia da Instalação Knightmare ainda é necessária).",
+        "Civilian relief for occupied worlds: stability +10.":
+            "Ajuda civil para os mundos ocupados: estabilidade +10.",
+        "Send envoys to another faction: relations +10.":
+            "Envia emissários a outra facção: relações +10.",
+        "Raise taxes on the member worlds: 300-500 credits every 15 minutes per level (max 2), popularity -5.":
+            "Aumenta os impostos dos mundos membros: 300-500 créditos a cada 15 minutos por nível (máximo 2), popularidade -5.",
+        "Recall and dismantle one of your fleets for 500 credits of salvage.":
+            "Recolhe e desmonta uma das suas frotas em troca de 500 créditos de sucata.",
+        "this is one of their priorities": "esta é uma das prioridades deles",
+        "delegates": "delegados",
+        "campaign": "campanha",
+        "campaigns": "campanhas",
+        "credits spent": "créditos gastos",
+        "Only players write a Declaration of War (the delegates never do); Congress then votes on it, and a majority is enough. Without a passed declaration Freedom Authority fleets cannot attack a planet. Click a planet on the map.":
+            "Só os jogadores apresentam uma declaração de guerra (os delegados nunca o fazem); o Congresso vota-a depois e a maioria simples basta. Sem uma declaração aprovada, as frotas da Freedom Authority não podem atacar um planeta. Clique em um planeta no mapa.",
+        "war declared · blue = Authority, red = Combine, white = Independents":
+            "guerra declarada · azul = Freedom Authority, vermelho = Combine, branco = Independents",
+        "Ring colour = occupation stage (gold occupied, light blue civilian administration, violet protected, green integrated)":
+            "Cor do anel = estágio de ocupação (dourado ocupado, azul-claro administração civil, violeta protegido, verde integrado)",
 
         /* ---------- host tools / overlays ---------- */
         "THE GAME HAS NOT STARTED": "O JOGO NÃO COMEÇOU",

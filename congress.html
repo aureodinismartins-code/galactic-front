@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=12"></script>
+<script src="i18n.js?v=13"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -123,12 +123,14 @@ label.row { display: block; margin: 10px 0 4px; font-size: 11px; letter-spacing:
    shows the chamber and sends proposals and bribes.
 ========================================================= */
 
+/* cost is always 0: a bill never costs the treasury anything, whether it passes
+   or not (the database enforces the same thing with cg_bills_are_free) */
 const TYPES = {
-    military_action: { name: "Declaration of War on Planet", votes: "majority", cost: 500, desc: "Authorize a military strike on a specific planet. Without it Freedom Authority fleets cannot attack." },
-    fleet_construction: { name: "Authorize New Fleet Construction", votes: "supermajority", cost: 2000, desc: "Approve one new military fleet (build it from the galaxy map afterwards)." },
-    knightmare_construction: { name: "Authorize Knightmare Squad Formation", votes: "supermajority", cost: 1500, desc: "Approve one elite Knightmare squad (the Knightmare Facility chain is still needed)." },
-    resource_allocation: { name: "Emergency Economic Relief", votes: "majority", cost: 300, desc: "Civilian relief for occupied worlds: stability +10." },
-    diplomacy: { name: "Diplomatic Mission Proposal", votes: "majority", cost: 200, desc: "Send envoys to another faction: relations +10." },
+    military_action: { name: "Declaration of War on Planet", votes: "majority", cost: 0, desc: "Authorize a military strike on a specific planet. Without it Freedom Authority fleets cannot attack." },
+    fleet_construction: { name: "Authorize New Fleet Construction", votes: "supermajority", cost: 0, desc: "Approve one new military fleet (build it from the galaxy map afterwards)." },
+    knightmare_construction: { name: "Authorize Knightmare Squad Formation", votes: "supermajority", cost: 0, desc: "Approve one elite Knightmare squad (the Knightmare Facility chain is still needed)." },
+    resource_allocation: { name: "Emergency Economic Relief", votes: "majority", cost: 0, desc: "Civilian relief for occupied worlds: stability +10." },
+    diplomacy: { name: "Diplomatic Mission Proposal", votes: "majority", cost: 0, desc: "Send envoys to another faction: relations +10." },
     taxation: { name: "Taxation Increase Proposal", votes: "supermajority", cost: 0, desc: "Raise taxes on the member worlds: 300-500 credits every 15 minutes per level (max 2), popularity -5." },
     fleet_revocation: { name: "Military Asset Recall and Decommission", votes: "supermajority", cost: 0, desc: "Recall and dismantle one of your fleets for 500 credits of salvage." }
 };
@@ -330,7 +332,7 @@ function renderLegend() {
     const pr = dv ? ov.proposals.find(x => x.id === dv.id) : null;
 
     $("legend").innerHTML = ov.factions.map(f =>
-        '<span class="chip fchip" data-f="' + f.id + '" style="cursor:pointer;' + (factionFilter === f.id ? "border-color:#fff;background:#1d3a6b;" : "") + '"><span class="dot" style="background:' + esc(f.color) + '"></span>' + esc(f.name) + ' &middot; <b>' + f.seats + '</b> seats &middot; loyalty ' + f.loyalty + '</span>'
+        '<span class="chip fchip" data-f="' + f.id + '" style="cursor:pointer;' + (factionFilter === f.id ? "border-color:#fff;background:#1d3a6b;" : "") + '"><span class="dot" style="background:' + esc(f.color) + '"></span>' + esc(f.name) + ' &middot; <b>' + f.seats + '</b> ' + T("seats") + ' &middot; ' + T("loyalty") + ' ' + f.loyalty + '</span>'
     ).join("") + '<span class="chip"><span class="dot" style="background:transparent;border:2px dashed #ffd37a"></span>' + esc(T("suspected of corruption")) + '</span>' +
     (dv ? '<span class="chip" style="border-color:#7dff9d"><span class="dot" style="background:transparent;border:2px solid #7dff9d"></span>' + esc(T("voting yes")) +
         '</span><span class="chip" style="border-color:#ff8a8a"><span class="dot" style="background:transparent;border:2px solid #ff8a8a"></span>' + esc(T("voting no")) +
@@ -749,9 +751,11 @@ function electionHtml() {
 
     if (pres && pres.name) {
         const f = factionById(pres.faction);
-        h += '<div style="font-size:18px;font-weight:800;color:' + esc(f.color) + '">' + esc(pres.name) + (pres.me ? " (you)" : "") + '</div>' +
-            '<div class="sub">' + esc(f.name) + ' &middot; term ' + pres.term_no + ' &middot; term ends in <b class="cdt" data-ts="' + esc(pres.term_end) + '">' + mmss(secondsLeft(pres.term_end)) + '</b></div>' +
-            '<div class="sub" style="margin-top:6px">The President may keep 5 proposals before Congress (others 3), may veto one proposal per term (' + (pres.veto_used ? "veto used" : "veto available") + '), and the ruling party\'s agenda is heard more often. State initiatives for new fleets and squads go to the President.</div>';
+        h += '<div style="font-size:18px;font-weight:800;color:' + esc(f.color) + '">' + esc(pres.name) + (pres.me ? " " + T("(you)") : "") + '</div>' +
+            '<div class="sub">' + esc(f.name) + ' &middot; ' + T("term") + ' ' + pres.term_no + ' &middot; ' + T("term ends in") + ' <b class="cdt" data-ts="' + esc(pres.term_end) + '">' + mmss(secondsLeft(pres.term_end)) + '</b></div>' +
+            '<div class="sub" style="margin-top:6px">' + T(pres.veto_used
+                ? "The President may keep 5 proposals before Congress (others 3), has used the veto of this term, and the ruling party's agenda is heard more often. State initiatives for new fleets and squads go to the President."
+                : "The President may keep 5 proposals before Congress (others 3), may veto one proposal per term, and the ruling party's agenda is heard more often. State initiatives for new fleets and squads go to the President.") + '</div>';
     }
     else { h += '<div class="sub">The office is vacant.</div>'; }
 
@@ -761,7 +765,7 @@ function electionHtml() {
         ov.factions.map(function(f) {
             const pl = (parties.find(x => x.faction === f.id) || { players: [] }).players;
             return '<div class="opt party' + (myParty === f.id ? " on" : "") + '" data-k="' + f.key + '"><span class="dot" style="background:' + esc(f.color) + '"></span> <b>' + esc(f.name) + '</b>' +
-                '<small>' + esc(f.description) + '</small><small>Players: ' + (pl.length ? esc(pl.join(", ")) : "none yet") + '</small></div>';
+                '<small>' + esc(f.description) + '</small><small>' + T("Players:") + ' ' + (pl.length ? esc(pl.join(", ")) : T("none yet")) + '</small></div>';
         }).join("") + '</div></div>';
 
     h += '<div class="card active"><h3>Presidential election</h3>';
@@ -774,18 +778,21 @@ function electionHtml() {
         const campaign = el.phase === "campaign";
         const iAmCandidate = el.candidates.some(c => c.mine);
 
-        h += '<div class="sub"><span class="badge live">' + (campaign ? "CAMPAIGN" : "VOTING") + '</span><b class="cdt" data-ts="' + esc(campaign ? el.campaign_end : el.vote_end) + '" style="color:#ffd37a">' +
-            mmss(secondsLeft(campaign ? el.campaign_end : el.vote_end)) + '</b> left &middot; ' + (campaign ? "players declare their candidacy, then everybody votes" : el.voted + " of " + el.voters + " party members have voted (only players vote)") + '</div>';
+        h += '<div class="sub"><span class="badge live">' + T(campaign ? "CAMPAIGN" : "VOTING") + '</span><b class="cdt" data-ts="' + esc(campaign ? el.campaign_end : el.vote_end) + '" style="color:#ffd37a">' +
+            mmss(secondsLeft(campaign ? el.campaign_end : el.vote_end)) + '</b> ' + T("left") + ' &middot; ' +
+            (campaign
+                ? T("players declare their candidacy, then everybody votes")
+                : el.voted + " " + T("of") + " " + el.voters + " " + T("party members have voted (only players vote)")) + '</div>';
 
         h += el.candidates.map(function(c) {
             const f = factionById(c.faction);
             const mine = el.my_vote === c.player_id;
-            return '<div class="fc" style="margin:8px 0"><span class="dot" style="background:' + esc(f.color) + '"></span><b style="flex:1;font-size:14px">' + esc(c.name) + (c.mine ? " (you)" : "") + ' <span class="sub">' + esc(f.name) + '</span></b>' +
-                (!campaign ? '<button class="btn small vote-btn" data-c="' + esc(c.player_id) + '"' + (el.my_vote ? " disabled" : "") + '>' + (mine ? "YOUR VOTE" : "VOTE") + '</button>' : "") + '</div>';
+            return '<div class="fc" style="margin:8px 0"><span class="dot" style="background:' + esc(f.color) + '"></span><b style="flex:1;font-size:14px">' + esc(c.name) + (c.mine ? " " + T("(you)") : "") + ' <span class="sub">' + esc(f.name) + '</span></b>' +
+                (!campaign ? '<button class="btn small vote-btn" data-c="' + esc(c.player_id) + '"' + (el.my_vote ? " disabled" : "") + '>' + T(mine ? "YOUR VOTE" : "VOTE") + '</button>' : "") + '</div>';
         }).join("") || '<div class="sub" style="margin:8px 0">No candidates yet.</div>';
 
         if (campaign) {
-            h += '<button class="btn" id="run-btn"' + (!myParty || iAmCandidate ? " disabled" : "") + '>' + (iAmCandidate ? "YOU ARE A CANDIDATE" : "RUN FOR PRESIDENT") + '</button>' +
+            h += '<button class="btn" id="run-btn"' + (!myParty || iAmCandidate ? " disabled" : "") + '>' + T(iAmCandidate ? "YOU ARE A CANDIDATE" : "RUN FOR PRESIDENT") + '</button>' +
                 (!myParty ? '<div class="sub" style="margin-top:6px">Choose a party above first.</div>' : "");
         }
         else if (!myParty) { h += '<div class="sub">Choose a party above to vote.</div>'; }
@@ -893,8 +900,8 @@ function newHtml() {
     const need = t.votes === "supermajority" ? ov.supermajority : ov.majority;
 
     let h = '<label class="row">WHAT DO YOU WANT CONGRESS TO DO?</label><select id="n-type" style="width:100%">' +
-        Object.keys(TYPES).filter(k => k !== "military_action").map(k => '<option value="' + k + '"' + (draft.type === k ? " selected" : "") + '>' + esc(TYPES[k].name) + '</option>').join("") + '</select>' +
-        '<div class="sub" style="margin-top:6px">' + esc(t.desc) + '</div>';
+        Object.keys(TYPES).filter(k => k !== "military_action").map(k => '<option value="' + k + '"' + (draft.type === k ? " selected" : "") + '>' + esc(T(TYPES[k].name)) + '</option>').join("") + '</select>' +
+        '<div class="sub" style="margin-top:6px">' + esc(T(t.desc)) + '</div>';
 
     if (draft.type === "military_action") {
         h += '<label class="row">TARGET PLANET</label><select id="n-planet" style="width:100%">' +
@@ -916,7 +923,7 @@ function newHtml() {
         ov.factions.map(f => {
             const appeal = (f.priorities || []).some(x => ({ military_action: ["military_action", "territorial_control"], fleet_construction: ["fleet_construction"], knightmare_construction: ["fleet_construction"], resource_allocation: ["resource_allocation", "civilian_relief", "infrastructure"], diplomacy: ["diplomacy"], taxation: ["taxation_reform", "taxation"] }[draft.type] || []).indexOf(x) !== -1);
             return '<div class="opt' + (draft.sponsor === f.key ? " on" : "") + '" data-k="' + f.key + '"><span class="dot" style="background:' + esc(f.color) + '"></span> <b>' + esc(f.name) + '</b> (' + f.seats + ')' +
-                '<small>' + (appeal ? "&#9733; this is one of their priorities" : "not a priority for them") + '</small></div>';
+                '<small>' + (appeal ? "&#9733; " + T("this is one of their priorities") : T("not a priority for them")) + '</small></div>';
         }).join("") + '</div><div class="sub" style="margin-top:6px">Delegates of the sponsoring faction vote for it far more often; factions near it in outlook tend to follow, distant ones oppose.</div>';
 
     h += '<div class="card" style="margin-top:14px"><div class="sub">' + T("COST:") + ' <b style="color:#7dff9d">' + T("free") + '</b> &middot; ' + T("VOTES NEEDED:") + ' <b style="color:#fff">' + need + ' ' + T("of") + ' ' + ov.seats + ' (' + esc(T(t.votes)) + ')</b></div>' +
@@ -990,8 +997,8 @@ function propagandaHtml() {
         const busy = until ? secondsLeft(until) > 0 : false;
 
         let card = '<div class="card"><h3><span class="dot" style="background:' + esc(f.color) + '"></span> ' + esc(f.name) + '</h3>' +
-            '<div class="sub">' + f.seats + ' delegates &middot; ' + f.loyalty + '% loyalty' +
-            (info.runs ? ' &middot; ' + info.runs + ' campaign' + (Number(info.runs) === 1 ? '' : 's') + ' &middot; ' + fmt(info.spent) + ' credits spent' : '') + '</div>' +
+            '<div class="sub">' + f.seats + ' ' + T("delegates") + ' &middot; ' + f.loyalty + '% ' + T("loyalty") +
+            (info.runs ? ' &middot; ' + info.runs + ' ' + T(Number(info.runs) === 1 ? "campaign" : "campaigns") + ' &middot; ' + fmt(info.spent) + ' ' + T("credits spent") : '') + '</div>' +
             '<div class="bar" style="margin-top:5px"><i style="width:' + Math.max(0, Math.min(100, f.loyalty)) + '%;background:' + esc(f.color) + '"></i></div>';
 
         if (busy) {
@@ -1000,7 +1007,7 @@ function propagandaHtml() {
 
         card += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">' + amounts.map(function(a) {
             const off = busy || credits < a;
-            return '<button class="btn small prop-btn" data-f="' + f.id + '" data-amt="' + a + '"' + (off ? " disabled" : "") + '>CAMPAIGN ' + fmt(a) + '</button>';
+            return '<button class="btn small prop-btn" data-f="' + f.id + '" data-amt="' + a + '"' + (off ? " disabled" : "") + '>' + T("CAMPAIGN") + ' ' + fmt(a) + '</button>';
         }).join("") + '</div>';
 
         return card + '</div>';
@@ -1051,13 +1058,13 @@ function occupiedHtml() {
 
     return '<div class="card">' + miniMapHtml("occupied") + '</div>' + ov.occupations.map(function(o) {
 
-        return '<div class="card"><h3>' + esc(o.planet) + '</h3><div class="sub">' + esc(o.stage_name) + ' &middot; ' + o.seats + ' of ' + o.seats_target + ' delegates seated</div>' +
-            '<div class="steps">' + names.map((n, i) => '<div class="' + (i < o.stage ? "done" : i === o.stage ? "cur" : "") + '">' + n + '</div>').join("") + '</div>' +
-            '<div class="sub">STABILITY ' + o.stability + ' / needed ' + (o.stage < 3 ? o.threshold : "-") + '</div>' +
+        return '<div class="card"><h3>' + esc(o.planet) + '</h3><div class="sub">' + esc(o.stage_name) + ' &middot; ' + o.seats + ' ' + T("of") + ' ' + o.seats_target + ' ' + T("delegates seated") + '</div>' +
+            '<div class="steps">' + names.map((n, i) => '<div class="' + (i < o.stage ? "done" : i === o.stage ? "cur" : "") + '">' + T(n) + '</div>').join("") + '</div>' +
+            '<div class="sub">' + T("STABILITY") + ' ' + o.stability + ' / ' + T("needed") + ' ' + (o.stage < 3 ? o.threshold : "-") + '</div>' +
             '<div class="bar"><i style="width:' + o.stability + '%;background:' + (o.stability >= o.threshold ? "#2fbf6a" : "#d6a84b") + '"></i></div>' +
-            (o.stage < 3 ? '<div class="sub">STAGE PROGRESS ' + o.progress + ' / ' + o.duration + ' turns (5 minutes each, only counted while stability is high enough)</div>' +
+            (o.stage < 3 ? '<div class="sub">' + T("STAGE PROGRESS") + ' ' + o.progress + ' / ' + o.duration + ' ' + T("turns (5 minutes each, only counted while stability is high enough)") + '</div>' +
                 '<div class="bar"><i style="width:' + (o.duration ? o.progress / o.duration * 100 : 0) + '%;background:#4cc2ff"></i></div>' : '<div class="sub" style="color:#7dff9d">Fully integrated into the Authority.</div>') +
-            '<div style="margin-top:8px"><button class="btn small relief" data-p="' + esc(o.planet) + '">PROPOSE RELIEF (+10 stability)</button></div></div>';
+            '<div style="margin-top:8px"><button class="btn small relief" data-p="' + esc(o.planet) + '">' + T("PROPOSE RELIEF (+10 stability)") + '</button></div></div>';
 
     }).join("");
 
@@ -1089,19 +1096,21 @@ function authorityHtml() {
     h += '<div class="card active"><h3>War room: declare war on a planet</h3>' +
         '<div class="sub" style="margin-bottom:8px">Only players write a Declaration of War (the delegates never do); Congress then votes on it, and a majority is enough. Without a passed declaration Freedom Authority fleets cannot attack a planet. Click a planet on the map.</div>' +
         miniMapHtml("war") +
-        '<div style="margin-top:8px;font-size:13px">' + (target ? 'Target: <b style="color:#ffd24c">' + esc(target.planet) + '</b> (held by ' + esc(target.owners) + ')' : 'No target chosen yet.') + '</div>' +
+        '<div style="margin-top:8px;font-size:13px">' + (target ? T("Target:") + ' <b style="color:#ffd24c">' + esc(target.planet) + '</b> (' + T("held by") + ' ' + esc(target.owners) + ')' : T("No target chosen yet.")) + '</div>' +
         '<label class="row">WHICH FACTION SPEAKS FOR IT?</label><div class="spons">' +
         ov.factions.map(f => '<div class="opt' + (draft.sponsor === f.key ? " on" : "") + '" data-k="' + f.key + '"><span class="dot" style="background:' + esc(f.color) + '"></span> <b>' + esc(f.name) + '</b> (' + f.seats + ')' +
-            '<small>' + ((f.priorities || []).indexOf("military_action") !== -1 ? "&#9733; war is one of their priorities" : "not a priority for them") + '</small></div>').join("") + '</div>' +
+            '<small>' + ((f.priorities || []).indexOf("military_action") !== -1 ? "&#9733; " + T("war is one of their priorities") : T("not a priority for them")) + '</small></div>').join("") + '</div>' +
         '<div style="margin-top:10px"><button class="btn" id="war-go"' + (target && !declaredWar.has(target.planet) ? "" : " disabled") + '>' + T("PROPOSE WAR") + '</button></div>' +
         '</div>';
 
-    h += '<div class="card"><h3>Standing</h3><div class="sub">POPULARITY ' + Math.round(ov.state.popularity) + '% (it shifts every vote by up to &plusmn;10 points: a popular Authority gets its way more often)</div>' +
+    h += '<div class="card"><h3>Standing</h3><div class="sub">' + T("POPULARITY") + ' ' + Math.round(ov.state.popularity) + '% ' +
+        T("(it shifts every vote by up to \u00b110 points: a popular Authority gets its way more often)") + '</div>' +
         '<div class="bar"><i style="width:' + ov.state.popularity + '%;background:#4cc2ff"></i></div>' +
-        '<div class="sub" style="margin-top:8px">TAX LEVEL ' + ov.state.tax_level + ' of 2 &middot; relations: Combine ' + (rel.Combine || 0) + ', Independents ' + (rel.Independents || 0) + '</div></div>';
+        '<div class="sub" style="margin-top:8px">' + T("TAX LEVEL") + ' ' + ov.state.tax_level + ' ' + T("of") + ' 2 &middot; ' + T("relations:") +
+        ' Combine ' + (rel.Combine || 0) + ', Independents ' + (rel.Independents || 0) + '</div></div>';
 
     h += '<div class="card"><h3>The four factions</h3>' + ov.factions.map(f =>
-        '<div class="sub" style="padding:4px 0"><span class="dot" style="background:' + esc(f.color) + '"></span> <b style="color:#fff">' + esc(f.name) + '</b> (' + f.seats + ' seats): ' + esc(f.description) + '</div>').join("") + '</div>';
+        '<div class="sub" style="padding:4px 0"><span class="dot" style="background:' + esc(f.color) + '"></span> <b style="color:#fff">' + esc(f.name) + '</b> (' + f.seats + ' ' + T("seats") + '): ' + esc(f.description) + '</div>').join("") + '</div>';
 
     return h;
 
