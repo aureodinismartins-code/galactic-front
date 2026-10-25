@@ -120,32 +120,19 @@
         "needs": "precisa de",
         "of": "de",
         "votes": "votos",
-        "Forecast: about": "Previsão: cerca de",
-        "yes votes (chance of a YES per faction, before bribes and surprises).":
-            "votos sim (chance de SIM por facção, antes de subornos e surpresas).",
         "Your bribes:": "Seus subornos:",
         "These bars already include the opening fleet rule.":
             "Estas barras já incluem a regra das primeiras frotas.",
-        "YES": "SIM",
-        "NO": "NÃO",
         "ABSTAIN": "ABSTENÇÃO",
         "needed": "necessários",
-        "Defection:": "Deserção:",
         "Scandal:": "Escândalo:",
-        "SELECT TO BRIBE DELEGATES": "SELECIONAR PARA SUBORNAR DELEGADOS",
-        "SELECTED FOR BRIBES": "SELECIONADA PARA SUBORNOS",
         "VETO": "VETAR",
 
         /* ---------- congress: the delegate panel ---------- */
         "delegate of the occupied world": "delegado do mundo ocupado",
         "area": "área",
         "seat": "cadeira",
-        "BRIBE FOR:": "SUBORNO PARA:",
-        "Already offered:": "Já oferecido:",
         "vote": "voto",
-        "buy a YES": "comprar um SIM",
-        "buy a NO": "comprar um NÃO",
-        "OFFER": "OFRECER",
         "Chance the bribe works:": "Chance de o suborno funcionar:",
         "risk of a scandal:": "risco de escândalo:",
         "A bribe that fails is still lost.": "Um suborno que falha é perdido mesmo assim.",
@@ -160,12 +147,7 @@
         "BOUGHT": "COMPRADO",
 
         /* ---------- congress: the tabs ---------- */
-        "PROPOSALS": "PROPOSTAS",
         "ELECTION": "ELEIÇÃO",
-        "NEW PROPOSAL": "NOVA PROPOSTA",
-        "OCCUPIED WORLDS": "MUNDOS OCUPADOS",
-        "AUTHORITY": "AUTORIDADE",
-        "NEWS": "NOTÍCIAS",
         "GUARANTEED: the Authority has no fleet, so every delegate votes yes.":
             "GARANTIDA: a Autoridade não tem frota, então todos os delegados votam sim.",
         "FAVOURED: the real odds are 35 points above the forecast while the Authority has fewer than five fleets.":
@@ -417,7 +399,7 @@
         "AUTHORITY": "AUTORIDADE",
         "NEWS": "NOTÍCIAS",
         "SELECTED FOR BRIBES": "SELECIONADA PARA SUBORNO",
-        "SELECT TO BRIBE DELEGATES": "SELECIONAR PARA SUBORNAR",
+        "SELECT TO BRIBE DELEGATES": "SELECIONAR PARA SUBORNAR DELEGADOS",
         "DELEGATES": "DELEGADOS",
         "FREEDOM AUTHORITY CONGRESS": "CONGRESSO DA FREEDOM AUTHORITY",
         "Freedom Authority Congress": "Congresso da Freedom Authority",

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=9"></script>
+<script src="i18n.js?v=10"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -611,7 +611,7 @@ function proposalsHtml() {
             }
 
             if (p.cost) {
-                h += '<div class="sub">Bringing this bill forward costs nothing. The price is paid from the treasury only if it passes.</div>';
+                h += '<div class="sub">' + T("Bringing this bill forward costs nothing. The price is paid from the treasury only if it passes.") + '</div>';
             }
 
             let expected = 0;
