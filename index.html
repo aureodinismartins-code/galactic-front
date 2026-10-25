@@ -838,6 +838,44 @@
         refreshAccountStatus();
         loadUsername();
 
+        /* the account panel folds away (it used to cover the galactic status panel) */
+        (function() {
+
+            const panel = document.getElementById("account-panel");
+
+            if (!panel) { return; }
+
+            const body = document.createElement("div");
+            body.id = "account-body";
+
+            while (panel.firstChild) { body.appendChild(panel.firstChild); }
+
+            const head = document.createElement("div");
+            head.style.cssText = "cursor:pointer;color:#fff;font-weight:bold;letter-spacing:1px;user-select:none;display:flex;justify-content:space-between;";
+
+            panel.appendChild(head);
+            panel.appendChild(body);
+
+            const firstTitle = body.querySelector("strong");
+            if (firstTitle) { firstTitle.style.display = "none"; }
+
+            const apply = function(collapsed) {
+                body.style.display = collapsed ? "none" : "block";
+                head.innerHTML = "<span>COMMANDER ACCOUNT</span><span>" + (collapsed ? "+" : "\u2013") + "</span>";
+                panel.style.width = collapsed ? "210px" : "";
+                try { localStorage.setItem("accountCollapsed", collapsed ? "1" : "0"); } catch (e) {}
+            };
+
+            head.addEventListener("click", function() { apply(body.style.display !== "none"); });
+
+            let saved = null;
+            try { saved = localStorage.getItem("accountCollapsed"); } catch (e) {}
+
+            /* a brand new visitor sees it open; everybody else starts folded */
+            apply(saved === null ? !!localStorage.getItem("playerID") : saved === "1");
+
+        })();
+
 
     </script>
 

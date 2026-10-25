@@ -1309,6 +1309,8 @@ document
         "click",
         function () {
 
+            if (!window.confirm("Return to the main menu?")) { return; }
+
             window.location.href =
                 "index.html";
 
@@ -2862,6 +2864,41 @@ async function pollSpaceBattles() {
 
 setInterval(pollSpaceBattles, 8000);
 setTimeout(pollSpaceBattles, 2500);
+
+/* =========================================
+   MINIMIZE THE FLEET PANEL (it covers the planets on the right, like Free Earth)
+========================================= */
+(function() {
+
+    const panel = document.getElementById("fleet-command-panel");
+
+    if (!panel) { return; }
+
+    const css = document.createElement("style");
+    css.textContent =
+        "#fleet-command-panel.collapsed { max-height: 58px !important; height: auto !important; overflow: hidden !important; width: 270px !important; }" +
+        "#fleet-command-panel.collapsed > *:not(#close-fleet-panel):not(#min-fleet-panel):not(#fleet-panel-name) { display: none !important; }" +
+        "#min-fleet-panel { position: absolute; top: 12px; right: 52px; width: 28px; height: 28px; background: #0e1a2f; color: #cfe3ff; border: 1px solid #355690; cursor: pointer; font: bold 16px Arial; line-height: 22px; padding: 0; z-index: 3; }" +
+        "#min-fleet-panel:hover { background: #1d3a6b; }";
+    document.head.appendChild(css);
+
+    const btn = document.createElement("button");
+    btn.id = "min-fleet-panel";
+    btn.type = "button";
+    panel.appendChild(btn);
+
+    const apply = function(collapsed) {
+        panel.classList.toggle("collapsed", collapsed);
+        btn.textContent = collapsed ? "+" : "\u2013";
+        btn.title = collapsed ? "Show the fleet panel" : "Minimize the fleet panel";
+        try { localStorage.setItem("fleetPanelCollapsed", collapsed ? "1" : "0"); } catch (e) {}
+    };
+
+    btn.addEventListener("click", function() { apply(!panel.classList.contains("collapsed")); });
+
+    apply((function() { try { return localStorage.getItem("fleetPanelCollapsed") === "1"; } catch (e) { return false; } })());
+
+})();
 
 /* =========================================
    CONGRESS (Freedom Authority only)

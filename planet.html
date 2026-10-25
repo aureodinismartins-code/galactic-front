@@ -2450,6 +2450,8 @@ async function openCityPanel(cityId) {
 
     }
 
+        panel.dataset.cityId = cityId;
+
     zoomToCity(city);
 
     const { data: credits } = await supabaseClient.rpc("get_faction_credits");
@@ -2693,9 +2695,16 @@ async function constructBuilding(cityId, type) {
         return;
     }
 
+    const hadBuildings = !!document.getElementById("buildings-panel");
+
     await loadCities();
     renderPlanet();
-    openCityPanel(cityId);
+    await openCityPanel(cityId);
+
+    if (hadBuildings) {
+        const c = planetCities.find(x => x.id === cityId);
+        if (c) { await renderBuildingsPanel(c); }
+    }
 
 }
 
@@ -2713,10 +2722,30 @@ async function refreshPlanetData() {
 
     await loadCities();
 
-    if (JSON.stringify([planetCities, planetBuildings]) === before) { return; }
+        if (JSON.stringify([planetCities, planetBuildings]) === before) { return; }
+
+    /* stay in the city you are in: only redraw, then reopen its panels */
+    const openPanel = document.getElementById("city-panel");
+    const openId = openPanel ? openPanel.dataset.cityId : null;
+    const hadBuildings = !!document.getElementById("buildings-panel");
+
+    if (openId) {
+
+        renderPlanet();
+        await openCityPanel(openId);
+
+        if (hadBuildings) {
+            const c = planetCities.find(x => x.id === openId);
+            if (c) { await renderBuildingsPanel(c); }
+        }
+
+        return;
+
+    }
 
     closeCityPanel();
     renderPlanet();
+
 
     if (fleetPanel) {
         fleetPanel.style.display = playerOwnsPlanet() ? "block" : "none";

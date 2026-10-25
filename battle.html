@@ -3603,7 +3603,19 @@ document.getElementById("battle-return-button").addEventListener("click", functi
 });
 
 document.getElementById("main-menu-button").addEventListener("click", function() {
+
+    const fighting = typeof battleResult !== "undefined" && battleResult === null;
+
+    const ok = window.confirm(
+        fighting
+            ? "A battle is still in progress. If you leave now it is abandoned. Return to the main menu anyway?"
+            : "Return to the main menu?"
+    );
+
+    if (!ok) { return; }
+
     window.location.href = "index.html";
+
 });
 
 

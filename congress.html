@@ -83,6 +83,7 @@ label.row { display: block; margin: 10px 0 4px; font-size: 11px; letter-spacing:
     <a class="back" href="galaxy.html">&larr; GALAXY</a>
     <h1>FREEDOM AUTHORITY CONGRESS</h1>
     <div class="grow"></div>
+    <div class="stat">PRESIDENT<br><b id="st-pres">-</b></div>
     <div class="stat">CREDITS<br><b id="st-credits">-</b></div>
     <div class="stat">POPULARITY<br><b id="st-pop">-</b></div>
     <div class="stat">TAX LEVEL<br><b id="st-tax">-</b></div>
@@ -97,7 +98,7 @@ label.row { display: block; margin: 10px 0 4px; font-size: 11px; letter-spacing:
             <h2>THE CHAMBER</h2>
             <div id="legend"></div>
             <div id="regionbar"></div>
-            <svg id="hemi" viewBox="0 0 760 420"></svg>
+            <svg id="hemi" viewBox="-70 0 900 420"></svg>
             <div id="member"></div>
         </div>
     </div>
@@ -136,8 +137,11 @@ let tab = "proposals";
 let selMember = null;
 let selProposal = null;
 let regionFilter = null;
+let factionFilter = null;
+let groupBy = "faction";      /* the chamber is grouped in the Congress factions (or by region) */
+let warTarget = null;
 let skew = 0;            /* server time minus browser time */
-let draft = { type: "military_action", planet: "", fleet: "", target: "Combine", sponsor: "" };
+let draft = { type: "fleet_construction", planet: "", fleet: "", target: "Combine", sponsor: "" };
 let positions = [];
 
 const $ = id => document.getElementById(id);
@@ -185,6 +189,9 @@ async function load() {
 
 function render() {
 
+    const pres = ov.president;
+    $("st-pres").textContent = pres && pres.name ? pres.name : "vacant";
+    $("st-pres").style.color = pres && pres.name ? factionById(pres.faction).color : "#8fa6c4";
     $("st-credits").textContent = fmt(ov.credits);
     $("st-pop").textContent = Math.round(ov.state.popularity) + "%";
     $("st-tax").textContent = ov.state.tax_level + " / 2";
@@ -203,19 +210,31 @@ function render() {
 /* ---------------------------------------------------------
    THE CHAMBER
 --------------------------------------------------------- */
+function wireLegend() {
+    $("legend").querySelectorAll(".fchip").forEach(el => el.addEventListener("click", function() {
+        const id = Number(el.dataset.f);
+        factionFilter = factionFilter === id ? null : id;
+        renderLegend(); renderHemicycle();
+    }));
+}
+
 function renderLegend() {
+    setTimeout(wireLegend, 0);
     $("legend").innerHTML = ov.factions.map(f =>
-        '<span class="chip"><span class="dot" style="background:' + esc(f.color) + '"></span>' + esc(f.name) + ' &middot; <b>' + f.seats + '</b> seats &middot; loyalty ' + f.loyalty + '</span>'
+        '<span class="chip fchip" data-f="' + f.id + '" style="cursor:pointer;' + (factionFilter === f.id ? "border-color:#fff;background:#1d3a6b;" : "") + '"><span class="dot" style="background:' + esc(f.color) + '"></span>' + esc(f.name) + ' &middot; <b>' + f.seats + '</b> seats &middot; loyalty ' + f.loyalty + '</span>'
     ).join("") + '<span class="chip"><span class="dot" style="background:transparent;border:2px dashed #ffd37a"></span>suspected of corruption</span>';
 }
 
 function renderRegions() {
     const regions = [];
     for (const m of ov.members) { if (regions.indexOf(m.region) === -1) { regions.push(m.region); } }
-    $("regionbar").innerHTML = '<span class="rchip' + (regionFilter ? "" : " on") + '" data-r="">ALL</span>' +
+    $("regionbar").innerHTML = '<span class="rchip' + (groupBy === "faction" ? " on" : "") + '" data-g="faction">GROUP BY FACTION</span>' +
+        '<span class="rchip' + (groupBy === "region" ? " on" : "") + '" data-g="region">GROUP BY REGION</span>' +
+        '<span class="rchip' + (regionFilter ? "" : " on") + '" data-r="">ALL REGIONS</span>' +
         regions.map(r => '<span class="rchip' + (regionFilter === r ? " on" : "") + '" data-r="' + esc(r) + '">' + esc(r) + ' (' + ov.members.filter(m => m.region === r).length + ')</span>').join("");
     $("regionbar").querySelectorAll(".rchip").forEach(el => el.addEventListener("click", function() {
-        regionFilter = el.dataset.r || null;
+        if (el.dataset.g) { groupBy = el.dataset.g; }
+        else { regionFilter = el.dataset.r || null; }
         renderRegions(); renderHemicycle();
     }));
 }
@@ -249,7 +268,10 @@ function layoutSeats(n) {
 
 function renderHemicycle() {
 
-    const members = ov.members;
+    /* the chamber is grouped in the Congress factions: every faction is one block of the half circle */
+    const members = ov.members.slice().sort(groupBy === "faction"
+        ? (a, b) => (a.faction - b.faction) || (a.planet ? 1 : 0) - (b.planet ? 1 : 0) || String(a.region).localeCompare(String(b.region)) || (a.area || 0) - (b.area || 0) || a.seat - b.seat
+        : (a, b) => (a.planet ? 1 : 0) - (b.planet ? 1 : 0) || String(a.region).localeCompare(String(b.region)) || (a.area || 0) - (b.area || 0) || a.seat - b.seat);
 
     if (positions.length !== members.length) { positions = layoutSeats(members.length); }
 
@@ -262,10 +284,26 @@ function renderHemicycle() {
     members.forEach(function(m, i) {
         const p = positions[i];
         const f = factionById(m.faction);
-        const dim = regionFilter && m.region !== regionFilter;
+        const dim = (regionFilter && m.region !== regionFilter) || (factionFilter && m.faction !== factionFilter);
         svg += '<circle class="seat" data-i="' + i + '" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + (m.planet ? 8 : 7.2) + '" fill="' + esc(f.color) + '" opacity="' + (dim ? 0.15 : 1) + '"' +
             (selMember === m.id ? ' stroke="#fff" stroke-width="3"' : m.suspect ? ' stroke="#ffd37a" stroke-width="2.2" stroke-dasharray="3 2"' : bribed.has(m.id) ? ' stroke="#7dff9d" stroke-width="2.5"' : m.planet ? ' stroke="#4cc2ff" stroke-width="2"' : '') + '/>';
     });
+
+    /* names of the blocks around the arc */
+    if (groupBy === "faction") {
+        const sums = {};
+        members.forEach(function(m, i) {
+            const k = m.faction;
+            sums[k] = sums[k] || { a: 0, n: 0 };
+            sums[k].a += positions[i].a; sums[k].n++;
+        });
+        Object.keys(sums).forEach(function(k) {
+            const f = factionById(Number(k));
+            const a = sums[k].a / sums[k].n;
+            const rr = 392;
+            svg += '<text x="' + (380 + Math.cos(a) * rr).toFixed(1) + '" y="' + (395 - Math.sin(a) * rr + 4).toFixed(1) + '" text-anchor="middle" fill="' + esc(f.color) + '" font-size="11" font-weight="800" letter-spacing="1">' + esc(f.name.toUpperCase()) + '</text>';
+        });
+    }
 
     svg += '<text x="380" y="360" text-anchor="middle" fill="#8fb4e8" font-size="15" letter-spacing="4" font-weight="800">CONGRESS</text>' +
         '<text x="380" y="380" text-anchor="middle" fill="#6f87aa" font-size="11" letter-spacing="2">' + ov.seats + ' DELEGATES</text>';
@@ -356,7 +394,7 @@ function renderMember() {
 --------------------------------------------------------- */
 function renderTabs() {
 
-    const tabs = [["proposals", "PROPOSALS"], ["new", "NEW PROPOSAL"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
+    const tabs = [["proposals", "PROPOSALS"], ["election", "ELECTION"], ["new", "NEW PROPOSAL"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + t[1] + '</div>').join("");
     $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
@@ -364,6 +402,7 @@ function renderTabs() {
     const body = $("tabbody");
 
     if (tab === "proposals") { body.innerHTML = proposalsHtml(); wireProposals(); }
+    else if (tab === "election") { body.innerHTML = electionHtml(); wireElection(); }
     else if (tab === "new") { body.innerHTML = newHtml(); wireNew(); }
     else if (tab === "occupied") { body.innerHTML = occupiedHtml(); wireOccupied(); }
     else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
@@ -374,9 +413,11 @@ function renderTabs() {
 /* ---- proposals ---- */
 function proposalsHtml() {
 
-    if (!ov.proposals.length) { return '<div class="sub">Congress has no proposals yet. Write one in NEW PROPOSAL; delegates also bring proposals of their own.</div>'; }
+    const note = '<div class="sub" style="margin-bottom:10px">Congress sits only while a Freedom Authority player is online. The delegates bring proposals of their own every few minutes.</div>';
 
-    return ov.proposals.map(function(p) {
+    if (!ov.proposals.length) { return note + '<div class="sub">Congress has no proposals yet. Write one in NEW PROPOSAL, or wait for the delegates.</div>'; }
+
+    return note + ov.proposals.map(function(p) {
 
         const t = TYPES[p.type] || { name: p.type, votes: "majority" };
         const spons = factionById(p.sponsor);
@@ -386,6 +427,7 @@ function proposalsHtml() {
         let h = '<div class="card' + (p.mine ? " mine" : "") + (live ? " active" : "") + (selProposal === p.id ? " sel" : "") + '" data-p="' + p.id + '">' +
             '<h3>' + esc(p.title) + '</h3>' +
             '<div class="sub"><span class="badge ' + (p.status === "passed" ? "pass" : live ? "live" : "fail") + '">' + esc(p.status === "failed_funds" ? "NO FUNDS" : p.status.toUpperCase()) + '</span>' +
+            (p.by_president ? '<span class="badge live">PRESIDENTIAL</span>' : "") +
             esc(t.votes) + ' &middot; ' + (p.cost ? fmt(p.cost) + ' credits' : 'free') + ' &middot; by ' + esc(p.proposer) +
             ' &middot; spoken for by <span style="color:' + esc(spons.color) + '">' + esc(spons.name) + '</span></div>';
 
@@ -407,14 +449,15 @@ function proposalsHtml() {
                 h += '<div class="sub" style="margin-top:4px">Your bribes: ' + p.bribes.length + ' (' + fmt(p.bribes.reduce((n, b) => n + b.amount, 0)) + ' credits)</div>';
             }
 
-            h += '<div style="margin-top:8px"><button class="btn small sel-btn" data-p="' + p.id + '">' + (selProposal === p.id ? "SELECTED FOR BRIBES" : "SELECT TO BRIBE DELEGATES") + '</button></div>';
+            h += '<div style="margin-top:8px"><button class="btn small sel-btn" data-p="' + p.id + '">' + (selProposal === p.id ? "SELECTED FOR BRIBES" : "SELECT TO BRIBE DELEGATES") + '</button>' +
+                (ov.president && ov.president.me && !ov.president.veto_used && !p.mine ? ' <button class="btn small red veto-btn" data-p="' + p.id + '">VETO</button>' : "") + '</div>';
 
         }
         else {
 
             const tot = Math.max(1, (p.yes || 0) + (p.no || 0) + (p.abstain || 0));
             h += '<div style="display:flex;height:11px;margin:8px 0 3px;background:#14223a"><i style="width:' + (p.yes / tot * 100) + '%;background:#2fbf6a"></i><i style="width:' + (p.no / tot * 100) + '%;background:#c44"></i><i style="width:' + (p.abstain / tot * 100) + '%;background:#667"></i></div>' +
-                '<div class="sub">YES ' + p.yes + ' &middot; NO ' + p.no + ' &middot; ABSTAIN ' + p.abstain + ' &middot; needed ' + p.required + '</div>';
+                '<div class="sub">YES ' + p.yes + ' &middot; NO ' + p.no + ' &middot; ABSTAIN ' + p.abstain + (p.required ? ' &middot; needed ' + p.required : '') + '</div>';
 
             if (p.result) {
                 if (p.result.effect) { h += '<div style="margin-top:6px;font-size:12px;color:#cfe3ff">' + esc(p.result.effect) + '</div>'; }
@@ -431,10 +474,166 @@ function proposalsHtml() {
 }
 
 function wireProposals() {
+    $("tabbody").querySelectorAll(".veto-btn").forEach(el => el.addEventListener("click", async function() {
+        if (!confirm("Use your veto on this proposal? You can only veto once per term.")) { return; }
+        const { error } = await supabaseClient.rpc("congress_veto", { p_proposal: Number(el.dataset.p) });
+        if (error) { toast(error.message, true); return; }
+        toast("Vetoed.");
+        await load();
+    }));
     $("tabbody").querySelectorAll(".sel-btn").forEach(el => el.addEventListener("click", function() {
         selProposal = Number(el.dataset.p);
         render();
     }));
+}
+
+/* ---- election ---- */
+function electionHtml() {
+
+    const pres = ov.president;
+    const el = ov.election;
+    const myParty = ov.my_party;
+    const parties = ov.parties || [];
+
+    let h = '<div class="card"><h3>President of the Freedom Authority</h3>';
+
+    if (pres && pres.name) {
+        const f = factionById(pres.faction);
+        h += '<div style="font-size:18px;font-weight:800;color:' + esc(f.color) + '">' + esc(pres.name) + (pres.me ? " (you)" : "") + '</div>' +
+            '<div class="sub">' + esc(f.name) + ' &middot; term ' + pres.term_no + ' &middot; term ends in <b class="cdt" data-ts="' + esc(pres.term_end) + '">' + mmss(secondsLeft(pres.term_end)) + '</b></div>' +
+            '<div class="sub" style="margin-top:6px">The President may keep 5 proposals before Congress (others 3), may veto one proposal per term (' + (pres.veto_used ? "veto used" : "veto available") + '), and the ruling party\'s agenda is heard more often. State initiatives for new fleets and squads go to the President.</div>';
+    }
+    else { h += '<div class="sub">The office is vacant.</div>'; }
+
+    h += '</div>';
+
+    h += '<div class="card"><h3>Your party</h3><div class="sub">Every Freedom Authority player belongs to a party. You need one to stand for President or to vote.</div><div class="spons" style="margin-top:8px">' +
+        ov.factions.map(function(f) {
+            const pl = (parties.find(x => x.faction === f.id) || { players: [] }).players;
+            return '<div class="opt party' + (myParty === f.id ? " on" : "") + '" data-k="' + f.key + '"><span class="dot" style="background:' + esc(f.color) + '"></span> <b>' + esc(f.name) + '</b>' +
+                '<small>' + esc(f.description) + '</small><small>Players: ' + (pl.length ? esc(pl.join(", ")) : "none yet") + '</small></div>';
+        }).join("") + '</div></div>';
+
+    h += '<div class="card active"><h3>Presidential election</h3>';
+
+    if (!el) {
+        h += '<div class="sub">' + (pres && pres.name ? 'The next election starts when the term ends (in <b class="cdt" data-ts="' + esc(pres.term_end) + '">' + mmss(secondsLeft(pres.term_end)) + '</b>).' : "An election will be called as soon as a Freedom Authority player is online.") + '</div>';
+    }
+    else {
+
+        const campaign = el.phase === "campaign";
+        const iAmCandidate = el.candidates.some(c => c.mine);
+
+        h += '<div class="sub"><span class="badge live">' + (campaign ? "CAMPAIGN" : "VOTING") + '</span><b class="cdt" data-ts="' + esc(campaign ? el.campaign_end : el.vote_end) + '" style="color:#ffd37a">' +
+            mmss(secondsLeft(campaign ? el.campaign_end : el.vote_end)) + '</b> left &middot; ' + (campaign ? "players declare their candidacy, then everybody votes" : el.voted + " of " + el.voters + " party members have voted (only players vote)") + '</div>';
+
+        h += el.candidates.map(function(c) {
+            const f = factionById(c.faction);
+            const mine = el.my_vote === c.player_id;
+            return '<div class="fc" style="margin:8px 0"><span class="dot" style="background:' + esc(f.color) + '"></span><b style="flex:1;font-size:14px">' + esc(c.name) + (c.mine ? " (you)" : "") + ' <span class="sub">' + esc(f.name) + '</span></b>' +
+                (!campaign ? '<button class="btn small vote-btn" data-c="' + esc(c.player_id) + '"' + (el.my_vote ? " disabled" : "") + '>' + (mine ? "YOUR VOTE" : "VOTE") + '</button>' : "") + '</div>';
+        }).join("") || '<div class="sub" style="margin:8px 0">No candidates yet.</div>';
+
+        if (campaign) {
+            h += '<button class="btn" id="run-btn"' + (!myParty || iAmCandidate ? " disabled" : "") + '>' + (iAmCandidate ? "YOU ARE A CANDIDATE" : "RUN FOR PRESIDENT") + '</button>' +
+                (!myParty ? '<div class="sub" style="margin-top:6px">Choose a party above first.</div>' : "");
+        }
+        else if (!myParty) { h += '<div class="sub">Choose a party above to vote.</div>'; }
+
+    }
+
+    h += '</div>';
+
+    if (ov.last_election) {
+        h += '<div class="card"><h3>Last election</h3><div class="sub">Winner: <b style="color:#fff">' + esc(ov.last_election.winner) + '</b>' +
+            (ov.last_election.result && ov.last_election.result.note ? ' &middot; ' + esc(ov.last_election.result.note) : "") + '</div></div>';
+    }
+
+    return h;
+
+}
+
+function wireElection() {
+
+    $("tabbody").querySelectorAll(".party").forEach(el => el.addEventListener("click", async function() {
+        const { error } = await supabaseClient.rpc("congress_join_party", { p_key: el.dataset.k });
+        if (error) { toast(error.message, true); return; }
+        toast("Party chosen.");
+        await load();
+    }));
+
+    if ($("run-btn")) {
+        $("run-btn").addEventListener("click", async function() {
+            const { error } = await supabaseClient.rpc("congress_run");
+            if (error) { toast(error.message, true); return; }
+            toast("You are a candidate for President.");
+            await load();
+        });
+    }
+
+    $("tabbody").querySelectorAll(".vote-btn").forEach(el => el.addEventListener("click", async function() {
+        const { error } = await supabaseClient.rpc("congress_vote", { p_candidate: el.dataset.c });
+        if (error) { toast(error.message, true); return; }
+        toast("Vote cast.");
+        await load();
+    }));
+
+}
+
+/* ---- mini map of the galaxy (planet positions are % of the galaxy map) ---- */
+const OWNER_COLORS = { "Freedom Authority": "#4a8cff", "Combine": "#ff4a4a", "Independents": "#e6e6e6" };
+
+function miniMapHtml(kind) {
+
+    const W = 480, H = 270;
+    const occ = {};
+    for (const o of ov.occupations) { occ[o.planet] = o; }
+    const declared = new Set(ov.authorizations.war);
+    const targets = new Set(ov.targets.map(t => t.planet));
+    const stageCols = ["#d6a84b", "#4cc2ff", "#7a8cff", "#5bff9a"];
+
+    let svg = '<svg class="minimap" viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;background:#050a14;border:1px solid #1f3354;display:block">';
+
+    for (let gx = 1; gx < 10; gx++) { svg += '<line x1="' + gx * W / 10 + '" y1="0" x2="' + gx * W / 10 + '" y2="' + H + '" stroke="#0d1830"/>'; }
+    for (let gy = 1; gy < 6; gy++) { svg += '<line x1="0" y1="' + gy * H / 6 + '" x2="' + W + '" y2="' + gy * H / 6 + '" stroke="#0d1830"/>'; }
+
+    for (const p of ov.planets || []) {
+
+        const x = p.x / 100 * W;
+        const y = p.y / 100 * H;
+        const col = OWNER_COLORS[p.owner] || "#778";
+        const o = occ[p.name];
+
+        let dim = false;
+        let ring = "";
+        let label = "";
+
+        if (kind === "war") {
+            dim = !targets.has(p.name) && !declared.has(p.name) && p.owner !== "Freedom Authority";
+            if (declared.has(p.name)) { ring = '<circle cx="' + x + '" cy="' + y + '" r="9" fill="none" stroke="#ff4a4a" stroke-width="2"/><path d="M' + (x - 12) + ' ' + y + ' H' + (x + 12) + ' M' + x + ' ' + (y - 12) + ' V' + (y + 12) + '" stroke="#ff4a4a" stroke-width="1.5"/>'; label = "WAR"; }
+            else if (targets.has(p.name)) { ring = '<circle cx="' + x + '" cy="' + y + '" r="8" fill="none" stroke="' + (warTarget === p.name ? "#ffd24c" : "#6f87aa") + '" stroke-width="' + (warTarget === p.name ? 3 : 1.5) + '"/>'; }
+            if (o) { ring += '<circle cx="' + x + '" cy="' + y + '" r="12" fill="none" stroke="#4cc2ff" stroke-dasharray="2 2"/>'; }
+        }
+        else {
+            dim = !o;
+            if (o) { ring = '<circle cx="' + x + '" cy="' + y + '" r="10" fill="none" stroke="' + stageCols[o.stage] + '" stroke-width="3"/>'; label = (o.stage + 1) + "/4"; }
+        }
+
+        svg += '<g class="mm-p" data-p="' + esc(p.name) + '" style="cursor:' + ((kind === "war" && targets.has(p.name)) || (kind !== "war" && o) ? "pointer" : "default") + '">' +
+            '<circle cx="' + x + '" cy="' + y + '" r="4" fill="' + col + '" opacity="' + (dim ? 0.25 : 1) + '"/>' + ring +
+            (label ? '<text x="' + x + '" y="' + (y - 15) + '" text-anchor="middle" fill="#fff" font-size="9" font-weight="800">' + label + '</text>' : "") +
+            ((kind === "war" ? (targets.has(p.name) || declared.has(p.name)) : !!o) ? '<text x="' + x + '" y="' + (y + 20) + '" text-anchor="middle" fill="#b9cae3" font-size="9">' + esc(p.name) + '</text>' : "") +
+            '</g>';
+
+    }
+
+    svg += '</svg><div class="sub" style="margin-top:4px">' +
+        (kind === "war"
+            ? '<span style="color:#ffd24c">&#9711;</span> chosen target &middot; <span style="color:#ff4a4a">&#10010;</span> war declared &middot; blue = Authority, red = Combine, white = Independents'
+            : 'Ring colour = occupation stage (gold occupied, light blue civilian administration, violet protected, green integrated)') + '</div>';
+
+    return svg;
+
 }
 
 /* ---- new proposal ---- */
@@ -444,7 +643,7 @@ function newHtml() {
     const need = t.votes === "supermajority" ? ov.supermajority : ov.majority;
 
     let h = '<label class="row">WHAT DO YOU WANT CONGRESS TO DO?</label><select id="n-type" style="width:100%">' +
-        Object.keys(TYPES).map(k => '<option value="' + k + '"' + (draft.type === k ? " selected" : "") + '>' + esc(TYPES[k].name) + '</option>').join("") + '</select>' +
+        Object.keys(TYPES).filter(k => k !== "military_action").map(k => '<option value="' + k + '"' + (draft.type === k ? " selected" : "") + '>' + esc(TYPES[k].name) + '</option>').join("") + '</select>' +
         '<div class="sub" style="margin-top:6px">' + esc(t.desc) + '</div>';
 
     if (draft.type === "military_action") {
@@ -520,7 +719,7 @@ function occupiedHtml() {
 
     const names = ["OCCUPIED", "CIVILIAN ADMIN", "PROTECTED", "INTEGRATED"];
 
-    return ov.occupations.map(function(o) {
+    return '<div class="card">' + miniMapHtml("occupied") + '</div>' + ov.occupations.map(function(o) {
 
         return '<div class="card"><h3>' + esc(o.planet) + '</h3><div class="sub">' + esc(o.stage_name) + ' &middot; ' + o.seats + ' of ' + o.seats_target + ' delegates seated</div>' +
             '<div class="steps">' + names.map((n, i) => '<div class="' + (i < o.stage ? "done" : i === o.stage ? "cur" : "") + '">' + n + '</div>').join("") + '</div>' +
@@ -535,6 +734,10 @@ function occupiedHtml() {
 }
 
 function wireOccupied() {
+    $("tabbody").querySelectorAll(".mm-p").forEach(el => el.addEventListener("click", function() {
+        const o = ov.occupations.find(x => x.planet === el.dataset.p);
+        if (o) { draft.type = "resource_allocation"; draft.planet = o.planet; toast("Relief for " + o.planet + ": press PROPOSE RELIEF on its card."); }
+    }));
     $("tabbody").querySelectorAll(".relief").forEach(el => el.addEventListener("click", function() {
         draft.type = "resource_allocation"; draft.planet = el.dataset.p; tab = "new"; renderTabs();
     }));
@@ -545,18 +748,27 @@ function authorityHtml() {
 
     const a = ov.authorizations;
     const rel = ov.state.relations || {};
+    const declaredWar = new Set(a.war);
+    const target = ov.targets.find(t => t.planet === warTarget);
 
     let h = '<div class="tokens">' +
         '<div class="token">AUTHORISED FLEETS<b>' + a.fleet + '</b><span class="sub">build from the galaxy map</span></div>' +
         '<div class="token">AUTHORISED KNIGHTMARE SQUADS<b>' + a.knightmare + '</b><span class="sub">recruit into a fleet</span></div>' +
         '<div class="token">WAR DECLARATIONS<b>' + a.war.length + '</b><span class="sub">' + (a.war.length ? esc(a.war.join(", ")) : "none") + '</span></div></div>';
 
+    h += '<div class="card active"><h3>War room: declare war on a planet</h3>' +
+        '<div class="sub" style="margin-bottom:8px">Only players write a Declaration of War (the delegates never do); Congress then votes on it (a majority is enough, 500 credits when it passes). Without a passed declaration Freedom Authority fleets cannot attack a planet. Click a planet on the map.</div>' +
+        miniMapHtml("war") +
+        '<div style="margin-top:8px;font-size:13px">' + (target ? 'Target: <b style="color:#ffd24c">' + esc(target.planet) + '</b> (held by ' + esc(target.owners) + ')' : 'No target chosen yet.') + '</div>' +
+        '<label class="row">WHICH FACTION SPEAKS FOR IT?</label><div class="spons">' +
+        ov.factions.map(f => '<div class="opt' + (draft.sponsor === f.key ? " on" : "") + '" data-k="' + f.key + '"><span class="dot" style="background:' + esc(f.color) + '"></span> <b>' + esc(f.name) + '</b> (' + f.seats + ')' +
+            '<small>' + ((f.priorities || []).indexOf("military_action") !== -1 ? "&#9733; war is one of their priorities" : "not a priority for them") + '</small></div>').join("") + '</div>' +
+        '<div style="margin-top:10px"><button class="btn" id="war-go"' + (target && !declaredWar.has(target.planet) ? "" : " disabled") + '>PROPOSE WAR (500 credits when passed)</button></div>' +
+        '</div>';
+
     h += '<div class="card"><h3>Standing</h3><div class="sub">POPULARITY ' + Math.round(ov.state.popularity) + '% (it shifts every vote by up to &plusmn;10 points: a popular Authority gets its way more often)</div>' +
         '<div class="bar"><i style="width:' + ov.state.popularity + '%;background:#4cc2ff"></i></div>' +
         '<div class="sub" style="margin-top:8px">TAX LEVEL ' + ov.state.tax_level + ' of 2 &middot; relations: Combine ' + (rel.Combine || 0) + ', Independents ' + (rel.Independents || 0) + '</div></div>';
-
-    h += '<div class="card"><h3>Planets you could declare war on</h3>' +
-        (ov.targets.map(x => '<div class="sub" style="padding:3px 0;color:#cfe3ff"><b>' + esc(x.planet) + '</b> &middot; held by ' + esc(x.owners) + (x.declared ? ' &middot; <span style="color:#7dff9d">WAR DECLARED</span>' : ' <button class="btn small decl" data-p="' + esc(x.planet) + '">PROPOSE WAR</button>') + '</div>').join("") || '<div class="sub">No targets.</div>') + '</div>';
 
     h += '<div class="card"><h3>The four factions</h3>' + ov.factions.map(f =>
         '<div class="sub" style="padding:4px 0"><span class="dot" style="background:' + esc(f.color) + '"></span> <b style="color:#fff">' + esc(f.name) + '</b> (' + f.seats + ' seats): ' + esc(f.description) + '</div>').join("") + '</div>';
@@ -566,9 +778,24 @@ function authorityHtml() {
 }
 
 function wireAuthority() {
-    $("tabbody").querySelectorAll(".decl").forEach(el => el.addEventListener("click", function() {
-        draft.type = "military_action"; draft.planet = el.dataset.p; tab = "new"; renderTabs();
+
+    $("tabbody").querySelectorAll(".mm-p").forEach(el => el.addEventListener("click", function() {
+        if (ov.targets.some(t => t.planet === el.dataset.p)) { warTarget = el.dataset.p; renderTabs(); }
     }));
+
+    $("tabbody").querySelectorAll(".spons .opt").forEach(el => el.addEventListener("click", function() { draft.sponsor = el.dataset.k; renderTabs(); }));
+
+    if ($("war-go")) {
+        $("war-go").addEventListener("click", async function() {
+            $("war-go").disabled = true;
+            const { error } = await supabaseClient.rpc("congress_submit", { p_type: "military_action", p_planet: warTarget, p_fleet: null, p_target: null, p_sponsor: draft.sponsor });
+            if (error) { toast(error.message, true); $("war-go").disabled = false; return; }
+            toast("The Declaration of War is before Congress.");
+            tab = "proposals";
+            await load();
+        });
+    }
+
 }
 
 /* ---------------------------------------------------------
@@ -577,6 +804,8 @@ function wireAuthority() {
 setInterval(function() {
 
     if (!ov) { return; }
+
+    document.querySelectorAll(".cdt").forEach(function(el) { el.textContent = mmss(secondsLeft(el.dataset.ts)); });
 
     document.querySelectorAll(".cd").forEach(function(el) {
         const p = ov.proposals.find(x => x.id === Number(el.dataset.p));
