@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=10"></script>
+<script src="i18n.js?v=11"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -146,6 +146,8 @@ let draft = { type: "fleet_construction", planet: "", fleet: "", target: "Combin
 let positions = [];
 let propState = null;     /* cooldowns and treasury for the propaganda tab */
 let propError = null;     /* set when the propaganda functions are not installed yet */
+let debate = null;        /* the sides every live bill's delegates are on */
+let debateError = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -261,6 +263,14 @@ async function load() {
     propState = ps.error ? null : ps.data;
     propError = ps.error ? ps.error.message : null;
 
+    /* the debate moves a few delegates every 15 seconds (the server throttles
+       it), and the view tells us where the chamber stands right now */
+    const dr = await supabaseClient.rpc("cg_debate_view");
+    debate = dr.error ? null : dr.data;
+    debateError = dr.error ? dr.error.message : null;
+
+    if (!dr.error) { supabaseClient.rpc("cg_debate_tick"); }
+
     if (!draft.sponsor) { draft.sponsor = "old_guard"; }
     if (!draft.planet && ov.targets.length) { draft.planet = ov.targets[0].planet; }
     if (!draft.fleet && ov.my_fleets.length) { draft.fleet = ov.my_fleets[0].id; }
@@ -301,11 +311,31 @@ function wireLegend() {
     }));
 }
 
+/* which live bill the dome is showing: the selected one, or the first live one */
+function liveDebateFor(id) {
+    if (!debate || !debate.proposals) { return null; }
+    return debate.proposals.find(x => x.id === id) || null;
+}
+
+function paintedDebate() {
+    if (!debate || !debate.proposals || !debate.proposals.length) { return null; }
+    return debate.proposals.find(x => x.id === selProposal) || debate.proposals[0];
+}
+
 function renderLegend() {
+
     setTimeout(wireLegend, 0);
+
+    const dv = paintedDebate();
+    const pr = dv ? ov.proposals.find(x => x.id === dv.id) : null;
+
     $("legend").innerHTML = ov.factions.map(f =>
         '<span class="chip fchip" data-f="' + f.id + '" style="cursor:pointer;' + (factionFilter === f.id ? "border-color:#fff;background:#1d3a6b;" : "") + '"><span class="dot" style="background:' + esc(f.color) + '"></span>' + esc(f.name) + ' &middot; <b>' + f.seats + '</b> seats &middot; loyalty ' + f.loyalty + '</span>'
-    ).join("") + '<span class="chip"><span class="dot" style="background:transparent;border:2px dashed #ffd37a"></span>suspected of corruption</span>';
+    ).join("") + '<span class="chip"><span class="dot" style="background:transparent;border:2px dashed #ffd37a"></span>' + esc(T("suspected of corruption")) + '</span>' +
+    (dv ? '<span class="chip" style="border-color:#7dff9d"><span class="dot" style="background:transparent;border:2px solid #7dff9d"></span>' + esc(T("voting yes")) +
+        '</span><span class="chip" style="border-color:#ff8a8a"><span class="dot" style="background:transparent;border:2px solid #ff8a8a"></span>' + esc(T("voting no")) +
+        '</span><span class="chip">' + esc(pr ? pr.title : "") + ' &middot; ' + T("YES") + ' ' + dv.yes + ' &middot; ' + T("NO") + ' ' + dv.no + ' &middot; ' + T("UNDECIDED") + ' ' + dv.undecided +
+        '</span>' : "");
 }
 
 function renderRegions() {
@@ -362,6 +392,9 @@ function renderHemicycle() {
     const pr = ov.proposals.find(p => p.id === selProposal);
     if (pr) { for (const b of pr.bribes) { bribed.add(b.member); } }
 
+    /* the bill the dome is showing, and the side every delegate is on */
+    const painting = paintedDebate();
+
     let svg = '<path d="M20 395 A360 360 0 0 1 740 395" fill="none" stroke="#1b2f52" stroke-width="1"/>';
 
     members.forEach(function(m, i) {
@@ -370,6 +403,16 @@ function renderHemicycle() {
         const dim = (regionFilter && m.region !== regionFilter) || (factionFilter && m.faction !== factionFilter);
         svg += '<circle class="seat" data-i="' + i + '" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + (m.planet ? 8 : 7.2) + '" fill="' + esc(f.color) + '" opacity="' + (dim ? 0.15 : 1) + '"' +
             (selMember === m.id ? ' stroke="#fff" stroke-width="3"' : m.suspect ? ' stroke="#ffd37a" stroke-width="2.2" stroke-dasharray="3 2"' : bribed.has(m.id) ? ' stroke="#7dff9d" stroke-width="2.5"' : m.planet ? ' stroke="#4cc2ff" stroke-width="2"' : '') + '/>';
+
+        /* a ring for the side the debate left them on */
+        const side = painting && painting.sides ? painting.sides[String(m.id)] : null;
+
+        if (side === "yes" || side === "no") {
+            svg += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + (m.planet ? 11 : 10) + '"' +
+                ' fill="none" stroke="' + (side === "yes" ? "#7dff9d" : "#ff8a8a") + '" stroke-width="1.8"' +
+                ' opacity="' + (dim ? 0.2 : 0.9) + '" pointer-events="none"/>';
+        }
+
     });
 
     /* names of the blocks around the arc */
@@ -618,15 +661,41 @@ function proposalsHtml() {
                 h += '<div class="sub">' + T("Bringing this bill forward costs nothing. The price is paid from the treasury only if it passes.") + '</div>';
             }
 
-            let expected = 0;
-            for (const fc of (p.forecast || [])) {
-                const f = factionById(fc.faction);
-                const chance = fleetRule ? (fleets === 0 ? 100 : Math.min(100, fc.p + 35)) : fc.p;
-                expected += f.seats * chance / 100;
-                h += '<div class="fc"><span class="nm">' + esc(f.name) + '</span><div class="bar"><i style="width:' + chance + '%;background:' + esc(f.color) + '"></i></div><span>' + chance + '%</span></div>';
+            const dv = liveDebateFor(p.id);
+
+            if (dv) {
+
+                /* the chamber as it stands: every delegate has taken a side */
+                let yesN = 0, noN = 0, undN = 0;
+
+                for (const f of ov.factions) {
+
+                    const d = (dv.factions || {})[String(f.id)] || { yes: 0, no: 0, undecided: 0 };
+                    const total = Math.max(1, d.yes + d.no + d.undecided);
+                    const share = Math.round(d.yes / total * 100);
+
+                    yesN += d.yes; noN += d.no; undN += d.undecided;
+
+                    h += '<div class="fc"><span class="nm">' + esc(f.name) + '</span><div class="bar"><i style="width:' + share + '%;background:' + esc(f.color) + '"></i></div><span>' + d.yes + '/' + total + '</span></div>';
+                }
+
+                h += '<div class="sub"><b style="color:' + (yesN >= need ? "#7dff9d" : "#ff8a8a") + '">' + T("YES") + ' ' + yesN + '</b> &middot; ' +
+                    T("NO") + ' ' + noN + ' &middot; ' + T("UNDECIDED") + ' ' + undN + ' &middot; ' + T("the floor is still moving") + '</div>';
+
             }
-            h += '<div class="sub">' + T("Forecast: about") + ' <b style="color:' + (expected >= need ? "#7dff9d" : "#ff8a8a") + '">' + Math.round(expected) + '</b> ' +
-                T("yes votes (chance of a YES per faction, before bribes and surprises).") + '</div>';
+            else {
+
+                let expected = 0;
+                for (const fc of (p.forecast || [])) {
+                    const f = factionById(fc.faction);
+                    const chance = fleetRule ? (fleets === 0 ? 100 : Math.min(100, fc.p + 35)) : fc.p;
+                    expected += f.seats * chance / 100;
+                    h += '<div class="fc"><span class="nm">' + esc(f.name) + '</span><div class="bar"><i style="width:' + chance + '%;background:' + esc(f.color) + '"></i></div><span>' + chance + '%</span></div>';
+                }
+                h += '<div class="sub">' + T("Forecast: about") + ' <b style="color:' + (expected >= need ? "#7dff9d" : "#ff8a8a") + '">' + Math.round(expected) + '</b> ' +
+                    T("yes votes (chance of a YES per faction, before bribes and surprises).") + '</div>';
+
+            }
 
             if (p.bribes.length) {
                 h += '<div class="sub" style="margin-top:4px">' + T("Your bribes:") + ' ' + p.bribes.length + ' (' + fmt(p.bribes.reduce((n, b) => n + b.amount, 0)) + ' ' + T("credits") + ')</div>';

@@ -411,6 +411,12 @@
             "Clique em um delegado para ver quem ele é. Enquanto uma proposta está em debate, você pode tentar conquistar o voto dele.",
         "Rumours of corruption surround this delegate.": "Rumores de corrupção cercam este delegado.",
         "suspected of corruption": "suspeito de corrupção",
+
+        /* ---------- congress: the debate ---------- */
+        "voting yes": "vota sim",
+        "voting no": "vota não",
+        "UNDECIDED": "INDECISOS",
+        "the floor is still moving": "o plenário ainda se mexe",
         "Fully integrated into the Authority.": "Totalmente integrado à Autoridade.",
         "BRIBE FOR:": "SUBORNO PARA:",
         "buy a YES": "comprar um SIM",
@@ -695,6 +701,12 @@
         [/^ELEIÇÃO: /, "ELECTION: "],
         [/^(.+) declara candidatura à Presidência\.$/, "$1 declares for President."],
         [/^(.+) entra em (The Old Guard|The Greens|Progressives|Independents)\.$/, "$1 joins $2."],
+
+        /* the debate turning (2026-10-27) */
+        [/^DEBATE: a câmara volta-se a favor de "(.*)": ([0-9]+) de ([0-9]+) votos prometidos\.$/,
+            'DEBATE: the chamber turns for "$1": $2 of $3 votes promised.'],
+        [/^DEBATE: a câmara volta-se contra "(.*)": só ([0-9]+) de ([0-9]+) votos prometidos\.$/,
+            'DEBATE: the chamber turns against "$1": only $2 of $3 votes promised.'],
 
         /* propaganda (2026-10-27) */
         [/^PROPAGANDA: a campanha pela (.+) custou ([0-9]+) créditos e subiu a lealdade dos seus delegados em ([0-9]+) pontos\.$/,
