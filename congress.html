@@ -426,13 +426,17 @@ let memberHistory = {};   /* member id -> the last votes, kept between renders *
 async function loadMemberHistory(id) {
 
     const known = memberHistory[id];
-    if (known && (known.loading || known.votes || known.error)) { return; }
+
+    if (known && known.loading) { return; }
+
+    /* a bill can resolve while the page is open: keep the record for two minutes */
+    if (known && (known.votes || known.error) && Date.now() - (known.at || 0) < 120000) { return; }
 
     memberHistory[id] = { loading: true };
 
     const { data, error } = await supabaseClient.rpc("congress_member_history", { p_member: id });
 
-    memberHistory[id] = error ? { error: error.message } : data;
+    memberHistory[id] = error ? { error: error.message, at: Date.now() } : Object.assign({ at: Date.now() }, data);
     paintMemberHistory(id);
 
 }
