@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=6"></script>
+<script src="i18n.js?v=7"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -144,6 +144,7 @@ let warTarget = null;
 let skew = 0;            /* server time minus browser time */
 let draft = { type: "fleet_construction", planet: "", fleet: "", target: "Combine", sponsor: "" };
 let positions = [];
+let propState = null;     /* cooldowns and treasury for the propaganda tab */
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -178,6 +179,11 @@ async function load() {
 
     ov = data;
     skew = new Date(ov.now).getTime() - Date.now();
+
+    if (tab === "propaganda") {
+        const ps = await supabaseClient.rpc("congress_propaganda_state");
+        propState = ps.error ? null : ps.data;
+    }
 
     if (!draft.sponsor) { draft.sponsor = "old_guard"; }
     if (!draft.planet && ov.targets.length) { draft.planet = ov.targets[0].planet; }
@@ -403,7 +409,7 @@ function renderMember() {
 --------------------------------------------------------- */
 function renderTabs() {
 
-    const tabs = [["proposals", "PROPOSALS"], ["election", "ELECTION"], ["new", "NEW PROPOSAL"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
+    const tabs = [["proposals", "PROPOSALS"], ["election", "ELECTION"], ["new", "NEW PROPOSAL"], ["propaganda", "PROPAGANDA"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + t[1] + '</div>').join("");
     $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
@@ -413,6 +419,7 @@ function renderTabs() {
     if (tab === "proposals") { body.innerHTML = proposalsHtml(); wireProposals(); }
     else if (tab === "election") { body.innerHTML = electionHtml(); wireElection(); }
     else if (tab === "new") { body.innerHTML = newHtml(); wireNew(); }
+    else if (tab === "propaganda") { body.innerHTML = propagandaHtml(); wirePropaganda(); }
     else if (tab === "occupied") { body.innerHTML = occupiedHtml(); wireOccupied(); }
     else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
     else { body.innerHTML = ov.log.map(l => '<div class="log"><time>' + new Date(l.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + '</time>' + esc(l.text) + '</div>').join("") || '<div class="sub">Nothing has happened yet.</div>'; }
@@ -719,6 +726,79 @@ function wireNew() {
 
 }
 
+/* ---- propaganda ---- */
+function propagandaHtml() {
+
+    const cd = (propState && Number(propState.cooldown)) || 600;
+
+    let h = '<div class="sub" style="margin-bottom:10px">Propaganda is paid from the Authority treasury. A campaign raises the loyalty of a faction\'s delegates and can pull delegates of other factions over to it. The same faction can be targeted once every ten minutes.</div>';
+
+    if (!propState) { return h + '<div class="sub">Loading the propaganda offices...</div>'; }
+
+    const credits = Number(propState.credits || 0);
+    const amounts = [1000, 2500, 5000, 10000];
+
+    h += '<div class="card"><h3>The propaganda offices</h3>' +
+        '<div class="sub">TREASURY <b style="color:#fff">' + fmt(credits) + ' credits</b></div>' +
+        '<div class="sub" style="margin-top:4px">A campaign lifts the loyalty of the faction\'s own delegates and wins over the least loyal delegates of the others (they join it, at its level of loyalty). More money means more points and more delegates.</div></div>';
+
+    h += ov.factions.map(function(f) {
+
+        const info = (propState.factions || {})[String(f.id)] || {};
+        const until = info.last_at ? new Date(new Date(info.last_at).getTime() + cd * 1000).toISOString() : null;
+        const busy = until ? secondsLeft(until) > 0 : false;
+
+        let card = '<div class="card"><h3><span class="dot" style="background:' + esc(f.color) + '"></span> ' + esc(f.name) + '</h3>' +
+            '<div class="sub">' + f.seats + ' delegates &middot; ' + f.loyalty + '% loyalty' +
+            (info.runs ? ' &middot; ' + info.runs + ' campaign' + (Number(info.runs) === 1 ? '' : 's') + ' &middot; ' + fmt(info.spent) + ' credits spent' : '') + '</div>' +
+            '<div class="bar" style="margin-top:5px"><i style="width:' + Math.max(0, Math.min(100, f.loyalty)) + '%;background:' + esc(f.color) + '"></i></div>';
+
+        if (busy) {
+            card += '<div class="sub" style="margin-top:7px;color:#ffd37a">A campaign for this faction is still running: <b class="prop-cd" data-until="' + esc(until) + '">' + mmss(secondsLeft(until)) + '</b></div>';
+        }
+
+        card += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">' + amounts.map(function(a) {
+            const off = busy || credits < a;
+            return '<button class="btn small prop-btn" data-f="' + f.id + '" data-amt="' + a + '"' + (off ? " disabled" : "") + '>CAMPAIGN ' + fmt(a) + '</button>';
+        }).join("") + '</div>';
+
+        return card + '</div>';
+
+    }).join("");
+
+    return h;
+
+}
+
+function wirePropaganda() {
+
+    $("tabbody").querySelectorAll(".prop-btn").forEach(function(el) {
+
+        el.addEventListener("click", async function() {
+
+            const fid = Number(el.dataset.f);
+            const amt = Number(el.dataset.amt);
+
+            if (!Number.isFinite(fid) || !Number.isFinite(amt)) { return; }
+
+            el.disabled = true;
+
+            const { data, error } = await supabaseClient.rpc("congress_propaganda", { p_faction: fid, p_credits: amt });
+
+            if (error) { toast(error.message, true); el.disabled = false; return; }
+
+            toast("Campaign run: " + fmt(data.spent) + " credits, +" + data.heat + " loyalty" +
+                (data.flipped ? ", " + data.flipped + " delegate" + (data.flipped === 1 ? "" : "s") + " changed side" : "") +
+                ". Now " + data.seats + " seats.");
+
+            await load();
+
+        });
+
+    });
+
+}
+
 /* ---- occupied worlds ---- */
 function occupiedHtml() {
 
@@ -815,6 +895,8 @@ setInterval(function() {
     if (!ov) { return; }
 
     document.querySelectorAll(".cdt").forEach(function(el) { el.textContent = mmss(secondsLeft(el.dataset.ts)); });
+
+    document.querySelectorAll(".prop-cd").forEach(function(el) { el.textContent = mmss(secondsLeft(el.dataset.until)); });
 
     document.querySelectorAll(".cd").forEach(function(el) {
         const p = ov.proposals.find(x => x.id === Number(el.dataset.p));

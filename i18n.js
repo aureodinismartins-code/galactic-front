@@ -97,6 +97,17 @@
             "Todo jogador da Freedom Authority pertence a um partido. Você precisa de um para se candidatar à Presidência ou votar.",
         "War room: declare war on a planet": "Sala de guerra: declarar guerra a um planeta",
 
+        /* ---------- congress: propaganda ---------- */
+        "PROPAGANDA": "PROPAGANDA",
+        "TREASURY": "TESOURO",
+        "The propaganda offices": "Os gabinetes de propaganda",
+        "Loading the propaganda offices...": "Carregando os gabinetes de propaganda...",
+        "A campaign for this faction is still running:": "Ainda há uma campanha em curso para esta fação:",
+        "Propaganda is paid from the Authority treasury. A campaign raises the loyalty of a faction's delegates and can pull delegates of other factions over to it. The same faction can be targeted once every ten minutes.":
+            "A propaganda é paga pelo tesouro da Autoridade. Uma campanha aumenta a lealdade dos delegados de uma fação e pode trazer para ela delegados de outras fações. A mesma fação só pode ser alvo uma vez a cada dez minutos.",
+        "A campaign lifts the loyalty of the faction's own delegates and wins over the least loyal delegates of the others (they join it, at its level of loyalty). More money means more points and more delegates.":
+            "Uma campanha sobe a lealdade dos próprios delegados da fação e conquista os delegados menos leais das outras (eles passam-se para ela, ao nível de lealdade dela). Mais dinheiro significa mais pontos e mais delegados.",
+
         /* ---------- shared status words ---------- */
         "STATIONED": "ESTACIONADA",
         "TRAVELLING": "EM VIAGEM",

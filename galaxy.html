@@ -14,7 +14,7 @@
 
     <link
         rel="stylesheet"
-        href="style.css?v=6"
+        href="style.css?v=7"
     >
 
     <script
@@ -22,7 +22,7 @@
     ></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=6"></script>
+    <script src="i18n.js?v=7"></script>
         <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js"></script>
     <script src="ships.js"></script>
@@ -1306,15 +1306,92 @@ const recruitAmounts = {
 ========================================= */
 
 
+/* the game's own confirmation box, drawn exactly like the NOTICE card
+   (the browser's confirm() cannot be styled and breaks the look) */
+function gameConfirm(message, title) {
+
+    return new Promise(function(resolve) {
+
+        const old = document.getElementById("game-confirm");
+        if (old) { old.remove(); }
+
+        const overlay = document.createElement("div");
+        overlay.id = "game-confirm";
+        overlay.style.cssText =
+            "position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;";
+
+        const card = document.createElement("div");
+        card.style.cssText =
+            "width:380px;max-width:90vw;background:rgba(8,12,22,.97);border:1px solid #7fdcff;" +
+            "box-shadow:0 0 24px rgba(80,200,255,.35);padding:18px 20px;color:#dfeaf2;" +
+            "font:14px Arial,sans-serif;line-height:1.5;";
+
+        const h = document.createElement("div");
+        h.style.cssText = "font-weight:bold;letter-spacing:2px;color:#7fdcff;margin-bottom:8px;";
+        h.textContent = (title || "NOTICE").toUpperCase();
+
+        const p = document.createElement("div");
+        p.textContent = message;
+
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;gap:8px;margin-top:14px;";
+
+        const yes = document.createElement("button");
+        yes.type = "button";
+        yes.textContent = "OK";
+        yes.style.cssText =
+            "padding:7px 26px;background:#10202e;color:#fff;border:1px solid #7fdcff;cursor:pointer;font-weight:bold;";
+
+        const no = document.createElement("button");
+        no.type = "button";
+        no.textContent = "CANCEL";
+        no.style.cssText =
+            "padding:7px 20px;background:transparent;color:#cfe3ff;border:1px solid #355690;cursor:pointer;font-weight:bold;";
+
+        const finish = function(ok) {
+            overlay.remove();
+            document.removeEventListener("keydown", onKey);
+            resolve(ok);
+        };
+
+        const onKey = function(e) {
+            if (e.key === "Escape") { finish(false); }
+            else if (e.key === "Enter") { finish(true); }
+        };
+
+        yes.addEventListener("click", function() { finish(true); });
+        no.addEventListener("click", function() { finish(false); });
+        overlay.addEventListener("click", function(e) { if (e.target === overlay) { finish(false); } });
+        document.addEventListener("keydown", onKey);
+
+        row.appendChild(yes);
+        row.appendChild(no);
+        card.appendChild(h);
+        card.appendChild(p);
+        card.appendChild(row);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+        yes.focus();
+
+    });
+
+}
+
+
 document
     .getElementById(
         "main-menu-button"
     )
     .addEventListener(
         "click",
-        function () {
+        async function () {
 
-            if (!window.confirm("Return to the main menu?")) { return; }
+            const ok = await gameConfirm(
+                "Return to the main menu?",
+                "Notice"
+            );
+
+            if (!ok) { return; }
 
             window.location.href =
                 "index.html";
