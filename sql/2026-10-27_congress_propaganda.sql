@@ -137,15 +137,16 @@ begin
         raise exception 'The treasury holds % credits: a campaign of % is not possible', v_credits, v_spend;
     end if;
 
-    /* where the faction stands before the campaign */
+    /* where the faction stands before the campaign (only the seated
+       delegates count: the chamber and every bill count them the same way) */
     select coalesce(round(avg(m.loyalty)), 50) into v_avg
     from public.cg_members as m
-    where m.faction_id = v_faction.id;
+    where m.faction_id = v_faction.id and m.active;
 
     /* its own delegates are stirred up: their loyalty rises */
     update public.cg_members as m
     set loyalty = least(100, m.loyalty + v_heat)
-    where m.faction_id = v_faction.id;
+    where m.faction_id = v_faction.id and m.active;
 
     /* and the discontented of the other factions listen.
        The loop exists over the twelve least loyal delegates: the
@@ -153,7 +154,7 @@ begin
     for m in
         select x.id, x.name, x.loyalty, x.faction_id
         from public.cg_members as x
-        where x.faction_id <> v_faction.id
+        where x.faction_id <> v_faction.id and x.active
         order by x.loyalty asc, random()
         limit 12
     loop
@@ -192,7 +193,7 @@ begin
 
     select count(*) into v_seats
     from public.cg_members as m
-    where m.faction_id = v_faction.id;
+    where m.faction_id = v_faction.id and m.active;
 
     perform public.cg_log(
         'PROPAGANDA: a campanha pela ' || v_faction.name || ' custou ' || v_spend ||
@@ -272,10 +273,10 @@ select
     (select count(*) from information_schema.routines
       where routine_schema = 'public'
         and routine_name in ('congress_propaganda', 'congress_propaganda_state')) as functions_present,
-    (select count(*) from public.cg_members as m) as delegates,
+    (select count(*) from public.cg_members as m where m.active) as delegates,
     (select coalesce(jsonb_agg(jsonb_build_object(
                 'faction', f.name,
-                'seats', (select count(*) from public.cg_members as m where m.faction_id = f.id),
-                'loyalty', (select coalesce(round(avg(m.loyalty)), 0) from public.cg_members as m where m.faction_id = f.id)
+                'seats', (select count(*) from public.cg_members as m where m.faction_id = f.id and m.active),
+                'loyalty', (select coalesce(round(avg(m.loyalty)), 0) from public.cg_members as m where m.faction_id = f.id and m.active)
             ) order by f.id), '[]'::jsonb)
        from public.cg_factions as f) as chamber;
