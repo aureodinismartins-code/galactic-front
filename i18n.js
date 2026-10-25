@@ -42,7 +42,6 @@
         "LOG IN": "ENTRAR",
         "LOG OUT": "SAIR",
         "SAVE / CREATE": "SALVAR / CRIAR",
-        "CANCEL": "CANCELAR",
         "A strategic map where players track the control of planets and individual cities across the galaxy.":
             "Um mapa estratégico onde os jogadores acompanham o controle dos planetas e das cidades individuais pela galáxia.",
         "Guest session. Save an account to keep this player ID forever.":
@@ -137,6 +136,7 @@
         "NEEDED": "NECESSÁRIOS",
         "CREATE": "CRIAR",
         "CANCEL": "CANCELAR",
+        "BATTLE IN PROGRESS": "BATALHA EM ANDAMENTO",
         "RETURN": "VOLTAR",
         "LEAVE": "SAIR",
         "FACTION CREDITS: —": "CRÉDITOS DA FACÇÃO: —",

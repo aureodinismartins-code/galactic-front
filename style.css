@@ -549,6 +549,14 @@ body {
         transform 1s cubic-bezier(0.65, 0, 0.2, 1);
 }
 
+/* zoomed in on a planet the map is scaled over the whole page, so the
+   header steps aside instead of ending up on top of a planet */
+.galaxy-page:has(.galaxy-map.camera-zoom) .map-header,
+.galaxy-page:has(.galaxy-map.camera-zoom) #player-faction-display {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
 
 /* =========================================================
    FLEET LAYER
