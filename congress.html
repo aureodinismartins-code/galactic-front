@@ -145,6 +145,7 @@ let skew = 0;            /* server time minus browser time */
 let draft = { type: "fleet_construction", planet: "", fleet: "", target: "Combine", sponsor: "" };
 let positions = [];
 let propState = null;     /* cooldowns and treasury for the propaganda tab */
+let propError = null;     /* set when the propaganda functions are not installed yet */
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -183,6 +184,7 @@ async function load() {
     if (tab === "propaganda") {
         const ps = await supabaseClient.rpc("congress_propaganda_state");
         propState = ps.error ? null : ps.data;
+        propError = ps.error ? ps.error.message : null;
     }
 
     if (!draft.sponsor) { draft.sponsor = "old_guard"; }
@@ -733,7 +735,14 @@ function propagandaHtml() {
 
     let h = '<div class="sub" style="margin-bottom:10px">Propaganda is paid from the Authority treasury. A campaign raises the loyalty of a faction\'s delegates and can pull delegates of other factions over to it. The same faction can be targeted once every ten minutes.</div>';
 
-    if (!propState) { return h + '<div class="sub">Loading the propaganda offices...</div>'; }
+    if (!propState) {
+        if (propError) {
+            return h + '<div class="card"><h3>The propaganda offices are not installed</h3>' +
+                '<div class="sub">Run <b style="color:#fff">sql/2026-10-27_congress_propaganda.sql</b> in the Supabase SQL editor, then reload this page.</div>' +
+                '<div class="sub" style="margin-top:6px;color:#ff8a8a">' + esc(propError) + '</div></div>';
+        }
+        return h + '<div class="sub">Loading the propaganda offices...</div>';
+    }
 
     const credits = Number(propState.credits || 0);
     const amounts = [1000, 2500, 5000, 10000];
