@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Galactic Wars - City Battle</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
+<script src="i18n.js"></script>
 <script src="gamecontrol.js"></script>
 <script src="knightmare_sprites.js"></script>
 <style>
@@ -4041,7 +4042,7 @@ function applySnapshot(s) {
 
     }
 
-    if (myUnits().length > 0 && !guestEnded && /Waiting for the battle commander/.test(document.getElementById("battle-message").textContent)) {
+    if (myUnits().length > 0 && !guestEnded && /Waiting for the battle commander|Aguardando o comandante da batalha/.test(document.getElementById("battle-message").textContent)) {
         setBattleMessage("Your divisions are in the battle. Select them and give orders.");
     }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 
 <head>
 
@@ -21,6 +21,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase.js"></script>
+    <script src="i18n.js"></script>
         <script>window.GC_NO_OVERLAY = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js"></script>
 
@@ -44,6 +45,31 @@
             A strategic map where players track the control
             of planets and individual cities across the galaxy.
         </p>
+
+
+        <div class="lang-switch" data-no-i18n>
+
+            <button
+                type="button"
+                class="lang-btn"
+                data-lang="en"
+                title="English"
+                onclick="setLanguage('en')"
+            >
+                ENG
+            </button>
+
+            <button
+                type="button"
+                class="lang-btn"
+                data-lang="pt"
+                title="Português"
+                onclick="setLanguage('pt')"
+            >
+                PT
+            </button>
+
+        </div>
 
 
         <div id="faction-selection">
@@ -142,7 +168,7 @@
     </div>
 
 
-        <div id="account-panel" style="position:fixed;left:20px;bottom:20px;z-index:50;width:290px;background:rgba(0,0,0,.85);border:1px solid #555;padding:12px 14px;color:#ccc;font:12px Arial,sans-serif;line-height:1.5;">
+        <div id="account-panel" style="position:fixed;right:20px;bottom:20px;z-index:50;width:290px;max-width:calc(100vw - 40px);max-height:calc(100vh - 40px);overflow-y:auto;background:rgba(0,0,0,.85);border:1px solid #555;padding:12px 14px;color:#ccc;font:12px Arial,sans-serif;line-height:1.5;">
         <strong style="color:#fff;letter-spacing:1px;">COMMANDER ACCOUNT</strong>
         <div id="account-status" style="margin:4px 0 8px;color:#aaa;"></div>
         <div style="border-top:1px solid #444;border-bottom:1px solid #444;padding:7px 0;margin-bottom:8px;">

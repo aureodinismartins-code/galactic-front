@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <title>Freedom Authority Congress</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
+<script src="i18n.js"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -300,8 +301,16 @@ function renderHemicycle() {
         Object.keys(sums).forEach(function(k) {
             const f = factionById(Number(k));
             const a = sums[k].a / sums[k].n;
-            const rr = 392;
-            svg += '<text x="' + (380 + Math.cos(a) * rr).toFixed(1) + '" y="' + (395 - Math.sin(a) * rr + 4).toFixed(1) + '" text-anchor="middle" fill="' + esc(f.color) + '" font-size="11" font-weight="800" letter-spacing="1">' + esc(f.name.toUpperCase()) + '</text>';
+            /* the name runs ALONG the arc in the margin outside the seats,
+               so it can never sit on top of the delegates */
+            const rr = 386;
+            const x = (380 + Math.cos(a) * rr).toFixed(1);
+            const y = (395 - Math.sin(a) * rr).toFixed(1);
+            const deg = (90 - a * 180 / Math.PI).toFixed(1);
+            svg += '<text transform="translate(' + x + ',' + y + ') rotate(' + deg + ')" text-anchor="middle" ' +
+                'fill="' + esc(f.color) + '" font-size="10" font-weight="800" letter-spacing="0.5" ' +
+                'stroke="#050a12" stroke-width="3" stroke-linejoin="round" paint-order="stroke">' +
+                esc(f.name.toUpperCase()) + '</text>';
         });
     }
 

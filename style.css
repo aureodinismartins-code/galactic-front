@@ -88,6 +88,39 @@ body {
 
 
 /* =========================================================
+   LANGUAGE SWITCH (ENG / PT)
+========================================================= */
+
+.lang-switch {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 36px;
+}
+
+.main-menu .lang-switch button {
+    width: 62px;
+    height: 30px;
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #9aa7b8;
+    border: 1px solid #555555;
+}
+
+.main-menu .lang-switch button:hover {
+    background: #14223a;
+    color: #ffffff;
+    border-color: #8fb4e8;
+}
+
+.main-menu .lang-switch button.on {
+    background: #14223a;
+    color: #ffffff;
+    border-color: #8fb4e8;
+}
+
+
+/* =========================================================
    FACTION SELECTION
 ========================================================= */
 
