@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=7"></script>
+<script src="i18n.js?v=8"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -160,6 +160,77 @@ function toast(text, err) {
     toast.h = setTimeout(() => { t.style.display = "none"; }, 5200);
 }
 
+/* the game's own confirmation box, drawn like the NOTICE card the rest of the
+   game shows (the browser's confirm() cannot be styled or translated) */
+function gameConfirm(message, title) {
+
+    return new Promise(function(resolve) {
+
+        const old = document.getElementById("game-confirm");
+        if (old) { old.remove(); }
+
+        const overlay = document.createElement("div");
+        overlay.id = "game-confirm";
+        overlay.style.cssText =
+            "position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;";
+
+        const card = document.createElement("div");
+        card.style.cssText =
+            "width:380px;max-width:90vw;background:rgba(8,12,22,.97);border:1px solid #7fdcff;" +
+            "box-shadow:0 0 24px rgba(80,200,255,.35);padding:18px 20px;color:#dfeaf2;" +
+            "font:14px Arial,sans-serif;line-height:1.5;";
+
+        const h = document.createElement("div");
+        h.style.cssText = "font-weight:bold;letter-spacing:2px;color:#7fdcff;margin-bottom:8px;";
+        h.textContent = (title || "NOTICE").toUpperCase();
+
+        const p = document.createElement("div");
+        p.textContent = message;
+
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;gap:8px;margin-top:14px;";
+
+        const yes = document.createElement("button");
+        yes.type = "button";
+        yes.textContent = "OK";
+        yes.style.cssText =
+            "padding:7px 26px;background:#10202e;color:#fff;border:1px solid #7fdcff;cursor:pointer;font-weight:bold;";
+
+        const no = document.createElement("button");
+        no.type = "button";
+        no.textContent = "CANCEL";
+        no.style.cssText =
+            "padding:7px 20px;background:transparent;color:#cfe3ff;border:1px solid #355690;cursor:pointer;font-weight:bold;";
+
+        const finish = function(ok) {
+            overlay.remove();
+            document.removeEventListener("keydown", onKey);
+            resolve(ok);
+        };
+
+        const onKey = function(e) {
+            if (e.key === "Escape") { finish(false); }
+            else if (e.key === "Enter") { finish(true); }
+        };
+
+        yes.addEventListener("click", function() { finish(true); });
+        no.addEventListener("click", function() { finish(false); });
+        overlay.addEventListener("click", function(e) { if (e.target === overlay) { finish(false); } });
+        document.addEventListener("keydown", onKey);
+
+        row.appendChild(yes);
+        row.appendChild(no);
+        card.appendChild(h);
+        card.appendChild(p);
+        card.appendChild(row);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+        yes.focus();
+
+    });
+
+}
+
 function factionById(id) { return (ov.factions || []).find(f => f.id === id) || { name: "?", color: "#888", priorities: [] }; }
 
 function secondsLeft(ts) { return Math.max(0, Math.round((new Date(ts).getTime() - (Date.now() + skew)) / 1000)); }
@@ -181,11 +252,11 @@ async function load() {
     ov = data;
     skew = new Date(ov.now).getTime() - Date.now();
 
-    if (tab === "propaganda") {
-        const ps = await supabaseClient.rpc("congress_propaganda_state");
-        propState = ps.error ? null : ps.data;
-        propError = ps.error ? ps.error.message : null;
-    }
+    /* the propaganda offices also carry the fleet count, which decides the
+       odds of a fleet bill: both the PROPAGANDA tab and the fleet cards use it */
+    const ps = await supabaseClient.rpc("congress_propaganda_state");
+    propState = ps.error ? null : ps.data;
+    propError = ps.error ? ps.error.message : null;
 
     if (!draft.sponsor) { draft.sponsor = "old_guard"; }
     if (!draft.planet && ov.targets.length) { draft.planet = ov.targets[0].planet; }
@@ -451,9 +522,26 @@ function proposalsHtml() {
 
         if (live) {
 
+            /* what the vote itself will do, which the forecast above cannot show:
+               cg_resolve carries the first fleet and pushes the next four */
+            const fleets = propState ? Number(propState.fleets) : NaN;
+
+            if (p.type === "fleet_construction" && Number.isFinite(fleets)) {
+                if (fleets === 0) {
+                    h += '<div class="sub" style="color:#7dff9d;margin-top:6px">GUARANTEED: the Authority has no fleet, so every delegate votes yes.</div>';
+                }
+                else if (fleets < 5) {
+                    h += '<div class="sub" style="color:#7dff9d;margin-top:6px">FAVOURED: the real odds are 35 points above the forecast while the Authority has fewer than five fleets.</div>';
+                }
+            }
+
             const secs = p.status === "introduction" ? secondsLeft(p.debate_at) : secondsLeft(p.vote_at);
             h += '<div class="sub" style="margin:6px 0"><b class="cd" data-p="' + p.id + '" data-s="' + p.status + '" style="color:#ffd37a">' +
                 (p.status === "introduction" ? "Debate opens in " : "Vote in ") + mmss(secs) + '</b> &middot; needs ' + need + ' yes votes of ' + ov.seats + '</div>';
+
+            if (p.cost) {
+                h += '<div class="sub">Bringing this bill forward costs nothing. The price is paid from the treasury only if it passes.</div>';
+            }
 
             let expected = 0;
             for (const fc of (p.forecast || [])) {
@@ -493,7 +581,8 @@ function proposalsHtml() {
 
 function wireProposals() {
     $("tabbody").querySelectorAll(".veto-btn").forEach(el => el.addEventListener("click", async function() {
-        if (!confirm("Use your veto on this proposal? You can only veto once per term.")) { return; }
+        const ok = await gameConfirm("Use your veto on this proposal? You can only veto once per term.", "Notice");
+        if (!ok) { return; }
         const { error } = await supabaseClient.rpc("congress_veto", { p_proposal: Number(el.dataset.p) });
         if (error) { toast(error.message, true); return; }
         toast("Vetoed.");

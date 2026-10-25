@@ -256,6 +256,11 @@ begin
             select ft.credits from public.faction_treasury as ft
             where ft.faction = 'Freedom Authority'
         ), 0),
+        /* how many fleets the Authority owns: cg_resolve decides the odds of
+           a fleet bill from it, so the screen can say what that bill will do */
+        'fleets', coalesce((
+            select count(*) from public.fleets as f where f.faction = 'Freedom Authority'
+        ), 0),
         'factions', v_factions
     );
 

@@ -13,11 +13,11 @@
 --
 --   * the Authority owns no fleet        -> the vote is unanimous,
 --                                           the authorisation passes;
---   * it owns one or two fleets         -> every delegate is 35
+--   * it owns one to four fleets        -> every delegate is 35
 --                                           points more likely to
 --                                           vote YES than the normal
 --                                           odds;
---   * three fleets or more              -> the usual cg_likelihood
+--   * five fleets or more               -> the usual cg_likelihood
 --                                           odds, exactly as before.
 --
 -- Nothing else changes: the cost is still paid when the bill passes,
@@ -93,7 +93,7 @@ begin
 
         if v_fleets = 0 then
             v_force := true;
-        elsif v_fleets in (1, 2) then
+        elsif v_fleets < 5 then
             v_boost := 35;
         end if;
 

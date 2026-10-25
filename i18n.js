@@ -100,6 +100,12 @@
         /* ---------- congress: propaganda ---------- */
         "PROPAGANDA": "PROPAGANDA",
         "TREASURY": "TESOURO",
+        "Bringing this bill forward costs nothing. The price is paid from the treasury only if it passes.":
+            "Levar esta proposta ao Congresso não custa nada. O preço só é pago pelo tesouro se ela for aprovada.",
+        "GUARANTEED: the Authority has no fleet, so every delegate votes yes.":
+            "GARANTIDA: a Autoridade não tem frota, então todos os delegados votam sim.",
+        "FAVOURED: the real odds are 35 points above the forecast while the Authority has fewer than five fleets.":
+            "FAVORECIDA: as chances reais são 35 pontos acima da previsão enquanto a Autoridade tiver menos de cinco frotas.",
         "The propaganda offices": "Os gabinetes de propaganda",
         "Loading the propaganda offices...": "Carregando os gabinetes de propaganda...",
         "A campaign for this faction is still running:": "Ainda há uma campanha em curso para esta fação:",
@@ -521,6 +527,139 @@
         "&times;": "×", "&hellip;": "…", "&quot;": "\"", "&#039;": "'", "&lt;": "<", "&gt;": ">"
     };
 
+    /* =====================================================
+       SERVER TEXT — Portuguese back to English
+       -----------------------------------------------------
+       Everything the DATABASE writes is stored in Portuguese by
+       the pt_text triggers: proposal titles, proposal results,
+       the Congress log, the war log and the faction
+       descriptions. Those strings never pass through DICT, so a
+       player who chose English was shown Portuguese anyway.
+       This is the other direction: the same sentences, written
+       in Portuguese by the server, translated back. Only exact
+       matches and the patterns below are touched, so a name, a
+       planet or a wording the server changed is left alone.
+    ===================================================== */
+
+    const SERVER = {
+
+        /* occupation stages */
+        "ocupado": "occupied",
+        "administração civil": "civilian administration",
+        "protegido": "protected",
+        "integrado": "integrated",
+
+        /* proposal titles */
+        "Autorizar a construção de uma nova frota":
+            "Authorize New Fleet Construction",
+        "Autorizar a construção de uma nova frota (iniciativa do Estado)":
+            "Authorize New Fleet Construction (state initiative)",
+        "Autorizar a formação de um esquadrão Knightmare":
+            "Authorize Knightmare Squad Formation",
+        "Autorizar a formação de um esquadrão Knightmare (iniciativa do Estado)":
+            "Authorize Knightmare Squad Formation (state initiative)",
+        "Ajuda econômica de emergência": "Emergency Economic Relief",
+        "Proposta de aumento de impostos": "Taxation Increase Proposal",
+
+        /* proposal results */
+        "Uma nova frota foi autorizada: construa-a no mapa galáctico.":
+            "A new fleet is authorised: build it from the galaxy map.",
+        "Um esquadrão Knightmare foi autorizado: recrute-o em uma frota (a cadeia da Instalação Knightmare ainda é necessária).":
+            "A Knightmare squad is authorised: recruit it into a fleet (the Knightmare Facility chain is still required).",
+        "Ajuda econômica para todos os mundos ocupados: estabilidade +10.":
+            "Economic relief for all occupied worlds: stability +10.",
+        "Impostos aumentados: 300-500 créditos a cada 15 minutos por nível de imposto; a Autoridade perde popularidade.":
+            "Taxes raised: 300-500 credits every 15 minutes per tax level; the Authority loses popularity.",
+        "A frota não pôde ser recolhida (ela não existe mais ou está em batalha).":
+            "The fleet could not be recalled (it no longer exists or is in battle).",
+        "O Presidente vetou esta proposta.": "The President vetoed this proposal.",
+        "O Presidente deixou a Freedom Authority: o cargo está vago.":
+            "The President has left the Freedom Authority: the office is vacant.",
+
+        /* election log lines */
+        "ELEIÇÃO: uma eleição presidencial foi convocada. Entre em um partido, declare sua candidatura (8 minutos) e então todos os jogadores votam (8 minutos).":
+            "ELECTION: a presidential election is called. Join a party, then declare your candidacy (8 minutes), then all players vote (8 minutes).",
+        "ELEIÇÃO: ninguém se candidatou ainda. A campanha foi prorrogada por 5 minutos.":
+            "ELECTION: nobody has declared yet. The campaign is extended by 5 minutes.",
+        "ELEIÇÃO: a votação está aberta. Todo jogador da Freedom Authority que entrou em um partido pode votar.":
+            "ELECTION: voting is open. Every Freedom Authority player who has joined a party may vote.",
+
+        /* the four factions, as the pt_cg_faction trigger stores them */
+        "Tradicional e militarista, com uma abordagem conservadora da expansão e do governo":
+            "Traditional and militaristic, with a conservative approach to expansion and government",
+        "Foco ambiental e diplomático, contrário à expansão agressiva":
+            "Environmental and diplomatic focus, opposed to aggressive expansion",
+        "Reformas progressistas e investimento em tecnologia e infraestrutura civil":
+            "Progressive reforms and investment in technology and civil infrastructure",
+        "Membros sem alinhamento, imprevisíveis, influenciados por argumentos ou subornos":
+            "Unaligned members, unpredictable, swayed by argument or bribes"
+    };
+
+    /* lines that carry names, planets or numbers: matched by shape */
+    const SERVER_RULES = [
+
+        [/^Declaração de Guerra contra (.+)$/, "Declaration of War on $1"],
+        [/^Ajuda econômica de emergência para (.+)$/, "Emergency Economic Relief for $1"],
+        [/^Missão diplomática para os (.+)$/, "Diplomatic Mission to the $1"],
+        [/^Recolhimento de ativo militar: frota "(.*)"$/, 'Military Asset Recall: fleet "$1"'],
+
+        [/^O Congresso declarou guerra contra (.+): as frotas da Freedom Authority podem atacá-lo\.$/,
+            "Congress has declared war on $1: Freedom Authority fleets may attack it."],
+        [/^Ajuda econômica para (.+): estabilidade \+10\.$/, "Economic relief for $1: stability +10."],
+        [/^Enviados à (.+): as relações melhoram\.$/, "Envoys sent to the $1: relations improve."],
+        [/^A frota "(.*)" foi desativada: 500 créditos de sucata\.$/, 'The fleet "$1" is decommissioned: 500 credits of salvage.'],
+        [/^O Congresso aprovou, mas a Autoridade não conseguiu pagar ([0-9]+) créditos\.$/,
+            "Congress approved, but the Authority could not pay $1 credits."],
+
+        /* these carry a proposal title inside, already stored in Portuguese:
+           the quoted part is translated back as well */
+        [/^PROPOSTA: (.+) leva "(.*)" ao Congresso\.$/, function (all, who, title) {
+            return 'PROPOSAL: ' + who + ' puts "' + (lookupServer(title) || title) + '" before Congress.';
+        }],
+        [/^PROPOSTA: (.+) propõe "(.*)"\.$/, function (all, who, title) {
+            return 'PROPOSAL: ' + who + ' propose "' + (lookupServer(title) || title) + '".';
+        }],
+        [/^(APROVADA|REJEITADA|SEM FUNDOS): "(.*)" \(([0-9]+) sim, ([0-9]+) não, ([0-9]+) abstenções; ([0-9]+) necessários\)\.? ?(.*)$/,
+            function (all, verdict, title, yes, no, abstain, need, effect) {
+                const word = verdict === "APROVADA" ? "PASSED" : verdict === "REJEITADA" ? "REJECTED" : "NO FUNDS";
+                return word + ': "' + (lookupServer(title) || title) + '" (' + yes + " yes, " + no + " no, " + abstain +
+                    " abstain; " + need + " needed). " + (lookupServer(effect) || effect);
+            }],
+        [/^ESCÂNDALO: o delegado (.*) foi flagrado em corrupção e removido\. (.*) assume a cadeira\.$/,
+            "SCANDAL: delegate $1 exposed for corruption and removed. $2 takes the seat."],
+        [/^ESCÂNDALO: uma rede de subornos foi exposta\. (.*) é removido, (.*) assume a cadeira\.$/,
+            "SCANDAL: a bribery network is exposed. $1 is removed, $2 takes the seat."],
+        [/^VETO: o Presidente (.*) veta "(.*)"\.$/, function (all, who, title) {
+            return 'VETO: President ' + who + ' vetoes "' + (lookupServer(title) || title) + '".';
+        }],
+        [/^IMPOSTOS: ([0-9]+) créditos arrecadados dos mundos membros\.$/,
+            "TAXES: $1 credits collected from the member worlds."],
+        [/^CAPTURADO: (.+) cai sob a Freedom Authority e entra em ocupação militar\.$/,
+            "CAPTURED: $1 falls to the Freedom Authority and is placed under military occupation."],
+        [/^PERDIDO: (.+) não está mais sob o controle da Autoridade\. Seus delegados deixam o Congresso\.$/,
+            "LOST: $1 is no longer held by the Authority. Its delegates leave Congress."],
+        [/^OCUPAÇÃO: (.+) avança para (.+)\.$/, "OCCUPATION: $1 advances to $2."],
+        [/^CONGRESSO: (.+) envia um delegado \(([0-9]+) de ([0-9]+) cadeiras\)\.$/,
+            "CONGRESS: $1 sends a delegate ($2 of $3 seats)."],
+        [/^O Congresso se reúne: ([0-9]+) delegados de ([0-9]+) áreas em ([0-9]+) regiões\.$/,
+            "Congress convenes: $1 delegates from $2 areas in $3 regions."],
+
+        [/^ELEIÇÃO: (.*) é eleito Presidente da Freedom Authority \((.*)\)\. ?(.*)$/,
+            "ELECTION: $1 is elected President of the Freedom Authority ($2). $3"],
+        [/^ELEIÇÃO: /, "ELECTION: "],
+        [/^(.+) declara candidatura à Presidência\.$/, "$1 declares for President."],
+        [/^(.+) entra em (The Old Guard|The Greens|Progressives|Independents)\.$/, "$1 joins $2."],
+
+        /* propaganda (2026-10-27) */
+        [/^PROPAGANDA: a campanha pela (.+) custou ([0-9]+) créditos e subiu a lealdade dos seus delegados em ([0-9]+) pontos\.$/,
+            "PROPAGANDA: the campaign for $1 cost $2 credits and lifted the loyalty of its delegates by $3 points."],
+        [/^PROPAGANDA: a campanha pela (.+) custou ([0-9]+) créditos e subiu a lealdade dos seus delegados em ([0-9]+) pontos; ([0-9]+) delegado\(s\) passaram-se para ela: (.*)\.$/,
+            "PROPAGANDA: the campaign for $1 cost $2 credits and lifted the loyalty of its delegates by $3 points; $4 delegate(s) crossed over to it: $5."],
+
+        [/^O assalto a (.+) teve sucesso\.$/, "The assault on $1 succeeded."],
+        [/^O assalto a (.+) foi repelido\.$/, "The assault on $1 was repelled."]
+    ];
+
     function normalize(text) {
         let s = String(text);
         for (const k in ENTITIES) {
@@ -529,11 +668,25 @@
         return s.replace(/\s+/g, " ").trim();
     }
 
+    /* the same table the other way round, so a sentence the server stored in
+       English (an older row, or a new one whose Portuguese rule has not been
+       written yet) is still shown in Portuguese */
+    const SERVER_PT = {};
+    for (const ptWord in SERVER) {
+        if (!Object.prototype.hasOwnProperty.call(SERVER_PT, SERVER[ptWord])) {
+            SERVER_PT[SERVER[ptWord]] = ptWord;
+        }
+    }
+
+    /* which direction the page is being translated in, set by start() */
+    let activeLookup = null;
+
     function lookup(raw) {
         const core = normalize(raw);
         if (!core || !/[A-Za-zÀ-ÿ]{2}/.test(core)) { return null; }
         if (PROTECTED.test(core)) { return null; }
         if (Object.prototype.hasOwnProperty.call(DICT, core)) { return DICT[core]; }
+        if (Object.prototype.hasOwnProperty.call(SERVER_PT, core)) { return SERVER_PT[core]; }
 
         for (let i = 0; i < PREFIX.length; i++) {
             const en = PREFIX[i][0];
@@ -552,12 +705,27 @@
         return null;
     }
 
+    /* the same sentences coming back out of the database */
+    function lookupServer(raw) {
+        const core = normalize(raw);
+        if (!core || !/[A-Za-z\u00c0-\u00ff]{2}/.test(core)) { return null; }
+        if (PROTECTED.test(core)) { return null; }
+        if (Object.prototype.hasOwnProperty.call(SERVER, core)) { return SERVER[core]; }
+
+        for (let i = 0; i < SERVER_RULES.length; i++) {
+            const rule = SERVER_RULES[i];
+            if (rule[0].test(core)) { return core.replace(rule[0], rule[1]); }
+        }
+
+        return null;
+    }
+
     function translateTextNode(node) {
         const raw = node.nodeValue;
         if (!raw || raw.length > 400) { return; }
         const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(raw);
         if (!m || !m[2]) { return; }
-        const out = lookup(m[2]);
+        const out = (activeLookup || lookup)(m[2]);
         if (out === null) { return; }
         node.nodeValue = m[1] + out + m[3];
     }
@@ -574,12 +742,12 @@
             const a = ATTRS[i];
             if (!el.hasAttribute(a)) { continue; }
             const cur = el.getAttribute(a);
-            const out = lookup(cur);
+            const out = (activeLookup || lookup)(cur);
             if (out !== null) { el.setAttribute(a, out); }
         }
 
         if (tag === "INPUT" && (el.type === "button" || el.type === "submit" || el.type === "reset")) {
-            const out = lookup(el.value);
+            const out = (activeLookup || lookup)(el.value);
             if (out !== null) { el.value = out; }
         }
     }
@@ -644,24 +812,9 @@
     }
 
 
-    function start() {
-
-        markLanguageButtons();
-
-        /* English: the pages are written in English, so nothing is replaced */
-        if (currentLanguage() === "en") {
-            document.documentElement.lang = "en";
-            return;
-        }
-
-        document.documentElement.lang = "pt-BR";
-
-        if (document.title) {
-            const title = lookup(document.title);
-            if (title !== null) { document.title = title; }
-        }
-
-        translateTree(document.body);
+    /* everything created later (panels, toasts, logs, server text) is
+       translated as it appears, in whichever direction is active */
+    function observe() {
 
         if (typeof MutationObserver !== "function") { return; }
 
@@ -702,6 +855,41 @@
         });
     }
 
+
+    function start() {
+
+        markLanguageButtons();
+
+        /* English: the pages are written in English and are left alone, but
+           everything the database writes arrives in Portuguese, so that is
+           translated back to English */
+        if (currentLanguage() === "en") {
+
+            document.documentElement.lang = "en";
+            activeLookup = lookupServer;
+
+            if (document.title) {
+                const title = lookupServer(document.title);
+                if (title !== null) { document.title = title; }
+            }
+
+            translateTree(document.body);
+            observe();
+            return;
+        }
+
+        document.documentElement.lang = "pt-BR";
+        activeLookup = lookup;
+
+        if (document.title) {
+            const title = lookup(document.title);
+            if (title !== null) { document.title = title; }
+        }
+
+        translateTree(document.body);
+        observe();
+    }
+
     /* the ENG / PT buttons: remember the choice and redraw the page in it */
     window.currentLanguage = currentLanguage;
 
@@ -713,7 +901,7 @@
 
     /* exposed for code that wants to translate a string directly */
     window.t = function (text) {
-        const out = lookup(text);
+        const out = (activeLookup || lookup)(text);
         return out === null ? text : out;
     };
     window.PT = DICT;
