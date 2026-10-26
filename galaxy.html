@@ -22,7 +22,7 @@
     ></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=24"></script>
+    <script src="i18n.js?v=25"></script>
         <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js?v=23"></script>
     <script src="ships.js"></script>
@@ -1793,6 +1793,59 @@ function isUsableFleet(f) {
     return !(f.player_id === playerID && f.faction && f.faction !== playerFaction);
 }
 
+
+/* =========================================
+   THE FOG OF WAR
+   An enemy fleet is drawn only while one of our own fleets or
+   worlds is within sensor range of it. Everything else is fog:
+   no marker, no label, no ghost. The server keeps the same rule
+   in visible_enemy_fleets(); this copy is here so the map never
+   depends on a database round trip to draw correctly.
+========================================= */
+const SENSOR_RANGE = 12;   /* per cent of the map */
+
+function sensorAnchors() {
+
+    const points = [];
+
+    for (const fleet of fleets) {
+
+        if (fleet.faction && fleet.faction !== playerFaction && fleet.player_id !== playerID) { continue; }
+
+        const at = getFleetPosition(fleet);
+
+        if (at && isFinite(at[0]) && isFinite(at[1])) { points.push(at); }
+
+    }
+
+    document.querySelectorAll(".planet").forEach(function (el) {
+
+        if ((el.dataset.owner || "").trim() === playerFaction) {
+            points.push(getPlanetPosition(el.dataset.name));
+        }
+
+    });
+
+    return points;
+
+}
+
+function fleetInSensorRange(fleet, anchors) {
+
+    if (!fleet.faction || fleet.faction === playerFaction || fleet.player_id === playerID) { return true; }
+
+    const at = getFleetPosition(fleet);
+
+    if (!at || !isFinite(at[0]) || !isFinite(at[1])) { return false; }
+
+    for (const a of anchors) {
+        if (Math.hypot(a[0] - at[0], a[1] - at[1]) <= SENSOR_RANGE) { return true; }
+    }
+
+    return false;
+
+}
+
 async function loadFleets() {
 
     /* move finished recruits into their fleets */
@@ -1884,20 +1937,38 @@ async function loadFleets() {
 
     }
 
-    /* enemy fleets close enough to one of ours (or to our planets) are visible */
+    /*
+       The fog, decided here first: every fleet of another faction is dropped
+       unless one of our own fleets or worlds is close enough to see it. This
+       is a filter, never a wipe - our own ships and allies always stay.
+    */
+    {
+        const anchors = sensorAnchors();
+
+        fleets = fleets.filter(f => isUsableFleet(f) && fleetInSensorRange(f, anchors));
+    }
+
+    /* and whatever the server's own reading can see is added on top */
     try {
 
         const seen = await supabaseClient.rpc("visible_enemy_fleets");
 
         if (!seen.error && Array.isArray(seen.data)) {
 
-            /* nothing of another faction is shown unless the server says it is within sensor range */
-            fleets = fleets.filter(f => f.player_id === playerID || !f.faction || f.faction === playerFaction);
-
             const known = new Set(fleets.map(f => String(f.id)));
 
             for (const f of seen.data) {
-                if (!known.has(String(f.id))) { fleets.push(f); }
+
+                if (known.has(String(f.id))) { continue; }
+                if (!f || !f.faction || f.faction === playerFaction) { continue; }
+
+                const at = getFleetPosition(f);
+
+                if (!at || !isFinite(at[0]) || !isFinite(at[1])) { continue; }
+
+                fleets.push(f);
+                known.add(String(f.id));
+
             }
 
         }
@@ -2092,14 +2163,17 @@ const orbitSlots = {};
     }
 
 
+    const enemiesInSight = fleets.filter(f => f.faction && f.faction !== playerFaction).length;
+
+    /* the reading is built here, so it is translated here too: the page's
+       translator only sees complete text nodes */
+    const tp = (typeof window.t === "function") ? window.t : function (s) { return s; };
+
     fleetStatusDisplay.textContent =
-        activeCount +
-        " ACTIVE FLEET" +
-        (
-            activeCount === 1
-            ? ""
-            : "S"
-        );
+        activeCount + " " + tp(activeCount === 1 ? "ACTIVE FLEET" : "ACTIVE FLEETS") +
+        " · " + (enemiesInSight
+            ? enemiesInSight + " " + tp(enemiesInSight === 1 ? "ENEMY IN SENSOR RANGE" : "ENEMIES IN SENSOR RANGE")
+            : tp("NO ENEMY IN SENSOR RANGE"));
 
 }
 
@@ -3587,6 +3661,11 @@ const SECTOR_STRENGTH = {
     "Independents": 0.5
 };
 
+/* the side across the war */
+function otherFaction() {
+    return playerFaction === "Combine" ? "Freedom Authority" : "Combine";
+}
+
 function drawSectors() {
 
     const map = document.getElementById("galaxy-map");
@@ -3613,19 +3692,38 @@ function drawSectors() {
        offset by it — otherwise the sectors drift up away from the planets */
     const layer = document.getElementById("planet-layer");
     const band = layer ? layer.offsetTop : 0;
-    const worldH = layer ? layer.offsetHeight : H;
+    const worldH = layer ? layer.offsetHeight : H;        const planets = Array.from(document.querySelectorAll(".planet")).map(function(el) {
+            const pos = getPlanetPosition(el.dataset.name);
+            const owner = (el.dataset.owner || "").trim();
+            const war = el.classList.contains("war");
 
-    const planets = Array.from(document.querySelectorAll(".planet")).map(function(el) {
-        const pos = getPlanetPosition(el.dataset.name);
-        const owner = (el.dataset.owner || "").trim();
-        const war = el.classList.contains("war");
-        return {
-            x: pos[0] / 100 * W / S,
-            y: (band + pos[1] / 100 * worldH) / S,
-            rgb: war ? [235, 95, 35] : (SECTOR_RGB[owner] || SECTOR_RGB.Independents),
-            k: war ? 1.0 : (SECTOR_STRENGTH[owner] ?? SECTOR_STRENGTH.Independents)
-        };
-    });
+            let rgb = war ? [235, 95, 35] : (SECTOR_RGB[owner] || SECTOR_RGB.Independents);
+            let k = war ? 1.0 : (SECTOR_STRENGTH[owner] ?? SECTOR_STRENGTH.Independents);
+
+            /* an independent world takes on the colour of the side it leans
+               to as the friendship deepens: a quarter, half, three quarters,
+               or the whole colour once it is a satellite */
+            const lean = Math.max(0, Math.min(1, Number(el.dataset.leaned || 0)));
+            const patron = el.dataset.patron === "me" ? playerFaction
+                         : (el.dataset.patron === "them" ? otherFaction() : "");
+
+            if (!war && lean > 0 && patron && SECTOR_RGB[patron]) {
+                const target = SECTOR_RGB[patron];
+                rgb = [
+                    rgb[0] + (target[0] - rgb[0]) * lean,
+                    rgb[1] + (target[1] - rgb[1]) * lean,
+                    rgb[2] + (target[2] - rgb[2]) * lean
+                ];
+                k = Math.max(k, 0.45 + 0.55 * lean);
+            }
+
+            return {
+                x: pos[0] / 100 * W / S,
+                y: (band + pos[1] / 100 * worldH) / S,
+                rgb: rgb,
+                k: k
+            };
+        });
 
     const R = 0.095 * W / S;
 
@@ -3767,7 +3865,10 @@ supabaseClient
         "#dip-tab .dip-bar{height:7px;background:#10202c;margin:5px 0;}" +
         "#dip-tab .dip-bar > i{display:block;height:100%;background:#4cc2ff;}" +
         "#dip-tab .dip-world{border-top:1px solid #1f3354;padding-top:8px;margin-top:10px;}" +
-        "#dip-tab .dip-msg{color:#ffd27a;min-height:18px;margin:6px 0 0;}";
+        "#dip-tab .dip-msg{color:#ffd27a;min-height:18px;margin:6px 0 0;}" +
+        "#dip-tab .dip-lvl{display:inline-block;margin-left:8px;padding:2px 8px;font:bold 10px Arial;" +
+        "letter-spacing:2px;color:#fff;border:1px solid rgba(255,255,255,.35);vertical-align:middle;}" +
+        "#dip-tab .dip-lean{letter-spacing:1px;}";
     document.head.appendChild(style);
 
     const openBtn = document.createElement("button");
@@ -3799,11 +3900,14 @@ supabaseClient
         cfErr = b.error ? b.error.message : null;
         stamp = performance.now();
 
+        /* every world on the map takes the colour of the side it leans to */
+        paintMap();
+
         if (opened) { render(); }
 
     }
 
-    async function act(call) {
+    async function act(call, done) {
 
         if (busy) { return; }
         busy = true;
@@ -3812,6 +3916,7 @@ supabaseClient
         try {
             const r = await call();
             if (r && r.error) { msg = r.error.message; }
+            else if (done && r) { msg = done(r.data); }
         }
         catch (e) { msg = String((e && e.message) || e); }
 
@@ -3893,6 +3998,116 @@ supabaseClient
 
     }
 
+    const LEVELS = {
+        neutral: "NEUTRAL",
+        friendly: "FRIENDLY",
+        allied: "ALLIED",
+        satellite: "SATELLITE",
+        integrated: "INTEGRATED"
+    };
+
+    function rgbOf(name) {
+        return name === "Combine" ? "213,43,43"
+             : (name === "Freedom Authority" ? "52,124,255" : "170,175,190");
+    }
+
+    function otherSide() {
+        return playerFaction === "Combine" ? "Freedom Authority" : "Combine";
+    }
+
+    /* what the dirty tricks cost and who may try them; an older database
+       without them simply hides the two buttons */
+    function prices() { return ov.prices || null; }
+    function minimums() { return ov.minimums || { rebel: 10, coup: 40 }; }
+
+    function paintMap() {
+
+        document.querySelectorAll(".planet").forEach(function (el) {
+            el.dataset.leaned = "0";
+            el.dataset.patron = "";
+        });
+
+        if (ov && Array.isArray(ov.planets)) {
+
+            const byName = {};
+
+            for (const p of ov.planets) { byName[p.planet] = p; }
+
+            document.querySelectorAll(".planet").forEach(function (el) {
+
+                const p = byName[el.dataset.name];
+                if (!p) { return; }
+
+                el.dataset.leaned = String(Math.max(0, Math.min(1, Number(p.leaned) || 0)));
+                el.dataset.patron = p.patron || "";
+
+            });
+
+        }
+
+        if (typeof drawSectors === "function") { drawSectors(); }
+
+    }
+
+    function worldRow(p) {
+
+        const mine = Number(p.relation) || 0;
+        const tint = Math.max(0, Math.min(1, Number(p.tint) || 0));
+        const rgb = rgbOf(playerFaction);
+        const theirs = rgbOf(otherSide());
+        const locked = Number(p.locked) > 0 ? Number(p.locked) : 0;
+        const trick = prices();
+
+        const lean = p.patron === "me"
+            ? T("it leans to your side")
+            : (p.patron === "them" ? T("it leans to the other side") : T("it leans nowhere yet"));
+
+        let acts = '<button class="dip-btn dip-envoy" type="button" data-p="' + esc(p.planet) + '"' +
+            (Number(p.wait) > 0 || locked > 0 ? " disabled" : "") + '>' +
+            esc(T("SEND ENVOYS")) + ' (' + ov.cost + ')</button>';
+
+        if (trick && !locked) {
+
+            acts += '<button class="dip-btn dip-arm" type="button" data-p="' + esc(p.planet) + '"' +
+                (Number(p.armed) > 0 || mine < Number(minimums().rebel) ? " disabled" : "") + '>' +
+                esc(T("ARM THE REBELS")) + ' (' + trick.rebel + ' &middot; ' + p.rebel_odds + '%)</button>';
+
+            acts += '<button class="dip-btn dip-coup" type="button" data-p="' + esc(p.planet) + '"' +
+                (Number(p.couped) > 0 || mine < Number(minimums().coup) ? " disabled" : "") + '>' +
+                esc(T("OVERTHROW THE GOVERNMENT")) + ' (' + trick.coup + ' &middot; ' + p.coup_odds + '%)</button>';
+
+        }
+
+        let timer = "";
+
+        if (locked > 0) {
+            timer = esc(T("The government will not receive you for")) + ' <b data-dip-lock="' + locked + '">' +
+                mmss(locked) + '</b>';
+        }
+        else if (Number(p.wait) > 0) {
+            timer = esc(T("the court will see you again in")) + ' <b data-dip-wait="' + Number(p.wait) + '">' +
+                mmss(Number(p.wait)) + '</b>';
+        }
+
+        return '<div class="dip-world">' +
+            '<div><b style="font-size:14px">' + esc(p.planet) + '</b>' +
+            '<span class="dip-lvl" style="background:rgba(' + rgb + ',' + (0.16 + 0.55 * tint).toFixed(2) + ')">' +
+            esc(T(LEVELS[p.level] || "NEUTRAL")) + '</span>' +
+            '<span class="dip-sub"> ' + esc(T("the other side is at")) + ' ' +
+            (Number(p.theirs) || 0) + ' (' + esc(T(LEVELS[p.theirs_level] || "NEUTRAL")) + ')</span></div>' +
+            '<div class="dip-bar"><i style="width:' + Math.max(0, Math.min(100, mine)) +
+            '%;background:rgba(' + rgb + ',0.95)"></i></div>' +
+            '<div class="dip-sub">' + esc(T("relations")) + ' <b>' + mine + '</b> / 100 &middot; ' +
+            esc(T("next stage at")) + ' <b>' + p.next + '</b> &middot; ' +
+            esc(T("envoys sent")) + ' ' + p.envoys + ' &middot; ' +
+            esc(T("one send per world every five minutes")) + '</div>' +
+            '<div class="dip-sub dip-lean" style="color:rgba(' + theirs + ',0.95)">' + esc(lean) + '</div>' +
+            '<div class="dip-row">' + acts + '</div>' +
+            (timer ? '<div class="dip-sub">' + timer + '</div>' : "") +
+            '</div>';
+
+    }
+
     function embassyCard() {
 
         if (ov === null) {
@@ -3902,28 +4117,21 @@ supabaseClient
         }
 
         let body = '<div class="dip-sub">' + esc(T(playerFaction === "Combine"
-            ? "The Independents are not a faction any more: every independent world is its own partner. Send envoys until the reading reaches 100 and the world signs the pact and joins the Union without a single shot."
-            : "The Independents are not a faction any more: every independent world is its own partner. Send envoys until the reading reaches 100 and the world signs the pact and joins the Freedom Authority without a single shot.")) + '</div>';
+            ? "The Independents are not a faction any more: every independent world is its own partner. Envoys raise its standing with you, stage by stage — friendly at 25, allied at 50, a satellite at 75 — until at 100 it is integrated and joins the Union. Or you can lean on it: arm its rebels, or throw its government out."
+            : "The Independents are not a faction any more: every independent world is its own partner. Envoys raise its standing with you, stage by stage — friendly at 25, allied at 50, a satellite at 75 — until at 100 it is integrated and joins the Freedom Authority. Or you can lean on it: arm its rebels, or throw its government out.")) + '</div>';
 
         body += '<div class="dip-sub">' + esc(T("Treasury:")) + ' <b>' + Number(ov.credits || 0).toLocaleString() + '</b> &middot; ' +
             esc(T("an embassy costs")) + ' <b>' + ov.cost + '</b> ' + esc(T("CREDITS")) + ' &middot; ' +
             esc(T("one send per world every five minutes")) + '</div>';
 
-        const theirs = playerFaction === "Combine" ? "the Freedom Authority is at" : "the Combine is at";
+        if (prices()) {
+            body += '<div class="dip-sub">' + esc(T("ARM THE REBELS")) + ' <b>' + prices().rebel + '</b> &middot; ' +
+                esc(T("OVERTHROW THE GOVERNMENT")) + ' <b>' + prices().coup + '</b> &middot; ' +
+                esc(T("both can fail, and a failed coup hands the world to the other side")) + '</div>';
+        }
 
-        body += (ov.planets || []).map(function (p) {
-
-            return '<div class="dip-world">' +
-                '<div><b style="font-size:14px">' + esc(p.planet) + '</b> ' +
-                '<span class="dip-sub">' + esc(T(theirs)) + ' ' + (p.theirs || 0) + '</span></div>' +
-                '<div class="dip-bar"><i style="width:' + Math.max(0, Math.min(100, p.relation)) + '%"></i></div>' +
-                '<div class="dip-sub">' + esc(T("relations")) + ' ' + p.relation + ' / 100 &middot; ' +
-                esc(T("envoys sent")) + ' ' + p.envoys + ' &middot; ' + esc(T("the world signs the pact at 100")) +
-                (p.wait > 0 ? ' &middot; ' + esc(T("the court will see you again in")) + ' <b data-dip-wait="' + p.wait + '">' + mmss(p.wait) + '</b>' : "") + '</div>' +
-                '<div class="dip-row"><button class="dip-btn dip-envoy" type="button" data-p="' + esc(p.planet) + '"' +
-                (p.wait > 0 ? " disabled" : "") + '>' + esc(T("SEND ENVOYS")) + ' (' + ov.cost + ' ' + esc(T("CREDITS")) + ')</button></div></div>';
-
-        }).join("") || '<div class="dip-sub">' + esc(T("No independent world is left: every one of them answers to somebody now.")) + '</div>';
+        body += (ov.planets || []).map(worldRow).join("") ||
+            '<div class="dip-sub">' + esc(T("No independent world is left: every one of them answers to somebody now.")) + '</div>';
 
         return card(T("INDEPENDENT WORLDS"), body);
 
@@ -3983,22 +4191,56 @@ supabaseClient
         }
 
         tab.querySelectorAll(".dip-envoy").forEach(function (el) {
-            el.addEventListener("click", async function () {
-
+            el.addEventListener("click", function () {
                 el.disabled = true;
-                msg = "";
-
-                const { data, error } = await supabaseClient.rpc("send_envoy", { p_planet: el.dataset.p });
-
-                if (error) { msg = error.message; }
-                else {
-                    msg = el.dataset.p + (data && data.annexed
+                const planet = el.dataset.p;
+                act(function () {
+                    return supabaseClient.rpc("send_envoy", { p_planet: planet });
+                }, function (data) {
+                    return planet + (data && data.annexed
                         ? " — " + T("signed the pact.")
-                        : " — " + T("relations") + " " + data.relation + "/100.");
+                        : " — " + T("relations") + " " + data.relation + "/100 (" +
+                          T(LEVELS[data.level] || "NEUTRAL") + ").");
+                });
+            });
+        });
+
+        tab.querySelectorAll(".dip-arm").forEach(function (el) {
+            el.addEventListener("click", function () {
+                el.disabled = true;
+                const planet = el.dataset.p;
+                act(function () {
+                    return supabaseClient.rpc("arm_rebels", { p_planet: planet });
+                }, function (data) {
+                    return planet + " — " + T(data.success
+                        ? "the rebels are armed"
+                        : "the arms were intercepted") + " · " +
+                        T("yours") + " " + data.relation + "/100 (" + T(LEVELS[data.level] || "NEUTRAL") + ")" +
+                        " · " + T("theirs") + " " + data.theirs + "/100.";
+                });
+            });
+        });
+
+        tab.querySelectorAll(".dip-coup").forEach(function (el) {
+            el.addEventListener("click", function () {
+
+                /* a coup is the whole world in one throw: make them mean it */
+                if (!window.confirm(T("Throw the government of ") + el.dataset.p + T(" out? If it fails, the world swings to the other side."))) {
+                    return;
                 }
 
-                await refresh();
+                el.disabled = true;
+                const planet = el.dataset.p;
 
+                act(function () {
+                    return supabaseClient.rpc("overthrow_government", { p_planet: planet });
+                }, function (data) {
+                    return planet + " — " + T(data.success
+                        ? "the government has fallen: the world is integrated"
+                        : "the coup failed: the world swings to the other side") + " · " +
+                        T("yours") + " " + data.relation + "/100 · " +
+                        T("theirs") + " " + data.theirs + "/100.";
+                });
             });
         });
 
@@ -4039,6 +4281,10 @@ supabaseClient
             el.textContent = mmss(left(Number(el.dataset.dipWait)));
         });
 
+        tab.querySelectorAll("[data-dip-lock]").forEach(function (el) {
+            el.textContent = mmss(left(Number(el.dataset.dipLock)));
+        });
+
         /* a clock ran out: take the book out of the database once more */
         const done = Array.prototype.some.call(tab.querySelectorAll("[data-dip-cd]"), function (el) {
             return el.textContent === "0:00";
@@ -4054,6 +4300,375 @@ supabaseClient
     setInterval(function () {
         if (opened && tab.classList.contains("on")) { refresh(); }
     }, 20000);
+
+    /* the map paints itself from this reading, so it is taken even when the
+       tab has never been opened */
+    refresh();
+    setInterval(refresh, 30000);
+
+})();
+
+</script>
+
+
+
+
+<script>
+
+/* =========================================================
+   SUPPLY LINES — the money has to travel. A world you hold
+   whole pays into the treasury only through a line to the
+   capital, and an enemy fleet in orbit of the world, in orbit
+   of the capital, or anywhere across the corridor between them
+   cuts it. The lines are drawn on the map itself.
+========================================================= */
+(function () {
+
+    "use strict";
+
+    if (playerFaction !== "Freedom Authority" && playerFaction !== "Combine") { return; }
+
+    const T = s => (typeof window.t === "function" ? window.t(s) : s);
+    const esc = escapeHTML;
+    const mmss = s => Math.floor(Math.max(0, s) / 60) + ":" + String(Math.max(0, s) % 60).padStart(2, "0");
+
+    const rgbOf = name => name === "Combine" ? "213,43,43"
+        : (name === "Freedom Authority" ? "52,124,255" : "170,175,190");
+
+    let st = null, stErr = null, msg = "", busy = false, opened = false;
+
+    const style = document.createElement("style");
+    style.textContent =
+        "#sup-open{position:fixed;top:176px;right:20px;z-index:60;padding:12px 26px;background:#0b1a2e;color:#cfe3ff;" +
+        "border:1px solid #3b6fd0;font:bold 13px Arial;letter-spacing:3px;cursor:pointer;}" +
+        "#sup-open:hover{background:#152c4d;}" +
+        "#sup-tab{position:fixed;inset:0;z-index:80;display:none;overflow:auto;padding:26px 34px 70px;" +
+        "background:radial-gradient(circle at 50% 0%,#0a1830 0%,#04080f 70%);color:#cfe6f0;font:13px Arial,sans-serif;}" +
+        "#sup-tab.on{display:block;}" +
+        "#sup-tab h2{font:bold 26px Arial;letter-spacing:6px;color:#fff;margin:0 0 4px;}" +
+        "#sup-tab .sup-top{display:flex;align-items:flex-start;gap:16px;max-width:900px;}" +
+        "#sup-tab .sup-close{margin-left:auto;background:#0c1a28;color:#e6f6ff;border:1px solid #4fb8d8;" +
+        "padding:8px 14px;font:bold 11px Arial;letter-spacing:2px;cursor:pointer;}" +
+        "#sup-tab .sup-card{background:rgba(4,12,22,.9);border:1px solid rgba(127,220,255,.35);padding:14px 16px;margin:16px 0;max-width:900px;}" +
+        "#sup-tab .sup-card h3{font:bold 13px Arial;letter-spacing:3px;color:#7fdcff;margin:0 0 8px;}" +
+        "#sup-tab .sup-sub{color:#9fb8c4;margin:4px 0;line-height:1.5;}" +
+        "#sup-tab .sup-line{color:#bcd3de;margin:3px 0;}" +
+        "#sup-tab .sup-row{margin:10px 0 2px;display:flex;gap:8px;flex-wrap:wrap;}" +
+        "#sup-tab .sup-btn{background:#0c1a28;color:#e6f6ff;border:1px solid #4fb8d8;padding:8px 12px;" +
+        "font:bold 11px Arial;letter-spacing:2px;cursor:pointer;}" +
+        "#sup-tab .sup-btn:hover:not(:disabled){background:#17324a;}" +
+        "#sup-tab .sup-btn:disabled{opacity:.45;cursor:default;}" +
+        "#sup-tab .sup-btn.danger{border-color:#d0523f;color:#ffb9a8;}" +
+        "#sup-tab .sup-world{border-top:1px solid #1f3354;padding-top:8px;margin-top:10px;}" +
+        "#sup-tab .sup-tag{display:inline-block;margin-left:8px;padding:2px 8px;font:bold 10px Arial;letter-spacing:2px;border:1px solid;}" +
+        "#sup-tab .sup-tag.ok{color:#8dffb0;border-color:#2f9d55;}" +
+        "#sup-tab .sup-tag.cut{color:#ff9c8a;border-color:#c33b28;}" +
+        "#sup-tab .sup-tag.none{color:#9fb8c4;border-color:#54687c;}" +
+        "#sup-tab .sup-tag.cap{color:#ffd27a;border-color:#b58a2c;}" +
+        "#sup-tab .sup-msg{color:#ffd27a;min-height:18px;margin:6px 0 0;}" +
+        "#supply-canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0;}";
+    document.head.appendChild(style);
+
+    const openBtn = document.createElement("button");
+    openBtn.id = "sup-open";
+    openBtn.type = "button";
+    openBtn.textContent = "SUPPLY LINES";
+    document.body.appendChild(openBtn);
+
+    const tab = document.createElement("div");
+    tab.id = "sup-tab";
+    document.body.appendChild(tab);
+
+    /* ---------- the lines on the map ---------- */
+    function canvasEl() {
+
+        const layer = document.getElementById("planet-layer");
+        if (!layer) { return null; }
+
+        let c = document.getElementById("supply-canvas");
+
+        if (!c) {
+            c = document.createElement("canvas");
+            c.id = "supply-canvas";
+            layer.insertBefore(c, layer.firstChild);
+        }
+
+        return c;
+    }
+
+    function draw() {
+
+        const layer = document.getElementById("planet-layer");
+        const c = canvasEl();
+
+        if (!layer || !c) { return; }
+
+        const w = layer.clientWidth;
+        const h = layer.clientHeight;
+
+        if (!w || !h) { return; }
+
+        const dpr = window.devicePixelRatio || 1;
+
+        if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+            c.width = Math.round(w * dpr);
+            c.height = Math.round(h * dpr);
+        }
+
+        const ctx = c.getContext("2d");
+
+        if (!ctx) { return; }
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+
+        if (!st || !Array.isArray(st.worlds)) { return; }
+
+        const cap = st.worlds.find(x => x.capital && x.x != null && x.y != null);
+
+        if (!cap) { return; }
+
+        const cx = cap.x / 100 * w;
+        const cy = cap.y / 100 * h;
+        const rgb = rgbOf(playerFaction);
+
+        for (const p of st.worlds) {
+
+            if (p.capital || !p.line || p.x == null || p.y == null) { continue; }
+
+            const x = p.x / 100 * w;
+            const y = p.y / 100 * h;
+
+            ctx.save();
+            ctx.lineWidth = p.open ? 2 : 2;
+            ctx.strokeStyle = p.open ? "rgba(" + rgb + ",0.55)" : "rgba(255,90,70,0.85)";
+            ctx.setLineDash(p.open ? [] : [7, 6]);
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+
+            /* the world end of the line */
+            ctx.setLineDash([]);
+            ctx.fillStyle = p.open ? "rgba(" + rgb + ",0.9)" : "rgba(255,90,70,0.95)";
+            ctx.beginPath();
+            ctx.arc(x, y, p.open ? 3.5 : 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            /* where the enemy is sitting on it */
+            if (!p.open) {
+
+                for (const b of (p.blockers || [])) {
+
+                    if (b.x == null || b.y == null) { continue; }
+
+                    const bx = Number(b.x) / 100 * w;
+                    const by = Number(b.y) / 100 * h;
+
+                    ctx.save();
+                    ctx.strokeStyle = "rgba(255,120,80,0.95)";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(bx - 4, by - 4); ctx.lineTo(bx + 4, by + 4);
+                    ctx.moveTo(bx + 4, by - 4); ctx.lineTo(bx - 4, by + 4);
+                    ctx.stroke();
+                    ctx.restore();
+
+                }
+
+            }
+
+        }
+
+        /* the capital itself */
+        ctx.save();
+        ctx.strokeStyle = "rgba(" + rgb + ",0.9)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+    }
+
+    window.addEventListener("resize", draw);
+    setInterval(draw, 2000);
+
+    /* ---------- data ---------- */
+    async function refresh() {
+
+        const { data, error } = await supabaseClient.rpc("supply_state");
+
+        st = error ? null : data;
+        stErr = error ? error.message : null;
+
+        draw();
+
+        if (opened) { render(); }
+
+    }
+
+    async function act(planet, call, done) {
+
+        if (busy) { return; }
+        busy = true;
+        msg = "";
+
+        try {
+            const r = await call(planet);
+            if (r && r.error) { msg = r.error.message; }
+            else if (done) { msg = done(r ? r.data : null); }
+        }
+        catch (e) { msg = String((e && e.message) || e); }
+
+        busy = false;
+        await refresh();
+
+    }
+
+    /* ---------- the screen ---------- */
+    const WHY = { orbit: "in orbit of the world", capital: "in orbit of the capital", corridor: "across the corridor" };
+
+    function worldRow(p) {
+
+        const blockers = (p.blockers || []).map(function (b) {
+            return '<div class="sup-line">&#9888; <b>' + esc(b.name || "?") + '</b> — ' + esc(T(b.faction || "")) +
+                ' &middot; ' + esc(T(WHY[b.why] || "")) + '</div>';
+        }).join("");
+
+        let tag;
+        if (p.capital) { tag = '<span class="sup-tag cap">' + esc(T("CAPITAL")) + '</span>'; }
+        else if (!p.line) { tag = '<span class="sup-tag none">' + esc(T("NO LINE")) + '</span>'; }
+        else if (p.open) { tag = '<span class="sup-tag ok">' + esc(T("OPEN")) + '</span>'; }
+        else { tag = '<span class="sup-tag cut">' + esc(T("CUT")) + '</span>'; }
+
+        let acts = "";
+
+        if (!p.capital) {
+
+            if (p.line) {
+                acts = '<button class="sup-btn danger sup-close-line" type="button" data-p="' + esc(p.planet) + '">' +
+                    esc(T("CLOSE THE LINE")) + '</button>';
+            }
+            else {
+                acts = '<button class="sup-btn sup-open-line" type="button" data-p="' + esc(p.planet) + '"' +
+                    (Number(ovCredits()) < Number(st.price) ? " disabled" : "") + '>' +
+                    esc(T("OPEN A LINE")) + ' (' + st.price + ' ' + esc(T("CREDITS")) + ')</button>';
+            }
+
+        }
+
+        return '<div class="sup-world">' +
+            '<div><b style="font-size:14px">' + esc(p.planet) + '</b>' + tag +
+            '<span class="sup-sub"> ' + esc(T("income")) + ' <b>' + Number(p.income || 0) + '</b> ' +
+            esc(T("per payment")) + (p.open ? ' &middot; ' + esc(T("carrying")) : "") + '</span></div>' +
+            blockers +
+            (acts ? '<div class="sup-row">' + acts + '</div>' : "") +
+            '</div>';
+
+    }
+
+    function ovCredits() { return st && st.credits != null ? Number(st.credits) : 0; }
+
+    function render() {
+
+        if (st === null) {
+
+            tab.innerHTML =
+                '<div class="sup-top"><div><h2>' + esc(T("SUPPLY LINES")) + '</h2></div>' +
+                '<button class="sup-close" type="button">' + esc(T("BACK TO THE MAP")) + '</button></div>' +
+                '<div class="sup-card"><h3>' + esc(T("THE LINES")) + '</h3>' +
+                '<div class="sup-sub">' + esc(T("The supply lines arrive with sql/2026-11-03_diplomacy_levels_supply_and_fog.sql. Run it, then reload this page.")) +
+                (stErr ? '<br><br>' + esc(stErr) : "") + '</div></div>';
+
+            wire();
+            return;
+
+        }
+
+        const cut = (st.worlds || []).filter(w => w.line && !w.open).length;
+        const paying = (st.worlds || []).filter(w => w.open).reduce((n, w) => n + Number(w.income || 0), 0);
+
+        let body = '<div class="sup-sub">' + esc(T("Credits only reach the capital along a supply line. Open one from a world you hold whole, and it carries its income to ")) +
+            '<b>' + esc(st.capital || "?") + '</b>. ' +
+            esc(T("An enemy fleet in orbit of the world, in orbit of the capital, or anywhere across the corridor between them cuts the line until it moves on.")) + '</div>';
+
+        body += '<div class="sup-sub">' + esc(T("Treasury:")) + ' <b>' + Number(st.credits || 0).toLocaleString() + '</b> &middot; ' +
+            esc(T("a line costs")) + ' <b>' + st.price + '</b> ' + esc(T("CREDITS")) + ' &middot; ' +
+            esc(T("the corridor is")) + ' <b>' + st.corridor + '</b> ' + esc(T("wide")) + '</div>';
+
+        body += '<div class="sup-sub">' + esc(T("Delivering:")) + ' <b>' + paying + '</b> ' + esc(T("per payment")) +
+            ' &middot; ' + esc(T("lines cut:")) + ' <b>' + cut + '</b></div>';
+
+        body += (st.worlds || []).map(worldRow).join("") ||
+            '<div class="sup-sub">' + esc(T("You hold no world whole yet.")) + '</div>';
+
+        tab.innerHTML =
+            '<div class="sup-top"><div><h2>' + esc(T("SUPPLY LINES")) + '</h2>' +
+            '<div class="sup-sub">' + esc(T("FACTION:")) + ' <b>' + esc(T(playerFaction)) + '</b></div></div>' +
+            '<button class="sup-close" type="button">' + esc(T("BACK TO THE MAP")) + '</button></div>' +
+            '<div class="sup-msg">' + esc(msg) + '</div>' +
+            '<div class="sup-card"><h3>' + esc(T("THE LINES")) + '</h3>' + body + '</div>';
+
+        wire();
+
+    }
+
+    function wire() {
+
+        const close = tab.querySelector(".sup-close");
+        if (close) {
+            close.addEventListener("click", function () {
+                tab.classList.remove("on");
+                opened = false;
+            });
+        }
+
+        tab.querySelectorAll(".sup-open-line").forEach(function (el) {
+            el.addEventListener("click", function () {
+                el.disabled = true;
+                const planet = el.dataset.p;
+                act(planet, function (p) {
+                    return supabaseClient.rpc("open_supply_line", { p_planet: p });
+                }, function (data) {
+                    return planet + " — " + T("line open to") + " " + (data ? data.capital : "?") + ".";
+                });
+            });
+        });
+
+        tab.querySelectorAll(".sup-close-line").forEach(function (el) {
+            el.addEventListener("click", function () {
+                el.disabled = true;
+                const planet = el.dataset.p;
+                act(planet, function (p) {
+                    return supabaseClient.rpc("close_supply_line", { p_planet: p });
+                }, function () {
+                    return planet + " — " + T("line closed.");
+                });
+            });
+        });
+
+    }
+
+    openBtn.addEventListener("click", function () {
+        opened = true;
+        msg = "";
+        tab.classList.add("on");
+        tab.innerHTML = '<div class="sup-sub">' + esc(T("Loading...")) + '</div>';
+        refresh();
+    });
+
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && tab.classList.contains("on")) {
+            tab.classList.remove("on");
+            opened = false;
+        }
+    });
+
+    /* the lines and their cuts are read even when the screen is shut */
+    refresh();
+    setInterval(refresh, 12000);
 
 })();
 

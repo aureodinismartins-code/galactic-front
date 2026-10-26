@@ -888,6 +888,68 @@
         "The embassies arrive with sql/2026-10-31_leaders_parties_and_diplomacy.sql. Run it, then reload this page.":
             "As embaixadas chegam com sql/2026-10-31_leaders_parties_and_diplomacy.sql. Rode o arquivo e recarregue esta página.",
 
+        /* ---------- the stages, the dirty tricks and the supply lines (2026-11-03) ---------- */
+        "NEUTRAL": "NEUTRO",
+        "FRIENDLY": "AMIGÁVEL",
+        "ALLIED": "ALIADO",
+        "SATELLITE": "SATÉLITE",
+        "INTEGRATED": "INTEGRADO",
+        "the other side is at": "o outro lado está em",
+        "next stage at": "próximo nível em",
+        "it leans to your side": "inclina-se para o seu lado",
+        "it leans to the other side": "inclina-se para o outro lado",
+        "it leans nowhere yet": "ainda não se inclina para ninguém",
+        "The Independents are not a faction any more: every independent world is its own partner. Envoys raise its standing with you, stage by stage — friendly at 25, allied at 50, a satellite at 75 — until at 100 it is integrated and joins the Union. Or you can lean on it: arm its rebels, or throw its government out.":
+            "Os Independentes não são mais uma facção: cada mundo independente é um parceiro próprio. Os emissários elevam sua posição com você, nível a nível — amigável aos 25, aliado aos 50, satélite aos 75 — até que aos 100 ele seja integrado e entre na União. Ou você pode pressioná-lo: armar seus rebeldes, ou derrubar seu governo.",
+        "The Independents are not a faction any more: every independent world is its own partner. Envoys raise its standing with you, stage by stage — friendly at 25, allied at 50, a satellite at 75 — until at 100 it is integrated and joins the Freedom Authority. Or you can lean on it: arm its rebels, or throw its government out.":
+            "Os Independentes não são mais uma facção: cada mundo independente é um parceiro próprio. Os emissários elevam sua posição com você, nível a nível — amigável aos 25, aliado aos 50, satélite aos 75 — até que aos 100 ele seja integrado e entre na Freedom Authority. Ou você pode pressioná-lo: armar seus rebeldes, ou derrubar seu governo.",
+        "ARM THE REBELS": "ARMAR OS REBELDES",
+        "OVERTHROW THE GOVERNMENT": "DERRUBAR O GOVERNO",
+        "both can fail, and a failed coup hands the world to the other side":
+            "os dois podem falhar, e um golpe fracassado entrega o mundo ao outro lado",
+        "The government will not receive you for": "O governo não receberá você por mais",
+        "the rebels are armed": "os rebeldes estão armados",
+        "the arms were intercepted": "as armas foram interceptadas",
+        "yours": "seu",
+        "theirs": "deles",
+        "the government has fallen: the world is integrated": "o governo caiu: o mundo está integrado",
+        "the coup failed: the world swings to the other side": "o golpe falhou: o mundo passa para o outro lado",
+        "Throw the government of ": "Derrubar o governo de ",
+        " out? If it fails, the world swings to the other side.": "? Se falhar, o mundo passa para o outro lado.",
+
+        "SUPPLY LINES": "LINHAS DE ABASTECIMENTO",
+        "THE LINES": "AS LINHAS",
+        "CAPITAL": "CAPITAL",
+        "NO LINE": "SEM LINHA",
+        "OPEN": "ABERTA",
+        "CUT": "CORTADA",
+        "CLOSE THE LINE": "FECHAR A LINHA",
+        "OPEN A LINE": "ABRIR UMA LINHA",
+        "income": "receita",
+        "per payment": "por pagamento",
+        "carrying": "a transportar",
+        "a line costs": "uma linha custa",
+        "the corridor is": "o corredor tem",
+        "wide": "de largura",
+        "Delivering:": "Entregando:",
+        "lines cut:": "linhas cortadas:",
+        "You hold no world whole yet.": "Você ainda não controla nenhum mundo por inteiro.",
+        "Credits only reach the capital along a supply line. Open one from a world you hold whole, and it carries its income to ":
+            "Os créditos só chegam à capital por uma linha de abastecimento. Abra uma a partir de um mundo que você controla por inteiro, e ela leva a receita até ",
+        "An enemy fleet in orbit of the world, in orbit of the capital, or anywhere across the corridor between them cuts the line until it moves on.":
+            "Uma frota inimiga em órbita do mundo, em órbita da capital, ou em qualquer ponto do corredor entre eles corta a linha até ela se mover.",
+        "in orbit of the world": "em órbita do mundo",
+        "in orbit of the capital": "em órbita da capital",
+        "across the corridor": "atravessando o corredor",
+        "line open to": "linha aberta até",
+        "line closed.": "linha fechada.",
+        "The supply lines arrive with sql/2026-11-03_diplomacy_levels_supply_and_fog.sql. Run it, then reload this page.":
+            "As linhas de abastecimento chegam com sql/2026-11-03_diplomacy_levels_supply_and_fog.sql. Rode o arquivo e recarregue esta página.",
+        "ACTIVE FLEETS": "FROTAS ATIVAS",
+        "ENEMY IN SENSOR RANGE": "INIMIGO NO ALCANCE DOS SENSORES",
+        "ENEMIES IN SENSOR RANGE": "INIMIGOS NO ALCANCE DOS SENSORES",
+        "NO ENEMY IN SENSOR RANGE": "NENHUM INIMIGO NO ALCANCE DOS SENSORES",
+
         /* ---------- the economy reading and the menu note (2026-10-31) ---------- */
         "IDLE: NOBODY HAS TOUCHED THE GAME, SO THE INCOME IS HALVED":
             "OCIOSO: NINGUÉM TOCOU NO JOGO, ENTÃO A RENDA É PELA METADE",
