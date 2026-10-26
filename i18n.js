@@ -656,21 +656,18 @@
         "hover a world for its stability, its cities and its fleets": "passe o rato num mundo para ver estabilidade, cidades e frotas",
         "1/4 is the stage of a world's administration, not the cities it has":
             "1/4 é a etapa da administração do mundo, não as cidades que ele tem",
-        "A consolidation of this world is before the Soviet.": "Uma consolidação deste mundo está no Soviete.",
-        "PUT A CONSOLIDATION BEFORE THE SOVIET": "LEVAR UMA CONSOLIDAÇÃO AO SOVIETE",
         "Stability is enough: the administration advances one turn every five minutes.":
             "A estabilidade basta: a administração avança um turno a cada cinco minutos.",
-        "Stability is below the threshold: the administration does not advance until it is consolidated.":
-            "A estabilidade está abaixo do limite: a administração não avança até ser consolidada.",
-        "Incorporated into the Union: the plan collects this world and the Party has its confidence.":
-            "Incorporado à União: o plano recolhe deste mundo e o Partido ganha confiança.",
-        "WORLD TO CONSOLIDATE": "MUNDO A CONSOLIDAR",
-        "no world under administration": "nenhum mundo sob administração",
-        "The directive raises that world's stability by 10; the administration stops advancing while it is below the threshold of its stage.":
-            "A diretiva sobe a estabilidade desse mundo em 10; a administração para de avançar enquanto estiver abaixo do limite do estágio.",
-        "Consolidate a World": "Consolidar um Mundo",
-        "Stability +10 for one world under Combine administration: each stage of its administration needs a stability threshold.":
-            "Estabilidade +10 para um mundo sob administração do Combine: cada estágio da administração exige um limite de estabilidade.",
+        "Stability is below the threshold: the administration does not advance until relief is sent.":
+            "A estabilidade está abaixo do limite: a administração não avança enquanto não for enviada ajuda.",
+        "Fully integrated into the Union: the plan collects this world and the Party has its confidence.":
+            "Totalmente integrado à União: o plano recolhe deste mundo e o Partido ganha confiança.",
+        "GRANT RELIEF (+10 stability)": "CONCEDER AJUDA (+10 estabilidade)",
+        "sent again in": "enviada de novo em",
+        "Relief sent to": "Ajuda enviada a",
+        "stability": "estabilidade",
+        "Relief is sent straight to a world under Combine administration — no directive, no vote — for +10 stability, one world every five minutes. The Freedom Authority has to put the same relief before Congress first.":
+            "A ajuda é enviada diretamente a um mundo sob administração do Combine — sem diretiva, sem votação — para +10 de estabilidade, um mundo a cada cinco minutos. A Autoridade da Liberdade tem de levar a mesma ajuda primeiro ao Congresso.",
         "The Combine holds no world yet. Take one with a military campaign (NEW DIRECTIVE), and it is listed here.":
             "O Combine ainda não tomou nenhum mundo. Tome um com uma campanha militar (NOVA DIRETIVA) e ele aparece aqui.",
         "WHOLE": "INTEIRO",

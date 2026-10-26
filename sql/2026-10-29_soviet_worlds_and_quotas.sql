@@ -4,7 +4,7 @@
 -- Run in the Supabase SQL editor AFTER 2026-10-28_combine_soviet.sql.
 -- Safe to run more than once. It can run with maintenance on or off.
 --
--- Three things change:
+-- Four things change:
 --
 --   1. THE FLEET QUOTA IS READABLE. Every approved "cota de nova
 --      frota" directive allows one fleet, so the number of fleets the
@@ -19,8 +19,12 @@
 --      Combine), how much of each it holds, who else holds cities
 --      there, what the world produces, and whether a campaign
 --      against the rest of it is already authorised or before the
---      Soviet. The Congress keeps its own occupation stages; these
---      are the straight facts of the map;
+--      Soviet. A world held whole is administered exactly as the
+--      Freedom Authority administers its own: four stages, five
+--      turns of five minutes each, and a stability threshold for
+--      every stage. The only difference is relief — the Authority
+--      puts a bill before Congress, the Combine sends it directly
+--      (cs_relief, +10 stability, once every five minutes);
 --
 --   3. THE MAP. cs_overview() also returns where every planet sits
 --      (planet_positions, the galaxy's own coordinates), so the screen
@@ -81,6 +85,10 @@ create table if not exists public.cs_occupations (
     created_at timestamptz not null default now(),
     integrated_at timestamptz
 );
+
+/* relief needs no vote here, so it is paced: one send per world every turn */
+alter table public.cs_occupations
+    add column if not exists last_relief_at timestamptz;
 
 alter table public.cs_occupations enable row level security;
 
@@ -199,6 +207,67 @@ begin
         end if;
 
     end loop;
+
+end;
+$function$;
+
+
+/* Relief, without a bill: the Authority puts the same +10 before Congress,
+   the Combine sends it. One world every five minutes, so stability cannot be
+   clicked to the ceiling and the stages keep their pace. */
+create or replace function public.cs_relief(p_planet text)
+returns jsonb
+language plpgsql
+security definer
+set search_path to ''
+as $function$
+declare
+    me uuid := auth.uid();
+    v_faction text;
+    o record;
+    v_wait integer;
+begin
+
+    if me is null then raise exception 'Not authenticated'; end if;
+
+    if not exists (select 1 from public.game_control as x where x.id = 1 and x.started) then
+        raise exception 'The game has not started';
+    end if;
+    if public.game_frozen() then raise exception 'The game is under maintenance'; end if;
+
+    select p.faction into v_faction from public.players as p where p.id = me;
+    if coalesce(v_faction, '') <> 'Combine' then
+        raise exception 'Only Combine players administer its worlds';
+    end if;
+
+    select * into o from public.cs_occupations as x where x.planet = p_planet;
+    if o.planet is null then
+        raise exception 'That world is not under Combine administration';
+    end if;
+    if o.stage >= 3 then
+        raise exception 'That world has already been incorporated into the Union';
+    end if;
+
+    if o.last_relief_at is not null and o.last_relief_at > now() - interval '5 minutes' then
+        v_wait := ceil(extract(epoch from (o.last_relief_at + interval '5 minutes' - now())))::integer;
+        raise exception 'Relief for % can only be sent once every five minutes (% s left)', p_planet, v_wait;
+    end if;
+
+    update public.cs_occupations as x
+    set stability = least(100, x.stability + 10), last_relief_at = now()
+    where x.planet = p_planet;
+
+    perform public.cs_log('AJUDA: ' || p_planet || ' recebeu ajuda económica: estabilidade +10.');
+
+    select * into o from public.cs_occupations as x where x.planet = p_planet;
+
+    return jsonb_build_object(
+        'planet', o.planet,
+        'stability', o.stability,
+        'stage', o.stage,
+        'threshold', public.cs_occupation_threshold(o.stage),
+        'wait', 300
+    );
 
 end;
 $function$;
@@ -448,10 +517,14 @@ begin
                        'stage', o.stage,
                        'stability', o.stability,
                        'progress', o.progress,
+                       'threshold', public.cs_occupation_threshold(o.stage),
                        'integrated', (o.integrated_at is not null),
-                       'consolidating', exists (select 1 from public.cs_directives as d
-                                                where d.dtype = 'consolidation' and d.planet = w.name
-                                                  and d.status in ('introduction', 'debate'))
+                       /* seconds until this world may receive relief again */
+                       'relief_wait', case
+                           when o.last_relief_at is null then 0
+                           else greatest(0, ceil(extract(epoch from
+                                  (o.last_relief_at + interval '5 minutes' - now())))::integer)
+                       end
                    ) order by w.whole desc, w.name)
             from (
                 select p.name,
@@ -674,21 +747,23 @@ begin
 
         else
 
-            /* a world whose administration has stalled: the Party asks for
-               stability to push it to the next stage */
+            /* a world whose administration has stalled: the Party sends the
+               relief itself, the way a delegate would put it to Congress —
+               the Combine does not need a directive for it */
             select o.planet into v_planet
             from public.cs_occupations as o
             where o.stage < 3
               and o.stability < public.cs_occupation_threshold(o.stage)
-              and not exists (select 1 from public.cs_directives as d
-                              where d.dtype = 'consolidation' and d.planet = o.planet
-                                and d.status in ('introduction', 'debate'))
+              and (o.last_relief_at is null or o.last_relief_at <= now() - interval '5 minutes')
             order by o.stage desc, random()
             limit 1;
 
             if v_planet is not null then
-                v_ok := true; v_type := 'consolidation'; v_current := 2;
-                v_title := 'Consolidar a administração de ' || v_planet;
+                update public.cs_occupations as o
+                set stability = least(100, o.stability + 10), last_relief_at = now()
+                where o.planet = v_planet;
+                perform public.cs_log('AJUDA: o Partido envia ajuda económica a ' || v_planet || ': estabilidade +10.');
+                return;
             end if;
 
         end if;
@@ -745,7 +820,7 @@ begin
     end if;
 
     if p_type not in ('military_campaign', 'fleet_construction', 'knightmare_construction',
-                      'production_quota', 'diplomacy', 'fleet_revocation', 'consolidation') then
+                      'production_quota', 'diplomacy', 'fleet_revocation') then
         raise exception 'Unknown directive';
     end if;
 
@@ -796,19 +871,6 @@ begin
         end if;
     end if;
 
-    if p_type = 'consolidation' then
-        if coalesce(p_planet, '') = '' then raise exception 'Choose a world to consolidate'; end if;
-        if not exists (select 1 from public.cs_occupations as o
-                       where o.planet = p_planet and o.stage < 3) then
-            raise exception 'That world is not under Combine administration';
-        end if;
-        if exists (select 1 from public.cs_directives as d
-                   where d.dtype = 'consolidation' and d.planet = p_planet
-                     and d.status in ('introduction', 'debate')) then
-            raise exception 'A consolidation of % is already before the Soviet', p_planet;
-        end if;
-    end if;
-
     if p_type = 'production_quota' then
         if st.quota >= 2 then raise exception 'The production quota is already at its highest level'; end if;
         if exists (select 1 from public.cs_directives as d
@@ -824,7 +886,6 @@ begin
         when 'production_quota' then 'Plano de produção: elevar a cota'
         when 'diplomacy' then 'Pacto fraterno com os ' || coalesce(nullif(p_target, ''), 'Independents')
         when 'fleet_revocation' then 'Reatribuir e desmontar a frota "' || coalesce(v_fleet_name, '?') || '"'
-        when 'consolidation' then 'Consolidar a administração de ' || coalesce(p_planet, '?')
         else initcap(replace(p_type, '_', ' ')) end;
 
     insert into public.cs_directives (dtype, title, sponsor_current, source, proposer_name, proposer_player,
@@ -893,6 +954,8 @@ begin
 
     elsif d.dtype = 'consolidation' then
 
+        /* no longer submitted anywhere: this only settles a consolidation that
+           was already in the plenum when relief became a direct order */
         update public.cs_occupations as o
         set stability = least(100, o.stability + 10)
         where o.planet = d.planet;
@@ -1013,6 +1076,6 @@ select
     (select count(*) from public.cs_occupations) as occupations,
     (select count(*) from information_schema.routines
       where routine_schema = 'public'
-        and routine_name in ('cs_player_online', 'cs_fleet_quota', 'cs_overview', 'cs_npc_directive', 'cs_submit')) as functions,
+        and routine_name in ('cs_player_online', 'cs_fleet_quota', 'cs_overview', 'cs_npc_directive', 'cs_submit', 'cs_relief')) as functions,
     (select exists (select 1 from information_schema.routines
                      where routine_schema = 'public' and routine_name = 'cs_overview')) as overview_ready;

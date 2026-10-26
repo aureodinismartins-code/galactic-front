@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=21"></script>
+<script src="i18n.js?v=22"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -131,8 +131,7 @@ const TYPES = {
     knightmare_construction: { name: "Armoured Detachment", votes: "qualified", desc: "Approve one elite armoured detachment (the Knightmare Facility chain is still needed)." },
     production_quota: { name: "Five-Year Plan: Raise the Quota", votes: "qualified", desc: "Raise the production quota: 300-500 credits every 15 minutes per level (max 2), confidence -5." },
     diplomacy: { name: "Fraternal Pact", votes: "majority", desc: "Send envoys to another faction: relations +10." },
-    fleet_revocation: { name: "Reassign and Dismantle a Fleet", votes: "qualified", desc: "Break up one Combine fleet for 500 credits of salvage." },
-    consolidation: { name: "Consolidate a World", votes: "majority", desc: "Stability +10 for one world under Combine administration: each stage of its administration needs a stability threshold." }
+    fleet_revocation: { name: "Reassign and Dismantle a Fleet", votes: "qualified", desc: "Break up one Combine fleet for 500 credits of salvage." }
 };
 
 let ov = null;
@@ -991,7 +990,9 @@ function worldsHtml() {
         '<div class="token">' + esc(T("INCORPORATED")) + '<b>' + incorporated + '</b></div></div>';
 
     const note = '<div class="sub" style="margin-bottom:10px">' +
-        esc(T("Every world where the Combine holds at least one city. A world held whole comes under Soviet administration and moves through four stages — occupied, military administration, collectivised, incorporated — five turns of five minutes each, counted only while its stability is at least the threshold of the stage. Only a whole world pays into the plan; the rest still has to be taken, and a campaign needs the Soviet's approval.")) + '</div>';
+        esc(T("Every world where the Combine holds at least one city. A world held whole comes under Soviet administration and moves through four stages — occupied, military administration, collectivised, incorporated — five turns of five minutes each, counted only while its stability is at least the threshold of the stage. Only a whole world pays into the plan; the rest still has to be taken, and a campaign needs the Soviet's approval.")) + '</div>' +
+        '<div class="sub" style="margin-bottom:10px">' +
+        esc(T("Relief is sent straight to a world under Combine administration — no directive, no vote — for +10 stability, one world every five minutes. The Freedom Authority has to put the same relief before Congress first.")) + '</div>';
 
     /* nothing held yet: the map would be a blank grid, so it is left out */
     const map = worlds.length ? '<div class="card">' + miniMapHtml("held") + '</div>' : "";
@@ -1004,24 +1005,31 @@ function worldsHtml() {
 
         const pct = w.total ? Math.round(w.held / w.total * 100) : 0;
         const stage = w.whole && w.stage != null ? Number(w.stage) : null;
-        const need = stage == null ? 100 : STAGE_NEED[stage];
+        const need = stage == null ? 100 : (w.threshold != null ? Number(w.threshold) : STAGE_NEED[stage]);
 
         let actions = "";
 
         if (w.whole) {
 
             if (stage >= 3) {
-                actions = '<div class="sub" style="color:#7dff9d">' + esc(T("Incorporated into the Union: the plan collects this world and the Party has its confidence.")) + '</div>';
-            }
-            else if (w.consolidating) {
-                actions = '<div class="sub" style="color:#ffd37a">' + esc(T("A consolidation of this world is before the Soviet.")) + '</div>';
+                actions = '<div class="sub" style="color:#7dff9d">' + esc(T("Fully integrated into the Union: the plan collects this world and the Party has its confidence.")) + '</div>';
             }
             else {
-                actions = '<div style="margin-top:8px"><button class="btn small consolidate-btn" data-p="' + esc(w.planet) + '">' + esc(T("PUT A CONSOLIDATION BEFORE THE SOVIET")) + '</button></div>' +
+                /* the Authority puts relief before Congress; here it is sent
+                   straight away, once every five minutes */
+                const wait = Number(w.relief_wait) || 0;
+                const until = new Date(Date.now() + wait * 1000).toISOString();
+
+                actions = '<div style="margin-top:8px"><button class="btn small relief-btn" data-p="' + esc(w.planet) + '"' + (wait > 0 ? " disabled" : "") + '>' +
+                    esc(T("GRANT RELIEF (+10 stability)")) + '</button>' +
+                    (wait > 0
+                        ? ' <span class="sub" style="color:#ffd37a">' + esc(T("sent again in")) +
+                          ' <b class="relief-cd" data-until="' + esc(until) + '">' + mmss(wait) + '</b></span>'
+                        : "") + '</div>' +
                     '<div class="sub" style="margin-top:4px">' +
                     esc(T(Number(w.stability) >= need
                         ? "Stability is enough: the administration advances one turn every five minutes."
-                        : "Stability is below the threshold: the administration does not advance until it is consolidated.")) + '</div>';
+                        : "Stability is below the threshold: the administration does not advance until relief is sent.")) + '</div>';
             }
 
         }
@@ -1046,7 +1054,7 @@ function worldsHtml() {
                 ? '<div class="steps">' + STAGE_KEYS.map(function(n, i) {
                       return '<div class="' + (i < stage ? "done" : i === stage ? "cur" : "") + '">' + esc(T(n)) + '</div>';
                   }).join("") + '</div>' +
-                  '<div class="sub">' + esc(T("STABILITY")) + ' ' + Math.round(w.stability) + ' / ' + (stage < 3 ? need : "-") + '</div>' +
+                  '<div class="sub">' + esc(T("STABILITY")) + ' ' + Math.round(w.stability) + ' / ' + esc(T("needed")) + ' ' + (stage < 3 ? need : "-") + '</div>' +
                   '<div class="bar"><i style="width:' + Math.min(100, Number(w.stability)) + '%;background:' +
                       (Number(w.stability) >= need ? "#2fbf6a" : "#d6a84b") + '"></i></div>' +
                   (stage < 3
@@ -1071,11 +1079,14 @@ function wireWorlds() {
         tab = "new";
         renderTabs();
     }));
-    $("tabbody").querySelectorAll(".consolidate-btn").forEach(el => el.addEventListener("click", function() {
-        draft.type = "consolidation";
-        draft.planet = el.dataset.p;
-        tab = "new";
-        renderTabs();
+    $("tabbody").querySelectorAll(".relief-btn").forEach(el => el.addEventListener("click", async function() {
+        const planet = el.dataset.p;
+        if (!planet) { return; }
+        el.disabled = true;
+        const { data, error } = await supabaseClient.rpc("cs_relief", { p_planet: planet });
+        if (error) { toast(error.message, true); el.disabled = false; return; }
+        toast(T("Relief sent to") + " " + planet + ": " + T("stability") + " " + data.stability + " / " + data.threshold + ".");
+        await load();
     }));
 }
 
@@ -1192,19 +1203,6 @@ function newHtml() {
                 esc(x.planet) + ' (' + esc(x.owners) + ')' + (x.declared ? " - " + esc(T("campaign approved")) : "") + '</option>').join("") ||
              '<option value="">' + esc(T("no targets")) + '</option>') + '</select>';
     }
-    else if (draft.type === "consolidation") {
-
-        const admin = (ov.worlds || []).filter(w => w.whole && w.stage != null && Number(w.stage) < 3);
-
-        if (!admin.some(w => w.planet === draft.planet)) { draft.planet = admin.length ? admin[0].planet : ""; }
-
-        h += '<label class="row">' + esc(T("WORLD TO CONSOLIDATE")) + '</label><select id="n-planet" style="width:100%">' +
-            (admin.map(w => '<option value="' + esc(w.planet) + '"' + (draft.planet === w.planet ? " selected" : "") + '>' +
-                esc(w.planet) + ' (' + esc(T("STABILITY")) + ' ' + w.stability + ' / ' + STAGE_NEED[Number(w.stage)] + ')</option>').join("") ||
-             '<option value="">' + esc(T("no world under administration")) + '</option>') + '</select>' +
-            '<div class="sub" style="margin-top:6px">' + esc(T("The directive raises that world's stability by 10; the administration stops advancing while it is below the threshold of its stage.")) + '</div>';
-
-    }
     else if (draft.type === "fleet_revocation") {
         h += '<label class="row">' + esc(T("FLEET TO DISMANTLE")) + '</label><select id="n-fleet" style="width:100%">' +
             (ov.my_fleets.map(f => '<option value="' + esc(f.id) + '"' + (draft.fleet === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>').join("") || '<option value="">' + esc(T("you have no fleets")) + '</option>') + '</select>';
@@ -1245,7 +1243,7 @@ function wireNew() {
 
         const { error } = await supabaseClient.rpc("cs_submit", {
             p_type: draft.type,
-            p_planet: (draft.type === "military_campaign" || draft.type === "consolidation") ? (draft.planet || null) : null,
+            p_planet: draft.type === "military_campaign" ? (draft.planet || null) : null,
             p_fleet: draft.type === "fleet_revocation" ? (draft.fleet || null) : null,
             p_target: draft.type === "diplomacy" ? draft.target : null,
             p_current: draft.current
@@ -1283,6 +1281,8 @@ setInterval(function() {
     document.querySelectorAll(".cdt").forEach(function(el) { el.textContent = mmss(secondsLeft(el.dataset.ts)); });
 
     document.querySelectorAll(".prop-cd").forEach(function(el) { el.textContent = mmss(secondsLeft(el.dataset.until)); });
+
+    document.querySelectorAll(".relief-cd").forEach(function(el) { el.textContent = mmss(secondsLeft(el.dataset.until)); });
 
     document.querySelectorAll(".cd").forEach(function(el) {
         const d = ov.directives.find(x => x.id === Number(el.dataset.d));
