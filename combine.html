@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=15"></script>
+<script src="i18n.js?v=16"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -735,6 +735,92 @@ function wireSecretary() {
 
 }
 
+/* the galaxy, as the Congress draws it: planet_positions are percentages */
+const MAP_COLORS = { "Freedom Authority": "#4a8cff", "Combine": "#ff4a4a", "Independents": "#e6e6e6" };
+
+function miniMapHtml(kind) {
+
+    const W = 480, H = 270;
+    const held = {};
+    for (const w of (ov.worlds || [])) { held[w.planet] = w; }
+
+    const declared = new Set(ov.authorizations.war || []);
+    const liveCampaign = new Set(ov.directives.filter(d => d.type === "military_campaign" &&
+        (d.status === "introduction" || d.status === "debate")).map(d => d.planet));
+    const fronts = new Set((ov.targets || []).filter(t => t.owners !== "Combine" && t.owners !== "Unclaimed").map(t => t.planet));
+
+    let svg = '<svg class="minimap" viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;background:#0b0708;border:1px solid #5a1d20;display:block">';
+
+    for (let gx = 1; gx < 10; gx++) { svg += '<line x1="' + gx * W / 10 + '" y1="0" x2="' + gx * W / 10 + '" y2="' + H + '" stroke="#241012"/>'; }
+    for (let gy = 1; gy < 6; gy++) { svg += '<line x1="0" y1="' + gy * H / 6 + '" x2="' + W + '" y2="' + gy * H / 6 + '" stroke="#241012"/>'; }
+
+    for (const p of (ov.planets || [])) {
+
+        const x = p.x / 100 * W;
+        const y = p.y / 100 * H;
+        const colour = MAP_COLORS[p.owner] || "#778";
+
+        let dim = false;
+        let ring = "";
+        let label = "";
+        let clickable = false;
+
+        if (kind === "war") {
+
+            clickable = fronts.has(p.name) && !declared.has(p.name);
+            dim = !fronts.has(p.name) && !declared.has(p.name) && !liveCampaign.has(p.name);
+
+            if (declared.has(p.name)) {
+                ring = '<circle cx="' + x + '" cy="' + y + '" r="9" fill="none" stroke="#ff4a4a" stroke-width="2"/>' +
+                    '<path d="M' + (x - 12) + ' ' + y + ' H' + (x + 12) + ' M' + x + ' ' + (y - 12) + ' V' + (y + 12) + '" stroke="#ff4a4a" stroke-width="1.5"/>';
+                label = T("WAR");
+            }
+            else if (liveCampaign.has(p.name)) {
+                ring = '<circle cx="' + x + '" cy="' + y + '" r="9" fill="none" stroke="#ffd37a" stroke-width="2" stroke-dasharray="3 2"/>';
+                label = T("SOVIET");
+            }
+            else if (fronts.has(p.name)) {
+                ring = '<circle cx="' + x + '" cy="' + y + '" r="8" fill="none" stroke="' + (draft.planet === p.name ? "#e8c46a" : "#7d5a5d") +
+                    '" stroke-width="' + (draft.planet === p.name ? 3 : 1.5) + '"/>';
+                if (draft.planet === p.name) { label = p.name; }
+            }
+
+        }
+        else {
+
+            const w = held[p.name];
+            dim = !w;
+
+            if (w) {
+                ring = '<circle cx="' + x + '" cy="' + y + '" r="10" fill="none" stroke="' + (w.whole ? "#2fbf6a" : "#d6a84b") + '" stroke-width="3"/>';
+                label = w.held + "/" + w.total;
+            }
+
+        }
+
+        svg += '<g class="mm-p" data-p="' + esc(p.name) + '" style="cursor:' + (clickable ? "pointer" : "default") + '">' +
+            '<circle cx="' + x + '" cy="' + y + '" r="4" fill="' + colour + '" opacity="' + (dim ? 0.25 : 1) + '"/>' + ring +
+            (label ? '<text x="' + x + '" y="' + (y - 15) + '" text-anchor="middle" fill="#fff" font-size="9" font-weight="800">' + esc(label) + '</text>' : "") +
+            (label && kind === "war" ? '<text x="' + x + '" y="' + (y + 20) + '" text-anchor="middle" fill="#c8a6a8" font-size="9">' + esc(p.name) + '</text>' : "") +
+            '</g>';
+
+    }
+
+    svg += '</svg><div class="sub" style="margin-top:4px">' +
+        (kind === "war"
+            ? '<span style="color:#ff4a4a">&#10010;</span> ' + esc(T("campaign approved")) +
+              ' &middot; <span style="color:#ffd37a">&#9711;</span> ' + esc(T("before the Soviet")) +
+              ' &middot; <span style="color:#e8c46a">&#9711;</span> ' + esc(T("your target")) + ' &middot; ' +
+              esc(T("click a planet to put a campaign against it before the Soviet")) +
+              ' &middot; <span style="color:#ff4a4a">red</span> = ' + esc(T("Combine")) + ', <span style="color:#4a8cff">blue</span> = ' + esc(T("Freedom Authority"))
+            : '<span style="color:#d6a84b">&#9711;</span> ' + esc(T("contested world")) +
+              ' &middot; <span style="color:#2fbf6a">&#9711;</span> ' + esc(T("whole world")) + ' &middot; ' +
+              esc(T("dim = not ours yet")) + ' &middot; ' + esc(T("the ring says how many of its cities are ours"))) + '</div>';
+
+    return svg;
+
+}
+
 /* ---- occupied worlds ---- */
 function worldsHtml() {
 
@@ -745,15 +831,19 @@ function worldsHtml() {
     const tokens = '<div class="tokens">' +
         '<div class="token">' + esc(T("WORLDS HELD")) + '<b>' + worlds.length + '</b></div>' +
         '<div class="token">' + esc(T("WHOLE WORLDS")) + '<b>' + whole + '</b></div>' +
-        '<div class="token">' + esc(T("CITIES HELD")) + '<b>' + cities + '</b></div></div>' +
-        '<div class="sub" style="margin-bottom:10px">' +
+        '<div class="token">' + esc(T("CITIES HELD")) + '<b>' + cities + '</b></div></div>';
+
+    const note = '<div class="sub" style="margin-bottom:10px">' +
         esc(T("Every world where the Combine holds at least one city. A world is whole only when no other faction holds a city there, and only a whole world pays into the plan; the rest still has to be taken, and a campaign needs the Soviet's approval.")) + '</div>';
 
+    /* nothing held yet: the map would be a blank grid, so it is left out */
+    const map = worlds.length ? '<div class="card">' + miniMapHtml("held") + '</div>' : "";
+
     if (!worlds.length) {
-        return tokens + '<div class="sub">' + esc(T("The Combine holds no world yet. Take one with a military campaign (NEW DIRECTIVE), and it is listed here.")) + '</div>';
+        return tokens + note + '<div class="sub">' + esc(T("The Combine holds no world yet. Take one with a military campaign (NEW DIRECTIVE), and it is listed here.")) + '</div>';
     }
 
-    return tokens + worlds.map(function(w) {
+    return tokens + map + note + worlds.map(function(w) {
 
         const pct = w.total ? Math.round(w.held / w.total * 100) : 0;
         let actions = "";
@@ -818,7 +908,8 @@ function authorityHtml() {
         esc(T(liveQuota ? "A QUOTA IS ALREADY BEFORE THE SOVIET" : "PUT A FLEET QUOTA BEFORE THE SOVIET")) + '</button></div></div>';
 
     h += '<div class="card"><h3>' + esc(T("War room: a campaign against a world")) + '</h3>' +
-        '<div class="sub" style="margin-bottom:8px">' + esc(T("Only players bring a campaign; the commissars never declare one. A majority is enough. Without an approved campaign Combine fleets cannot attack the planet.")) + '</div>';
+        '<div class="sub" style="margin-bottom:8px">' + esc(T("Only players bring a campaign; the commissars never declare one. A majority is enough. Without an approved campaign Combine fleets cannot attack the planet.")) + '</div>' +
+        miniMapHtml("war");
 
     const fronts = ov.targets.filter(t => t.owners !== "Combine" && t.owners !== "Unclaimed");
 
@@ -854,6 +945,15 @@ function authorityHtml() {
 }
 
 function wireAuthority() {
+
+    /* clicking a planet on the map chooses it as the target */
+    $("tabbody").querySelectorAll(".mm-p").forEach(el => el.addEventListener("click", function() {
+        if (el.style.cursor !== "pointer") { return; }
+        draft.type = "military_campaign";
+        draft.planet = el.dataset.p;
+        tab = "new";
+        renderTabs();
+    }));
 
     $("tabbody").querySelectorAll(".camp-btn").forEach(el => el.addEventListener("click", function() {
         draft.type = "military_campaign";

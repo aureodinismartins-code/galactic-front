@@ -22,7 +22,12 @@
 --      Soviet. The Congress keeps its own occupation stages; these
 --      are the straight facts of the map;
 --
---   3. NO DISMANTLING BEHIND AN ABSENT COMMANDER'S BACK. The Party
+--   3. THE MAP. cs_overview() also returns where every planet sits
+--      (planet_positions, the galaxy's own coordinates), so the screen
+--      can draw the same minimap the Congress draws: the worlds held
+--      there, and the fronts in the war room;
+--
+--   4. NO DISMANTLING BEHIND AN ABSENT COMMANDER'S BACK. The Party
 --      used to be able to bring a "reatribuir e desmontar" directive
 --      naming any Combine fleet, including the fleet of somebody who
 --      had logged off — they would come back to find it gone. The
@@ -247,6 +252,26 @@ begin
                        end as owner
                 from public.planets as p
             ) as t
+        ), '[]'::jsonb),
+
+        /* where every planet sits, so the screen can draw the same map
+           the Congress draws (planet_positions is the galaxy's own table) */
+        'planets', coalesce((
+            select jsonb_agg(jsonb_build_object(
+                       'name', p.name,
+                       'x', pp.x,
+                       'y', pp.y,
+                       'owner', case
+                           when not exists (select 1 from public.cities as c where c.planet_id = p.id) then 'Unclaimed'
+                           when not exists (select 1 from public.cities as c
+                                            where c.planet_id = p.id and c.faction is distinct from 'Combine') then 'Combine'
+                           when not exists (select 1 from public.cities as c
+                                            where c.planet_id = p.id and c.faction is distinct from 'Freedom Authority') then 'Freedom Authority'
+                           else 'Contested'
+                       end
+                   ) order by p.name)
+            from public.planet_positions as pp
+            join public.planets as p on p.name = pp.name
         ), '[]'::jsonb),
 
         /* the worlds the Combine holds at least one city of */
