@@ -526,6 +526,15 @@
         .fleet-marker.freedom svg.fleet-ships { filter: drop-shadow(0 0 2px #3b7bff) drop-shadow(0 0 5px #3b7bff); }
         .fleet-marker.independent svg.fleet-ships { filter: drop-shadow(0 0 3px #ffffff); }
         .fleet-marker.enemy svg.fleet-ships { opacity: 0.85; }
+        .fleet-marker.ghost {
+            border-style: dashed !important;
+            opacity: 0.45;
+            background: rgba(255,255,255,0.05);
+            box-shadow: none;
+            pointer-events: none;
+        }
+        .fleet-marker.ghost .ghost-dot { color: #ffb9a8; font-size: 12px; }
+        .fleet-marker.ghost .fleet-label { color: #ffb9a8; }
         .fleet-marker.engaged svg.fleet-ships { animation: engagedPulse 0.8s ease-in-out infinite alternate; }
         @keyframes engagedPulse { from { filter: drop-shadow(0 0 3px #ff5a2a); } to { filter: drop-shadow(0 0 9px #ff2a00); } }
         /* fleets are sent with a right-click on the map, so the old destination picker is hidden */
@@ -1482,6 +1491,53 @@ function getPlanetPosition(name) {
 }
 
 
+/*
+   Where a planet is REALLY drawn, in the planet layer's own pixels.
+
+   This is the only place the map asks that question, and it asks the
+   element itself: its rectangle already carries the percentage layout,
+   any centring transform, a zoom, or whatever the map's styling does
+   next year. Lines drawn to this centre are attached to the disc and
+   stay attached; the old version measured percentages against a table
+   and every line ended up floating beside its world when the two
+   disagreed.
+*/
+function planetDrawBox(name) {
+
+    const layer = document.getElementById("planet-layer");
+
+    if (!layer) { return null; }
+
+    let el = null;
+
+    for (const p of document.querySelectorAll(".planet")) {
+        if (p.dataset.name === name) { el = p; break; }
+    }
+
+    if (!el) { return null; }
+
+    const box = el.getBoundingClientRect();
+    const frame = layer.getBoundingClientRect();
+
+    /* an undrawn planet (display:none, a test page) has no rectangle */
+    if (!box || !box.width || !box.height || !frame) { return null; }
+
+    /* the map zooms when a planet is opened, and the canvas keeps drawing in
+       its own pixels: undo the zoom so the answer stays in that space */
+    const sx = (layer.offsetWidth && frame.width) ? frame.width / layer.offsetWidth : 1;
+    const sy = (layer.offsetHeight && frame.height) ? frame.height / layer.offsetHeight : 1;
+
+    return {
+        x: (box.left - frame.left + box.width / 2) / sx,
+        y: (box.top - frame.top + box.height / 2) / sy,
+        /* the radius comes from the unscaled width, so hovering a planet
+           does not make its lines jump back a few pixels */
+        r: (el.offsetWidth || box.width / sx) / 2 + 2
+    };
+
+}
+
+
 /* =========================================
    FLEET LOCATION
 ========================================= */
@@ -1805,46 +1861,63 @@ function isUsableFleet(f) {
 
 /* =========================================
    THE FOG OF WAR
-   An enemy fleet is drawn only while one of our own fleets or
-   worlds is within sensor range of it. Everything else is fog:
-   no marker, no label, no ghost. The server keeps the same rule
-   in visible_enemy_fleets(); this copy is here so the map never
-   depends on a database round trip to draw correctly.
+
+   What you can see is what you are watching with:
+     - every world you hold whole watches a wide circle
+       around itself (VISION_WORLD), because it is yours;
+     - every fleet of yours watches a tight bubble
+       (VISION_FLEET), which is all a ship's sensors are;
+     - your own side of the war is always drawn.
+
+   An enemy fleet outside all of that is fog. When contact is
+   LOST, the map keeps a last known position for two minutes —
+   a dashed ghost that counts down — so a raider that slips
+   away is not simply erased from your memory. Anything the
+   server's own reading reports is added on top.
 ========================================= */
-const SENSOR_RANGE = 12;   /* per cent of the map */
+const VISION_WORLD = 20;      /* per cent of the map around a world of ours */
+const VISION_FLEET = 12;      /* per cent of the map around one of our fleets */
+const LAST_SEEN_MS = 120000;  /* how long a lost contact is remembered */
 
-function sensorAnchors() {
+const lastSeenEnemies = new Map();
 
-    const points = [];
+
+/* everything of ours with eyes: the worlds we hold and our fleets */
+function visionAnchors() {
+
+    const anchors = [];
 
     for (const fleet of fleets) {
 
-        /* only ships that answer to this side of the war can look for anyone;
-           a dormant fleet of ours under the other flag is the enemy here */
+        /* a dormant fleet of ours under the other flag is the enemy here;
+           it cannot watch on our behalf */
         if (fleet.faction && fleet.faction !== playerFaction) { continue; }
 
         const at = getFleetPosition(fleet);
 
-        if (at && isFinite(at[0]) && isFinite(at[1])) { points.push(at); }
+        if (at && isFinite(at[0]) && isFinite(at[1])) {
+            anchors.push({ x: at[0], y: at[1], r: VISION_FLEET });
+        }
 
     }
 
     document.querySelectorAll(".planet").forEach(function (el) {
 
-        if ((el.dataset.owner || "").trim() === playerFaction) {
-            points.push(getPlanetPosition(el.dataset.name));
-        }
+        if ((el.dataset.owner || "").trim() !== playerFaction) { return; }
+
+        const at = getPlanetPosition(el.dataset.name);
+
+        anchors.push({ x: at[0], y: at[1], r: VISION_WORLD });
 
     });
 
-    return points;
+    return anchors;
 
 }
 
-function fleetInSensorRange(fleet, anchors) {
 
-    /* our own side of the war is always drawn; a dormant fleet of ours under
-       the other flag is the enemy here and obeys the fog like any other */
+function fleetInVision(fleet, anchors) {
+
     if (!fleet.faction || fleet.faction === playerFaction) { return true; }
 
     const at = getFleetPosition(fleet);
@@ -1852,12 +1925,106 @@ function fleetInSensorRange(fleet, anchors) {
     if (!at || !isFinite(at[0]) || !isFinite(at[1])) { return false; }
 
     for (const a of anchors) {
-        if (Math.hypot(a[0] - at[0], a[1] - at[1]) <= SENSOR_RANGE) { return true; }
+        if (Math.hypot(a.x - at[0], a.y - at[1]) <= a.r) { return true; }
     }
 
     return false;
 
 }
+
+
+/* every fleet the database last returned, before the fog touches it */
+let fleetSource = [];
+
+/* the enemy contacts the database itself reported: those are trustworthy
+   whatever our own geometry believes, so the fog never removes one */
+let reportedContacts = new Set();
+
+
+/*
+   Put the fog on top of the full fleet list. It is applied again whenever
+   the worlds change hands, so taking a planet widens what you can see at
+   once instead of on the next poll, and losing one narrows it the same way.
+*/
+function applyFog() {
+
+    const anchors = visionAnchors();
+
+    fleets = fleetSource.filter(function (f) {
+
+        if (reportedContacts.has(String(f.id))) { return true; }
+
+        return fleetInVision(f, anchors);
+
+    });
+
+    rememberContacts(
+        fleets.filter(f => f.faction && f.faction !== playerFaction)
+    );
+
+}
+
+
+/* keep what we saw, and forget it after two minutes */
+function rememberContacts(visible) {
+
+    const now = Date.now();
+
+    for (const fleet of visible) {
+
+        const at = getFleetPosition(fleet);
+
+        if (!at || !isFinite(at[0]) || !isFinite(at[1])) { continue; }
+
+        lastSeenEnemies.set(String(fleet.id), {
+            x: at[0],
+            y: at[1],
+            faction: fleet.faction,
+            name: fleet.name,
+            at: now
+        });
+
+    }
+
+    for (const [id, ghost] of lastSeenEnemies) {
+        if (now - ghost.at > LAST_SEEN_MS) { lastSeenEnemies.delete(id); }
+    }
+
+}
+
+
+/* the contacts that have slipped out of sight, still worth a marker */
+function lastSeenGhosts() {
+
+    const now = Date.now();
+    const present = new Set(fleets.map(f => String(f.id)));
+    const ghosts = [];
+
+    for (const [id, ghost] of lastSeenEnemies) {
+
+        if (present.has(id)) { continue; }
+
+        if (now - ghost.at > LAST_SEEN_MS) {
+            lastSeenEnemies.delete(id);
+            continue;
+        }
+
+        ghosts.push({
+            id: id,
+            x: ghost.x,
+            y: ghost.y,
+            faction: ghost.faction,
+            name: ghost.name,
+            age: now - ghost.at,
+            left: LAST_SEEN_MS - (now - ghost.at)
+        });
+
+    }
+
+    return ghosts;
+
+}
+
 
 async function loadFleets() {
 
@@ -1944,19 +2111,12 @@ async function loadFleets() {
 
 
     /* every fleet is drawn, dormant ones included: they are the enemy now,
-       and hiding them was why a blockade could sit there unseen */
-    fleets = (refreshError ? fleets : (refreshed || []));
+       and hiding them was why a blockade could sit there unseen. The list is
+       kept whole and the fog is applied on top of it, so the fog can be
+       recomputed without asking the database again. */
+    if (!refreshError) { fleetSource = (refreshed || []); }
 
-    /*
-       The fog, decided here first: every fleet of another faction is dropped
-       unless one of our own fleets or worlds is close enough to see it. This
-       is a filter, never a wipe - our own ships and allies always stay.
-    */
-    {
-        const anchors = sensorAnchors();
-
-        fleets = fleets.filter(f => fleetInSensorRange(f, anchors));
-    }
+    reportedContacts = new Set();
 
     /* and whatever the server's own reading can see is added on top */
     try {
@@ -1965,19 +2125,19 @@ async function loadFleets() {
 
         if (!seen.error && Array.isArray(seen.data)) {
 
-            const known = new Set(fleets.map(f => String(f.id)));
-
             for (const f of seen.data) {
 
-                if (known.has(String(f.id))) { continue; }
-                if (!f || !f.faction || f.faction === playerFaction) { continue; }
+                if (!f || !f.id || !f.faction || f.faction === playerFaction) { continue; }
 
                 const at = getFleetPosition(f);
 
                 if (!at || !isFinite(at[0]) || !isFinite(at[1])) { continue; }
 
-                fleets.push(f);
-                known.add(String(f.id));
+                reportedContacts.add(String(f.id));
+
+                if (!fleetSource.some(x => String(x.id) === String(f.id))) {
+                    fleetSource.push(f);
+                }
 
             }
 
@@ -1987,6 +2147,8 @@ async function loadFleets() {
     catch (e) {
         console.warn("Could not look for enemy fleets:", e);
     }
+
+    applyFog();
 
 
     renderFleets();
@@ -2173,18 +2335,58 @@ const orbitSlots = {};
     }
 
 
-    const enemiesInSight = fleets.filter(f => f.faction && f.faction !== playerFaction).length;
+    /* ---------- the last known contacts ---------- */
 
-    /* the reading is built here, so it is translated here too: the page's
-       translator only sees complete text nodes */
-    const tp = (typeof window.t === "function") ? window.t : function (s) { return s; };
+    const ghosts = lastSeenGhosts();
+
+    for (const ghost of ghosts) {
+
+        const marker = document.createElement("div");
+
+        marker.className = "fleet-marker ghost " + factionClass(ghost.faction);
+        marker.style.left = ghost.x + "%";
+        marker.style.top = ghost.y + "%";
+        marker.title = ghost.name || "";
+
+        const left = Math.max(0, Math.ceil(ghost.left / 1000));
+
+        marker.innerHTML =
+            '<span class="ghost-dot">?</span>' +
+            '<div class="fleet-label">' +
+                escapeHTML(tpText("LAST SEEN")) + " " +
+                Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") +
+            '</div>';
+
+        fleetLayer.appendChild(marker);
+
+    }
+
+    const enemiesInSight = fleets.filter(f => f.faction && f.faction !== playerFaction).length;
+    const linksCut = (window.SUPPLY_STATUS && Number(window.SUPPLY_STATUS.cut)) || 0;
 
     fleetStatusDisplay.textContent =
-        activeCount + " " + tp(activeCount === 1 ? "ACTIVE FLEET" : "ACTIVE FLEETS") +
+        activeCount + " " + tpText(activeCount === 1 ? "ACTIVE FLEET" : "ACTIVE FLEETS") +
         " · " + (enemiesInSight
-            ? enemiesInSight + " " + tp(enemiesInSight === 1 ? "ENEMY IN SENSOR RANGE" : "ENEMIES IN SENSOR RANGE")
-            : tp("NO ENEMY IN SENSOR RANGE"));
+            ? enemiesInSight + " " + tpText(enemiesInSight === 1 ? "ENEMY IN SIGHT" : "ENEMIES IN SIGHT")
+            : tpText("NO ENEMY IN SIGHT")) +
+        " · " + (ghosts.length
+            ? ghosts.length + " " + tpText(ghosts.length === 1 ? "LAST SEEN CONTACT" : "LAST SEEN CONTACTS")
+            : tpText("NO LOST CONTACTS")) +
+        (linksCut
+            ? " · " + linksCut + " " + tpText(linksCut === 1 ? "SUPPLY LINK CUT" : "SUPPLY LINKS CUT")
+            : "");
 
+}
+
+
+/* =========================================
+   TRANSLATED TEXT
+   The page's translator only sees whole text nodes, so anything the
+   scripts build is translated piece by piece with this.
+========================================= */
+
+function tpText(text) {
+    return (typeof window.t === "function") ? window.t(text) : text;
 }
 
 
@@ -3650,7 +3852,27 @@ async function loadPlanetStatus() {
 
     drawSectors();
 
+    /* the fog is made of the worlds we hold: when one changes hands, what
+       can be seen changes with it, at once and not on the next poll */
+    const owners = Array.from(document.querySelectorAll(".planet"))
+        .map(el => el.dataset.name + ":" + (el.dataset.owner || ""))
+        .join("|");
+
+    if (owners !== lastOwnerReading && typeof applyFog === "function") {
+
+        lastOwnerReading = owners;
+
+        if (typeof fleetSource !== "undefined" && fleetSource.length) {
+            applyFog();
+            renderFleets();
+        }
+
+    }
+
 }
+
+/* the ownership picture the fog was last built from */
+let lastOwnerReading = "";
 
 /* =========================================
    SECTOR AURAS
@@ -4324,17 +4546,16 @@ supabaseClient
 <script>
 
 /* =========================================================
-   SUPPLY NETWORK — the credits have to travel, and the
-   network builds itself. Every world you hold whole feeds
+   SUPPLY NETWORK — universal and invisible as a tool: there is
+   no screen and no button. Every world you hold whole feeds
    the nearest world you hold whole that is closer to the
-   capital, so the lines run inward like a real supply net,
-   and an enemy fleet in orbit of either end — or across the
-   short corridor between them — cuts every world behind it.
+   capital, so the lines run inward like a real supply net, and
+   an enemy fleet in orbit of either end — or anywhere across
+   the corridor between them — cuts every world behind it.
 
-   Every line starts and ends on the RIM of its planet, not at
-   the centre: the nearest point of the circle to the world it
-   is heading for, so nothing is hidden under a planet and the
-   net reads as one continuous thing.
+   The lines are drawn from the planets' REAL drawn positions
+   (not from a table of percentages), so they always meet the
+   discs exactly, now and after any re-layout of the map.
 ========================================================= */
 
 /* the nearest point of a circle's edge to wherever we are heading */
@@ -4358,50 +4579,22 @@ function supplyRimPoint(fromX, fromY, toX, toY, radius) {
 
     if (playerFaction !== "Freedom Authority" && playerFaction !== "Combine") { return; }
 
-    const T = s => (typeof window.t === "function" ? window.t(s) : s);
-    const esc = escapeHTML;
-
     const rgbOf = name => name === "Combine" ? "213,43,43"
         : (name === "Freedom Authority" ? "52,124,255" : "170,175,190");
 
-    let st = null, stErr = null, opened = false;
+    /* the corner readout reads this, so a cut line is visible without a panel */
+    window.SUPPLY_STATUS = { cut: 0, drawn: 0 };
 
-    const style = document.createElement("style");
-    style.textContent =
-        "#sup-open{position:fixed;top:176px;right:20px;z-index:60;padding:12px 26px;background:#0b1a2e;color:#cfe3ff;" +
-        "border:1px solid #3b6fd0;font:bold 13px Arial;letter-spacing:3px;cursor:pointer;}" +
-        "#sup-open:hover{background:#152c4d;}" +
-        "#sup-tab{position:fixed;inset:0;z-index:80;display:none;overflow:auto;padding:26px 34px 70px;" +
-        "background:radial-gradient(circle at 50% 0%,#0a1830 0%,#04080f 70%);color:#cfe6f0;font:13px Arial,sans-serif;}" +
-        "#sup-tab.on{display:block;}" +
-        "#sup-tab h2{font:bold 26px Arial;letter-spacing:6px;color:#fff;margin:0 0 4px;}" +
-        "#sup-tab .sup-top{display:flex;align-items:flex-start;gap:16px;max-width:900px;}" +
-        "#sup-tab .sup-close{margin-left:auto;background:#0c1a28;color:#e6f6ff;border:1px solid #4fb8d8;" +
-        "padding:8px 14px;font:bold 11px Arial;letter-spacing:2px;cursor:pointer;}" +
-        "#sup-tab .sup-card{background:rgba(4,12,22,.9);border:1px solid rgba(127,220,255,.35);padding:14px 16px;margin:16px 0;max-width:900px;}" +
-        "#sup-tab .sup-card h3{font:bold 13px Arial;letter-spacing:3px;color:#7fdcff;margin:0 0 8px;}" +
-        "#sup-tab .sup-sub{color:#9fb8c4;margin:4px 0;line-height:1.5;}" +
-        "#sup-tab .sup-line{color:#bcd3de;margin:3px 0;}" +
-        "#sup-tab .sup-world{border-top:1px solid #1f3354;padding-top:8px;margin-top:10px;}" +
-        "#sup-tab .sup-tag{display:inline-block;margin-left:8px;padding:2px 8px;font:bold 10px Arial;letter-spacing:2px;border:1px solid;}" +
-        "#sup-tab .sup-tag.ok{color:#8dffb0;border-color:#2f9d55;}" +
-        "#sup-tab .sup-tag.cut{color:#ff9c8a;border-color:#c33b28;}" +
-        "#sup-tab .sup-tag.up{color:#ffc48a;border-color:#b5762c;}" +
-        "#sup-tab .sup-tag.cap{color:#ffd27a;border-color:#b58a2c;}" +
-        "#supply-canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0;}";
-    document.head.appendChild(style);
+    let st = null;
 
-    const openBtn = document.createElement("button");
-    openBtn.id = "sup-open";
-    openBtn.type = "button";
-    openBtn.textContent = "SUPPLY LINES";
-    document.body.appendChild(openBtn);
+    /* the shared answer to "where is this planet drawn" (planetDrawBox
+       above), so the net and the rest of the map can never disagree */
+    function planetBox(name) {
 
-    const tab = document.createElement("div");
-    tab.id = "sup-tab";
-    document.body.appendChild(tab);
+        return planetDrawBox(name);
 
-    /* ---------- the network on the map ---------- */
+    }
+
     function canvasEl() {
 
         const layer = document.getElementById("planet-layer");
@@ -4412,20 +4605,12 @@ function supplyRimPoint(fromX, fromY, toX, toY, radius) {
         if (!c) {
             c = document.createElement("canvas");
             c.id = "supply-canvas";
+            c.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;" +
+                              "pointer-events:none;z-index:0;";
             layer.insertBefore(c, layer.firstChild);
         }
 
         return c;
-    }
-
-    /* the drawn planet's own radius, plus a breath of space */
-    function planetRadius(name) {
-
-        const el = document.querySelector('.planet[data-name="' + String(name).replace(/"/g, '\\"') + '"]');
-
-        if (el && el.offsetWidth) { return el.offsetWidth / 2 + 2; }
-
-        return 11;
 
     }
 
@@ -4462,33 +4647,33 @@ function supplyRimPoint(fromX, fromY, toX, toY, radius) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
 
-        if (!st || !Array.isArray(st.links) || !Array.isArray(st.worlds)) { return; }
+        window.SUPPLY_STATUS = { cut: 0, drawn: 0 };
+
+        if (!st || !Array.isArray(st.links)) { return; }
 
         const rgb = rgbOf(playerFaction);
-        const px = v => v / 100 * w;
-        const py = v => v / 100 * h;
 
-        /* a line meets a planet on its rim, never under it */
-        const radii = {};
+        let cut = 0;
+        let drawn = 0;
 
-        for (const world of st.worlds) { radii[world.planet] = planetRadius(world.planet); }
-
-        /* one short hop per pair of worlds, never a spoke to the capital */
         for (const link of st.links) {
 
-            if (link.x1 == null || link.x2 == null || link.y1 == null || link.y2 == null) { continue; }
+            /* both ends must be on the map as they are drawn, or the line
+               would hang in space */
+            const from = planetBox(link.from);
+            const to = planetBox(link.to);
 
-            const ax = px(Number(link.x1));
-            const ay = py(Number(link.y1));
-            const bx = px(Number(link.x2));
-            const by = py(Number(link.y2));
+            if (!from || !to) { continue; }
 
-            const start = supplyRimPoint(ax, ay, bx, by, radii[link.from] || 12);
-            const end = supplyRimPoint(bx, by, ax, ay, radii[link.to] || 12);
+            const start = supplyRimPoint(from.x, from.y, to.x, to.y, from.r);
+            const end = supplyRimPoint(to.x, to.y, from.x, from.y, to.r);
 
             if (Math.hypot(end[0] - start[0], end[1] - start[1]) < 2) { continue; }
 
             const open = link.open === true;
+
+            drawn++;
+            if (!open) { cut++; }
 
             ctx.save();
             ctx.lineWidth = 2;
@@ -4502,160 +4687,62 @@ function supplyRimPoint(fromX, fromY, toX, toY, radius) {
 
         }
 
-        /* only the capital carries a mark of its own, and only where a line
-           is actually cut do we draw anything at all */
-        for (const world of st.worlds) {
+        /* a red cross where the enemy is sitting on a cut part of the net;
+           fleets are drawn on their percentages, so the cross goes there too */
+        if (Array.isArray(st.worlds)) {
 
-            if (world.x == null || world.y == null) { continue; }
+            for (const world of st.worlds) {
 
-            const x = px(Number(world.x));
-            const y = py(Number(world.y));
+                if (world.open) { continue; }
 
-            if (world.capital) {
-
-                ctx.save();
-                ctx.strokeStyle = "rgba(" + rgb + ",0.95)";
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(x, y, (radii[world.planet] || 12) + 3, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.restore();
-
-            }
-
-            if (!world.open) {
                 ctx.save();
                 ctx.strokeStyle = "rgba(255,120,80,0.95)";
                 ctx.lineWidth = 2;
+
                 for (const b of (world.blockers || [])) {
+
                     if (b.x == null || b.y == null) { continue; }
-                    cross(ctx, px(Number(b.x)), py(Number(b.y)));
+
+                    cross(ctx, Number(b.x) / 100 * w, Number(b.y) / 100 * h);
+
                 }
+
                 ctx.restore();
+
             }
 
         }
 
+        window.SUPPLY_STATUS = { cut: cut, drawn: drawn };
+
     }
 
     window.addEventListener("resize", draw);
+
+    /* the first draw can happen before the planets have been laid out, and
+       a rotated screen or a zoomed page moves every one of them */
+    window.addEventListener("load", draw);
+
+    if (typeof window.ResizeObserver === "function") {
+
+        new window.ResizeObserver(function () { draw(); })
+            .observe(document.getElementById("planet-layer"));
+
+    }
+
     setInterval(draw, 2000);
 
-    /* ---------- data ---------- */
     async function refresh() {
 
         const { data, error } = await supabaseClient.rpc("supply_state");
 
         st = error ? null : data;
-        stErr = error ? error.message : null;
 
         draw();
 
-        if (opened) { render(); }
-
     }
 
-    /* ---------- the screen ---------- */
-    const WHY = {
-        orbit: "in orbit of the world",
-        hub: "in orbit of the world it feeds through",
-        corridor: "across the corridor"
-    };
-
-    function worldRow(p) {
-
-        const blockers = (p.blockers || []).map(function (b) {
-            return '<div class="sup-line">&#9888; <b>' + esc(b.name || "?") + '</b> — ' + esc(T(b.faction || "")) +
-                ' &middot; ' + esc(T(WHY[b.why] || "")) + '</div>';
-        }).join("");
-
-        let tag;
-
-        if (p.capital) { tag = '<span class="sup-tag cap">' + esc(T("CAPITAL")) + '</span>'; }
-        else if (p.open) { tag = '<span class="sup-tag ok">' + esc(T("SUPPLIED")) + '</span>'; }
-        else if (p.own) { tag = '<span class="sup-tag up">' + esc(T("CUT UPSTREAM")) + '</span>'; }
-        else { tag = '<span class="sup-tag cut">' + esc(T("CUT")) + '</span>'; }
-
-        const feeds = p.capital
-            ? esc(T("it feeds nobody"))
-            : esc(T("feeds through")) + ' <b>' + esc(p.parent || "?") + '</b>';
-
-        return '<div class="sup-world">' +
-            '<div><b style="font-size:14px">' + esc(p.planet) + '</b>' + tag +
-            '<span class="sup-sub"> ' + esc(T("income")) + ' <b>' + Number(p.income || 0) + '</b> ' +
-            esc(T("per payment")) + ' &middot; ' + feeds + '</span></div>' +
-            blockers +
-            '</div>';
-
-    }
-
-    function render() {
-
-        if (st === null) {
-
-            tab.innerHTML =
-                '<div class="sup-top"><div><h2>' + esc(T("SUPPLY LINES")) + '</h2></div>' +
-                '<button class="sup-close" type="button">' + esc(T("BACK TO THE MAP")) + '</button></div>' +
-                '<div class="sup-card"><h3>' + esc(T("THE NETWORK")) + '</h3>' +
-                '<div class="sup-sub">' + esc(T("The supply network arrives with sql/2026-11-04_automatic_supply_network.sql. Run it, then reload this page.")) +
-                (stErr ? '<br><br>' + esc(stErr) : "") + '</div></div>';
-
-            wire();
-            return;
-
-        }
-
-        const cut = (st.worlds || []).filter(w => !w.open).length;
-
-        let body = '<div class="sup-sub">' + esc(T("The network runs itself: every world you hold whole feeds the nearest world you hold whole that is closer to the capital, so the lines run inward, world by world. Nothing is bought and nothing is clicked.")) + '</div>';
-
-        body += '<div class="sup-sub">' + esc(T("An enemy fleet in orbit of either end of a link, or anywhere across the corridor between them, cuts it — and every world behind it goes with it, until the enemy moves on.")) + '</div>';
-
-        body += '<div class="sup-sub">' + esc(T("Treasury:")) + ' <b>' + Number(st.credits || 0).toLocaleString() + '</b> &middot; ' +
-            esc(T("Delivering:")) + ' <b>' + Number(st.total || 0) + '</b> ' + esc(T("per payment")) + ' &middot; ' +
-            esc(T("worlds cut:")) + ' <b>' + cut + '</b> &middot; ' +
-            esc(T("the corridor is")) + ' <b>' + st.corridor + '</b> ' + esc(T("wide")) + '</div>';
-
-        body += (st.worlds || []).map(worldRow).join("") ||
-            '<div class="sup-sub">' + esc(T("You hold no world whole yet.")) + '</div>';
-
-        tab.innerHTML =
-            '<div class="sup-top"><div><h2>' + esc(T("SUPPLY LINES")) + '</h2>' +
-            '<div class="sup-sub">' + esc(T("FACTION:")) + ' <b>' + esc(T(playerFaction)) + '</b></div></div>' +
-            '<button class="sup-close" type="button">' + esc(T("BACK TO THE MAP")) + '</button></div>' +
-            '<div class="sup-card"><h3>' + esc(T("THE NETWORK")) + '</h3>' + body + '</div>';
-
-        wire();
-
-    }
-
-    function wire() {
-
-        const close = tab.querySelector(".sup-close");
-        if (close) {
-            close.addEventListener("click", function () {
-                tab.classList.remove("on");
-                opened = false;
-            });
-        }
-
-    }
-
-    openBtn.addEventListener("click", function () {
-        opened = true;
-        tab.classList.add("on");
-        tab.innerHTML = '<div class="sup-sub">' + esc(T("Loading...")) + '</div>';
-        refresh();
-    });
-
-    document.addEventListener("keydown", function (e) {
-        if (e.key === "Escape" && tab.classList.contains("on")) {
-            tab.classList.remove("on");
-            opened = false;
-        }
-    });
-
-    /* the network is read even when the screen is shut, so the map draws it */
+    /* the network is drawn from the moment the map opens, unconditionally */
     refresh();
     setInterval(refresh, 12000);
 
