@@ -654,6 +654,8 @@
         "incorporated into the Union": "incorporado à União",
         "dashed = contested, not yet a whole world": "tracejado = disputado, ainda não é um mundo inteiro",
         "hover a world for its stability, its cities and its fleets": "passe o rato num mundo para ver estabilidade, cidades e frotas",
+        "1/4 is the stage of a world's administration, not the cities it has":
+            "1/4 é a etapa da administração do mundo, não as cidades que ele tem",
         "A consolidation of this world is before the Soviet.": "Uma consolidação deste mundo está no Soviete.",
         "PUT A CONSOLIDATION BEFORE THE SOVIET": "LEVAR UMA CONSOLIDAÇÃO AO SOVIETE",
         "Stability is enough: the administration advances one turn every five minutes.":

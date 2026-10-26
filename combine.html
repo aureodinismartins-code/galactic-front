@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=20"></script>
+<script src="i18n.js?v=21"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -851,7 +851,8 @@ function miniMapHtml(kind) {
               ' &middot; <span style="color:#7a8cff">&#9711;</span> ' + esc(T("collectivised")) +
               ' &middot; <span style="color:#2fbf6a">&#9711;</span> ' + esc(T("incorporated into the Union")) +
               ' &middot; <span style="color:#d6a84b">&#9711;</span> ' + esc(T("dashed = contested, not yet a whole world")) + ' &middot; ' +
-              esc(T("hover a world for its stability, its cities and its fleets"))) + '</div>';
+              esc(T("hover a world for its stability, its cities and its fleets")) + ' &middot; ' +
+              esc(T("1/4 is the stage of a world's administration, not the cities it has"))) + '</div>';
 
     return svg;
 
