@@ -668,6 +668,7 @@
         "whole world": "mundo inteiro",
         "dim = not ours yet": "apagado = ainda não é nosso",
         "the ring says how many of its cities are ours": "o anel diz quantas de suas cidades são nossas",
+        "a YES raises the maximum to": "um SIM eleva o máximo para",
         "Our fleets here:": "Nossas frotas aqui:",
         "No fleet of ours here.": "Nenhuma frota nossa aqui.",
         "squads": "esquadrões",
@@ -720,6 +721,8 @@
         "CREDITS": "CRÉDITOS",
         "fleets": "frotas",
         "put a new fleet quota before it first": "coloque antes uma nova cota de frota no Soviete",
+        "the quota waiting belongs to another commander": "a cota em espera pertence a outro comandante",
+        "none of the quotas waiting is yours": "nenhuma das cotas em espera é sua",
 
         /* ---------- host tools / overlays ---------- */
         "THE GAME HAS NOT STARTED": "O JOGO NÃO COMEÇOU",

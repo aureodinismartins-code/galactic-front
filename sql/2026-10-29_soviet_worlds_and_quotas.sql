@@ -83,6 +83,7 @@ declare
     v_fleets integer;
     v_building integer;
     v_quotas integer;
+    v_mine integer;
     v_price integer;
 begin
 
@@ -96,7 +97,13 @@ begin
     from public.fleets as f
     where f.faction = coalesce(v_faction, 'Combine');
 
+    /* the ceiling the Soviet has granted is the faction's, like the header's */
     select count(*) into v_quotas
+    from public.cs_authorizations as a
+    where a.kind = 'fleet' and not a.used;
+
+    /* but only a quota of your own (or one nobody claimed) may be spent by you */
+    select count(*) into v_mine
     from public.cs_authorizations as a
     where a.kind = 'fleet' and not a.used
       and (a.player_id = me or a.player_id is null);
@@ -110,9 +117,10 @@ begin
         'fleets', v_fleets,
         'building', v_building,
         'quotas', v_quotas,
+        'mine', v_mine,
         'max', v_fleets + v_building + v_quotas,
         'next_price', coalesce(v_price, 500),
-        'can_build', coalesce(v_faction, '') <> 'Combine' or v_quotas > 0
+        'can_build', coalesce(v_faction, '') <> 'Combine' or v_mine > 0
     );
 
 end;

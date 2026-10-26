@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=17"></script>
+<script src="i18n.js?v=18"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -547,6 +547,12 @@ function directivesHtml() {
                 ' data-intro="' + esc(T("Debate opens in")) + '" data-vote="' + esc(T("Vote in")) + '" style="color:#ffd37a">' +
                 (d.status === "introduction" ? T("Debate opens in") : T("Vote in")) + ' ' + mmss(secs) + '</b> &middot; ' +
                 T("needs") + ' ' + need + ' ' + T("of") + ' ' + ov.seats + ' ' + T("votes") + '</div>';
+
+            if (d.type === "fleet_construction") {
+                const fl = ov.fleets || { total: 0, max: 0 };
+                h += '<div class="sub">' + T("FLEETS NOW:") + ' <b style="color:#fff">' + fl.total + ' / ' + fl.max + '</b> ' +
+                    T("a YES raises the maximum to") + ' <b style="color:#7dff9d">' + (fl.max + 1) + '</b>.</div>';
+            }
 
             const dv = liveDebateFor(d.id);
 
