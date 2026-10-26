@@ -945,6 +945,19 @@
         "line closed.": "linha fechada.",
         "The supply lines arrive with sql/2026-11-03_diplomacy_levels_supply_and_fog.sql. Run it, then reload this page.":
             "As linhas de abastecimento chegam com sql/2026-11-03_diplomacy_levels_supply_and_fog.sql. Rode o arquivo e recarregue esta página.",
+        "SUPPLIED": "ABASTECIDO",
+        "CUT UPSTREAM": "CORTADA A MONTANTE",
+        "feeds through": "abastece-se via",
+        "it feeds nobody": "não abastece ninguém",
+        "THE NETWORK": "A REDE",
+        "worlds cut:": "mundos cortados:",
+        "in orbit of the world it feeds through": "em órbita do mundo por onde se abastece",
+        "The network runs itself: every world you hold whole feeds the nearest world you hold whole that is closer to the capital, so the lines run inward, world by world. Nothing is bought and nothing is clicked.":
+            "A rede funciona sozinha: cada mundo que você controla por inteiro abastece o mundo mais próximo que você também controla por inteiro e que esteja mais perto da capital, então as linhas correm para dentro, mundo a mundo. Nada é comprado e nada é clicado.",
+        "An enemy fleet in orbit of either end of a link, or anywhere across the corridor between them, cuts it — and every world behind it goes with it, until the enemy moves on.":
+            "Uma frota inimiga em órbita de qualquer das pontas de um trecho, ou em qualquer ponto do corredor entre elas, corta o trecho — e todo mundo atrás dele cai junto, até o inimigo se mover.",
+        "The supply network arrives with sql/2026-11-04_automatic_supply_network.sql. Run it, then reload this page.":
+            "A rede de abastecimento chega com sql/2026-11-04_automatic_supply_network.sql. Rode o arquivo e recarregue esta página.",
         "ACTIVE FLEETS": "FROTAS ATIVAS",
         "ENEMY IN SENSOR RANGE": "INIMIGO NO ALCANCE DOS SENSORES",
         "ENEMIES IN SENSOR RANGE": "INIMIGOS NO ALCANCE DOS SENSORES",

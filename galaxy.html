@@ -22,7 +22,7 @@
     ></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=25"></script>
+    <script src="i18n.js?v=26"></script>
         <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js?v=23"></script>
     <script src="ships.js"></script>
@@ -1788,9 +1788,18 @@ async function finalizeExpiredFleets() {
 ========================================= */
 
 
-/* a fleet built under another faction is dormant until you switch back */
+/*
+   A fleet of ours built under another faction is DORMANT: your own ships as
+   far as the account goes, enemy ships as far as this side of the war goes.
+   They are drawn - they are an enemy already - but they answer to nobody on
+   this side, so they can never be given an order.
+*/
+function fleetIsDormant(f) {
+    return !!(f && f.player_id === playerID && f.faction && f.faction !== playerFaction);
+}
+
 function isUsableFleet(f) {
-    return !(f.player_id === playerID && f.faction && f.faction !== playerFaction);
+    return !fleetIsDormant(f);
 }
 
 
@@ -1810,7 +1819,9 @@ function sensorAnchors() {
 
     for (const fleet of fleets) {
 
-        if (fleet.faction && fleet.faction !== playerFaction && fleet.player_id !== playerID) { continue; }
+        /* only ships that answer to this side of the war can look for anyone;
+           a dormant fleet of ours under the other flag is the enemy here */
+        if (fleet.faction && fleet.faction !== playerFaction) { continue; }
 
         const at = getFleetPosition(fleet);
 
@@ -1832,7 +1843,9 @@ function sensorAnchors() {
 
 function fleetInSensorRange(fleet, anchors) {
 
-    if (!fleet.faction || fleet.faction === playerFaction || fleet.player_id === playerID) { return true; }
+    /* our own side of the war is always drawn; a dormant fleet of ours under
+       the other flag is the enemy here and obeys the fog like any other */
+    if (!fleet.faction || fleet.faction === playerFaction) { return true; }
 
     const at = getFleetPosition(fleet);
 
@@ -1892,10 +1905,8 @@ async function loadFleets() {
         userData.user.id;
 
 
-    const {
-        data,
-        error
-    } =
+    const    { data, error }
+    =
         await supabaseClient
             .from("fleets")
             .select("*");
@@ -1916,6 +1927,7 @@ async function loadFleets() {
     }
 
 
+    /* finishing arrivals only concerns fleets this side can actually command */
     fleets = (data || []).filter(isUsableFleet);
 
 
@@ -1931,11 +1943,9 @@ async function loadFleets() {
             .select("*");
 
 
-    if (!refreshError) {
-
-        fleets = (refreshed || []).filter(isUsableFleet);
-
-    }
+    /* every fleet is drawn, dormant ones included: they are the enemy now,
+       and hiding them was why a blockade could sit there unseen */
+    fleets = (refreshError ? fleets : (refreshed || []));
 
     /*
        The fog, decided here first: every fleet of another faction is dropped
@@ -1945,7 +1955,7 @@ async function loadFleets() {
     {
         const anchors = sensorAnchors();
 
-        fleets = fleets.filter(f => isUsableFleet(f) && fleetInSensorRange(f, anchors));
+        fleets = fleets.filter(f => fleetInSensorRange(f, anchors));
     }
 
     /* and whatever the server's own reading can see is added on top */
@@ -2079,7 +2089,7 @@ const orbitSlots = {};
 
         const isOwner =
             fleet.player_id ===
-            playerID;
+            playerID && !fleetIsDormant(fleet);
 
 
         if (!isOwner) {
@@ -2432,7 +2442,7 @@ function selectFleet(fleet) {
 
     const isOwner =
         fleet.player_id ===
-        playerID;
+        playerID && !fleetIsDormant(fleet);
 
 
     document
@@ -4311,16 +4321,15 @@ supabaseClient
 </script>
 
 
-
-
 <script>
 
 /* =========================================================
-   SUPPLY LINES — the money has to travel. A world you hold
-   whole pays into the treasury only through a line to the
-   capital, and an enemy fleet in orbit of the world, in orbit
-   of the capital, or anywhere across the corridor between them
-   cuts it. The lines are drawn on the map itself.
+   SUPPLY NETWORK — the credits have to travel, and the
+   network builds itself. Every world you hold whole feeds
+   the nearest world you hold whole that is closer to the
+   capital, so the lines run inward like a real supply net,
+   and an enemy fleet in orbit of either end — or across the
+   short corridor between them — cuts every world behind it.
 ========================================================= */
 (function () {
 
@@ -4330,12 +4339,11 @@ supabaseClient
 
     const T = s => (typeof window.t === "function" ? window.t(s) : s);
     const esc = escapeHTML;
-    const mmss = s => Math.floor(Math.max(0, s) / 60) + ":" + String(Math.max(0, s) % 60).padStart(2, "0");
 
     const rgbOf = name => name === "Combine" ? "213,43,43"
         : (name === "Freedom Authority" ? "52,124,255" : "170,175,190");
 
-    let st = null, stErr = null, msg = "", busy = false, opened = false;
+    let st = null, stErr = null, opened = false;
 
     const style = document.createElement("style");
     style.textContent =
@@ -4353,19 +4361,12 @@ supabaseClient
         "#sup-tab .sup-card h3{font:bold 13px Arial;letter-spacing:3px;color:#7fdcff;margin:0 0 8px;}" +
         "#sup-tab .sup-sub{color:#9fb8c4;margin:4px 0;line-height:1.5;}" +
         "#sup-tab .sup-line{color:#bcd3de;margin:3px 0;}" +
-        "#sup-tab .sup-row{margin:10px 0 2px;display:flex;gap:8px;flex-wrap:wrap;}" +
-        "#sup-tab .sup-btn{background:#0c1a28;color:#e6f6ff;border:1px solid #4fb8d8;padding:8px 12px;" +
-        "font:bold 11px Arial;letter-spacing:2px;cursor:pointer;}" +
-        "#sup-tab .sup-btn:hover:not(:disabled){background:#17324a;}" +
-        "#sup-tab .sup-btn:disabled{opacity:.45;cursor:default;}" +
-        "#sup-tab .sup-btn.danger{border-color:#d0523f;color:#ffb9a8;}" +
         "#sup-tab .sup-world{border-top:1px solid #1f3354;padding-top:8px;margin-top:10px;}" +
         "#sup-tab .sup-tag{display:inline-block;margin-left:8px;padding:2px 8px;font:bold 10px Arial;letter-spacing:2px;border:1px solid;}" +
         "#sup-tab .sup-tag.ok{color:#8dffb0;border-color:#2f9d55;}" +
         "#sup-tab .sup-tag.cut{color:#ff9c8a;border-color:#c33b28;}" +
-        "#sup-tab .sup-tag.none{color:#9fb8c4;border-color:#54687c;}" +
+        "#sup-tab .sup-tag.up{color:#ffc48a;border-color:#b5762c;}" +
         "#sup-tab .sup-tag.cap{color:#ffd27a;border-color:#b58a2c;}" +
-        "#sup-tab .sup-msg{color:#ffd27a;min-height:18px;margin:6px 0 0;}" +
         "#supply-canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0;}";
     document.head.appendChild(style);
 
@@ -4379,7 +4380,7 @@ supabaseClient
     tab.id = "sup-tab";
     document.body.appendChild(tab);
 
-    /* ---------- the lines on the map ---------- */
+    /* ---------- the network on the map ---------- */
     function canvasEl() {
 
         const layer = document.getElementById("planet-layer");
@@ -4394,6 +4395,13 @@ supabaseClient
         }
 
         return c;
+    }
+
+    function cross(ctx, x, y) {
+        ctx.beginPath();
+        ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4);
+        ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4);
+        ctx.stroke();
     }
 
     function draw() {
@@ -4422,73 +4430,66 @@ supabaseClient
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
 
-        if (!st || !Array.isArray(st.worlds)) { return; }
+        if (!st || !Array.isArray(st.links) || !Array.isArray(st.worlds)) { return; }
 
-        const cap = st.worlds.find(x => x.capital && x.x != null && x.y != null);
-
-        if (!cap) { return; }
-
-        const cx = cap.x / 100 * w;
-        const cy = cap.y / 100 * h;
         const rgb = rgbOf(playerFaction);
+        const px = v => v / 100 * w;
+        const py = v => v / 100 * h;
 
-        for (const p of st.worlds) {
+        /* one short hop per pair of worlds, never a spoke to the capital */
+        for (const link of st.links) {
 
-            if (p.capital || !p.line || p.x == null || p.y == null) { continue; }
+            if (link.x1 == null || link.x2 == null) { continue; }
 
-            const x = p.x / 100 * w;
-            const y = p.y / 100 * h;
+            const open = link.open === true;
 
             ctx.save();
-            ctx.lineWidth = p.open ? 2 : 2;
-            ctx.strokeStyle = p.open ? "rgba(" + rgb + ",0.55)" : "rgba(255,90,70,0.85)";
-            ctx.setLineDash(p.open ? [] : [7, 6]);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = open ? "rgba(" + rgb + ",0.5)" : "rgba(255,90,70,0.85)";
+            ctx.setLineDash(open ? [] : [7, 6]);
             ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(x, y);
+            ctx.moveTo(px(Number(link.x1)), py(Number(link.y1)));
+            ctx.lineTo(px(Number(link.x2)), py(Number(link.y2)));
             ctx.stroke();
-
-            /* the world end of the line */
-            ctx.setLineDash([]);
-            ctx.fillStyle = p.open ? "rgba(" + rgb + ",0.9)" : "rgba(255,90,70,0.95)";
-            ctx.beginPath();
-            ctx.arc(x, y, p.open ? 3.5 : 4.5, 0, Math.PI * 2);
-            ctx.fill();
             ctx.restore();
-
-            /* where the enemy is sitting on it */
-            if (!p.open) {
-
-                for (const b of (p.blockers || [])) {
-
-                    if (b.x == null || b.y == null) { continue; }
-
-                    const bx = Number(b.x) / 100 * w;
-                    const by = Number(b.y) / 100 * h;
-
-                    ctx.save();
-                    ctx.strokeStyle = "rgba(255,120,80,0.95)";
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(bx - 4, by - 4); ctx.lineTo(bx + 4, by + 4);
-                    ctx.moveTo(bx + 4, by - 4); ctx.lineTo(bx - 4, by + 4);
-                    ctx.stroke();
-                    ctx.restore();
-
-                }
-
-            }
 
         }
 
-        /* the capital itself */
-        ctx.save();
-        ctx.strokeStyle = "rgba(" + rgb + ",0.9)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
+        for (const world of st.worlds) {
+
+            if (world.x == null || world.y == null) { continue; }
+
+            const x = px(Number(world.x));
+            const y = py(Number(world.y));
+
+            ctx.save();
+
+            if (world.capital) {
+                ctx.strokeStyle = "rgba(" + rgb + ",0.95)";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            else {
+                ctx.fillStyle = world.open ? "rgba(" + rgb + ",0.9)" : "rgba(255,90,70,0.95)";
+                ctx.beginPath();
+                ctx.arc(x, y, world.open ? 3.5 : 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (!world.open) {
+                ctx.strokeStyle = "rgba(255,120,80,0.95)";
+                ctx.lineWidth = 2;
+                for (const b of (world.blockers || [])) {
+                    if (b.x == null || b.y == null) { continue; }
+                    cross(ctx, px(Number(b.x)), py(Number(b.y)));
+                }
+            }
+
+            ctx.restore();
+
+        }
 
     }
 
@@ -4509,26 +4510,12 @@ supabaseClient
 
     }
 
-    async function act(planet, call, done) {
-
-        if (busy) { return; }
-        busy = true;
-        msg = "";
-
-        try {
-            const r = await call(planet);
-            if (r && r.error) { msg = r.error.message; }
-            else if (done) { msg = done(r ? r.data : null); }
-        }
-        catch (e) { msg = String((e && e.message) || e); }
-
-        busy = false;
-        await refresh();
-
-    }
-
     /* ---------- the screen ---------- */
-    const WHY = { orbit: "in orbit of the world", capital: "in orbit of the capital", corridor: "across the corridor" };
+    const WHY = {
+        orbit: "in orbit of the world",
+        hub: "in orbit of the world it feeds through",
+        corridor: "across the corridor"
+    };
 
     function worldRow(p) {
 
@@ -4538,38 +4525,24 @@ supabaseClient
         }).join("");
 
         let tag;
+
         if (p.capital) { tag = '<span class="sup-tag cap">' + esc(T("CAPITAL")) + '</span>'; }
-        else if (!p.line) { tag = '<span class="sup-tag none">' + esc(T("NO LINE")) + '</span>'; }
-        else if (p.open) { tag = '<span class="sup-tag ok">' + esc(T("OPEN")) + '</span>'; }
+        else if (p.open) { tag = '<span class="sup-tag ok">' + esc(T("SUPPLIED")) + '</span>'; }
+        else if (p.own) { tag = '<span class="sup-tag up">' + esc(T("CUT UPSTREAM")) + '</span>'; }
         else { tag = '<span class="sup-tag cut">' + esc(T("CUT")) + '</span>'; }
 
-        let acts = "";
-
-        if (!p.capital) {
-
-            if (p.line) {
-                acts = '<button class="sup-btn danger sup-close-line" type="button" data-p="' + esc(p.planet) + '">' +
-                    esc(T("CLOSE THE LINE")) + '</button>';
-            }
-            else {
-                acts = '<button class="sup-btn sup-open-line" type="button" data-p="' + esc(p.planet) + '"' +
-                    (Number(ovCredits()) < Number(st.price) ? " disabled" : "") + '>' +
-                    esc(T("OPEN A LINE")) + ' (' + st.price + ' ' + esc(T("CREDITS")) + ')</button>';
-            }
-
-        }
+        const feeds = p.capital
+            ? esc(T("it feeds nobody"))
+            : esc(T("feeds through")) + ' <b>' + esc(p.parent || "?") + '</b>';
 
         return '<div class="sup-world">' +
             '<div><b style="font-size:14px">' + esc(p.planet) + '</b>' + tag +
             '<span class="sup-sub"> ' + esc(T("income")) + ' <b>' + Number(p.income || 0) + '</b> ' +
-            esc(T("per payment")) + (p.open ? ' &middot; ' + esc(T("carrying")) : "") + '</span></div>' +
+            esc(T("per payment")) + ' &middot; ' + feeds + '</span></div>' +
             blockers +
-            (acts ? '<div class="sup-row">' + acts + '</div>' : "") +
             '</div>';
 
     }
-
-    function ovCredits() { return st && st.credits != null ? Number(st.credits) : 0; }
 
     function render() {
 
@@ -4578,8 +4551,8 @@ supabaseClient
             tab.innerHTML =
                 '<div class="sup-top"><div><h2>' + esc(T("SUPPLY LINES")) + '</h2></div>' +
                 '<button class="sup-close" type="button">' + esc(T("BACK TO THE MAP")) + '</button></div>' +
-                '<div class="sup-card"><h3>' + esc(T("THE LINES")) + '</h3>' +
-                '<div class="sup-sub">' + esc(T("The supply lines arrive with sql/2026-11-03_diplomacy_levels_supply_and_fog.sql. Run it, then reload this page.")) +
+                '<div class="sup-card"><h3>' + esc(T("THE NETWORK")) + '</h3>' +
+                '<div class="sup-sub">' + esc(T("The supply network arrives with sql/2026-11-04_automatic_supply_network.sql. Run it, then reload this page.")) +
                 (stErr ? '<br><br>' + esc(stErr) : "") + '</div></div>';
 
             wire();
@@ -4587,19 +4560,16 @@ supabaseClient
 
         }
 
-        const cut = (st.worlds || []).filter(w => w.line && !w.open).length;
-        const paying = (st.worlds || []).filter(w => w.open).reduce((n, w) => n + Number(w.income || 0), 0);
+        const cut = (st.worlds || []).filter(w => !w.open).length;
 
-        let body = '<div class="sup-sub">' + esc(T("Credits only reach the capital along a supply line. Open one from a world you hold whole, and it carries its income to ")) +
-            '<b>' + esc(st.capital || "?") + '</b>. ' +
-            esc(T("An enemy fleet in orbit of the world, in orbit of the capital, or anywhere across the corridor between them cuts the line until it moves on.")) + '</div>';
+        let body = '<div class="sup-sub">' + esc(T("The network runs itself: every world you hold whole feeds the nearest world you hold whole that is closer to the capital, so the lines run inward, world by world. Nothing is bought and nothing is clicked.")) + '</div>';
+
+        body += '<div class="sup-sub">' + esc(T("An enemy fleet in orbit of either end of a link, or anywhere across the corridor between them, cuts it — and every world behind it goes with it, until the enemy moves on.")) + '</div>';
 
         body += '<div class="sup-sub">' + esc(T("Treasury:")) + ' <b>' + Number(st.credits || 0).toLocaleString() + '</b> &middot; ' +
-            esc(T("a line costs")) + ' <b>' + st.price + '</b> ' + esc(T("CREDITS")) + ' &middot; ' +
+            esc(T("Delivering:")) + ' <b>' + Number(st.total || 0) + '</b> ' + esc(T("per payment")) + ' &middot; ' +
+            esc(T("worlds cut:")) + ' <b>' + cut + '</b> &middot; ' +
             esc(T("the corridor is")) + ' <b>' + st.corridor + '</b> ' + esc(T("wide")) + '</div>';
-
-        body += '<div class="sup-sub">' + esc(T("Delivering:")) + ' <b>' + paying + '</b> ' + esc(T("per payment")) +
-            ' &middot; ' + esc(T("lines cut:")) + ' <b>' + cut + '</b></div>';
 
         body += (st.worlds || []).map(worldRow).join("") ||
             '<div class="sup-sub">' + esc(T("You hold no world whole yet.")) + '</div>';
@@ -4608,8 +4578,7 @@ supabaseClient
             '<div class="sup-top"><div><h2>' + esc(T("SUPPLY LINES")) + '</h2>' +
             '<div class="sup-sub">' + esc(T("FACTION:")) + ' <b>' + esc(T(playerFaction)) + '</b></div></div>' +
             '<button class="sup-close" type="button">' + esc(T("BACK TO THE MAP")) + '</button></div>' +
-            '<div class="sup-msg">' + esc(msg) + '</div>' +
-            '<div class="sup-card"><h3>' + esc(T("THE LINES")) + '</h3>' + body + '</div>';
+            '<div class="sup-card"><h3>' + esc(T("THE NETWORK")) + '</h3>' + body + '</div>';
 
         wire();
 
@@ -4625,35 +4594,10 @@ supabaseClient
             });
         }
 
-        tab.querySelectorAll(".sup-open-line").forEach(function (el) {
-            el.addEventListener("click", function () {
-                el.disabled = true;
-                const planet = el.dataset.p;
-                act(planet, function (p) {
-                    return supabaseClient.rpc("open_supply_line", { p_planet: p });
-                }, function (data) {
-                    return planet + " — " + T("line open to") + " " + (data ? data.capital : "?") + ".";
-                });
-            });
-        });
-
-        tab.querySelectorAll(".sup-close-line").forEach(function (el) {
-            el.addEventListener("click", function () {
-                el.disabled = true;
-                const planet = el.dataset.p;
-                act(planet, function (p) {
-                    return supabaseClient.rpc("close_supply_line", { p_planet: p });
-                }, function () {
-                    return planet + " — " + T("line closed.");
-                });
-            });
-        });
-
     }
 
     openBtn.addEventListener("click", function () {
         opened = true;
-        msg = "";
         tab.classList.add("on");
         tab.innerHTML = '<div class="sup-sub">' + esc(T("Loading...")) + '</div>';
         refresh();
@@ -4666,14 +4610,13 @@ supabaseClient
         }
     });
 
-    /* the lines and their cuts are read even when the screen is shut */
+    /* the network is read even when the screen is shut, so the map draws it */
     refresh();
     setInterval(refresh, 12000);
 
 })();
 
 </script>
-
 
 </body>
 </html>
