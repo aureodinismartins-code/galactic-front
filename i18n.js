@@ -667,7 +667,22 @@
         "contested world": "mundo disputado",
         "whole world": "mundo inteiro",
         "dim = not ours yet": "apagado = ainda não é nosso",
-        "the ring says how many of its cities are ours": "o anel diz quantas de suas cidades são nossas",
+        "hover a world for its cities and its fleets": "passe o rato num mundo para ver suas cidades e suas frotas",
+
+        /* ---------- the Soviet: agitprop ---------- */
+        "Agitprop is paid from the Combine treasury. A campaign raises the discipline of a current's commissars and can pull the least disciplined commissars of the other currents over to it. The same current can be targeted once every ten minutes.":
+            "O agitprop é pago pelo tesouro do Combine. Uma campanha sobe a disciplina dos comissários de uma corrente e pode puxar para ela os comissários menos disciplinados das outras correntes. A mesma corrente só pode ser alvo uma vez a cada dez minutos.",
+        "The agitprop offices are not installed": "Os escritórios de agitprop não estão instalados",
+        "Run sql/2026-10-30_soviet_agitprop.sql in the Supabase SQL editor, then reload this page.":
+            "Execute sql/2026-10-30_soviet_agitprop.sql no editor SQL do Supabase e recarregue esta página.",
+        "Loading the agitprop offices...": "Carregando os escritórios de agitprop...",
+        "The agitprop offices": "Os escritórios de agitprop",
+        "A campaign lifts the discipline of the current's own commissars and wins over the least disciplined commissars of the others (they join it, at its level of discipline). More money means more points and more commissars.":
+            "Uma campanha sobe a disciplina dos próprios comissários da corrente e conquista os comissários menos disciplinados das outras (eles se juntam a ela, no nível de disciplina dela). Mais dinheiro significa mais pontos e mais comissários.",
+        "A campaign for this current is still running:": "Ainda há uma campanha para esta corrente em curso:",
+        "Agitprop campaign:": "Campanha de agitprop:",
+        "commissar changed current": "comissário mudou de corrente",
+        "commissars changed current": "comissários mudaram de corrente",
         "a YES raises the maximum to": "um SIM eleva o máximo para",
         "Our fleets here:": "Nossas frotas aqui:",
         "No fleet of ours here.": "Nenhuma frota nossa aqui.",
