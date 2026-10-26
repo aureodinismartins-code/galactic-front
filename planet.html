@@ -3620,13 +3620,15 @@ warUnits = un.error ? [] : (un.data || []);
 
         for (const row of L.data) {
 
-            const v = Number(row.current_losses);
+            /* a loss counter only ever grows: anything below zero is junk, not news */
+            const v = Math.max(0, Number(row.current_losses) || 0);
+            const rate = Math.max(0, Number(row.loss_rate) || 0);
             const s2 = warLoss[row.faction_id];
 
-            if (!s2) { warLoss[row.faction_id] = { base: v, rate: Number(row.loss_rate), t0: now, shown: v }; }
+            if (!s2) { warLoss[row.faction_id] = { base: v, rate: rate, t0: now, shown: v }; }
             else {
                 s2.base = Math.max(v, s2.shown);   /* never show less than we already showed */
-                s2.rate = Number(row.loss_rate);
+                s2.rate = rate;
                 s2.t0 = now;
             }
 
@@ -3883,7 +3885,7 @@ function updateWarPanels() {
         warFactions.map(f =>
             '<div style="display:flex;gap:8px;margin:3px 0;"><span style="color:' + f.color + ';">' + f.name + "</span>" +
             '<span id="war-loss-' + f.id + '" style="margin-left:auto;color:#fff;">' +
-            Math.round((warLoss[f.id] || { shown: Number(f.losses) }).shown).toLocaleString() + "</span></div>"
+            Math.round(Math.max(0, Number((warLoss[f.id] || { shown: Number(f.losses) }).shown) || 0)).toLocaleString() + "</span></div>"
         ).join("");
 
     document.getElementById("war-feed").innerHTML =
@@ -4429,7 +4431,7 @@ function animateWarLosses() {
         const s = warLoss[id];
         const el = document.getElementById("war-loss-" + id);
 
-        s.shown = Math.max(s.shown, s.base + s.rate * (now - s.t0) / 1000);
+        s.shown = Math.max(0, s.shown, s.base + Math.max(0, s.rate) * (now - s.t0) / 1000);
 
         if (el) { el.textContent = Math.round(s.shown).toLocaleString(); }
 
