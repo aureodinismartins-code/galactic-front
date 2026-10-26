@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=14"></script>
+<script src="i18n.js?v=15"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -86,6 +86,7 @@ hr.rule { border: 0; border-top: 1px solid #5a1d20; margin: 10px 0; }
     <div class="stat">CREDITS<br><b id="st-credits">-</b></div>
     <div class="stat">CONFIDENCE<br><b id="st-pop">-</b></div>
     <div class="stat">QUOTA<br><b id="st-quota">-</b></div>
+    <div class="stat">FLEETS<br><b id="st-fleets">-</b></div>
     <div class="stat">SEATS<br><b id="st-seats">-</b></div>
     <div class="stat">NEEDED<br><b id="st-need">-</b></div>
 </div>
@@ -122,7 +123,7 @@ hr.rule { border: 0; border-top: 1px solid #5a1d20; margin: 10px 0; }
 
 const TYPES = {
     military_campaign: { name: "Military Campaign against a Planet", votes: "majority", desc: "Authorise an attack on one planet. Without it Combine fleets cannot attack." },
-    fleet_construction: { name: "New Fleet Quota", votes: "qualified", desc: "Approve one new fleet (build it from the galaxy map afterwards; it is still paid for there)." },
+    fleet_construction: { name: "New Fleet Quota", votes: "qualified", desc: "Raise the maximum by one fleet (build it from the galaxy map afterwards; it is still paid for there)." },
     knightmare_construction: { name: "Armoured Detachment", votes: "qualified", desc: "Approve one elite armoured detachment (the Knightmare Facility chain is still needed)." },
     production_quota: { name: "Five-Year Plan: Raise the Quota", votes: "qualified", desc: "Raise the production quota: 300-500 credits every 15 minutes per level (max 2), confidence -5." },
     diplomacy: { name: "Fraternal Pact", votes: "majority", desc: "Send envoys to another faction: relations +10." },
@@ -200,6 +201,12 @@ function render() {
     $("st-credits").textContent = fmt(ov.credits);
     $("st-pop").textContent = Math.round(ov.state.popularity) + "%";
     $("st-quota").textContent = ov.state.tax_level + " / 2";
+
+    const fl = ov.fleets || { total: 0, max: 0, quotas: 0 };
+    $("st-fleets").textContent = fl.total + " / " + fl.max;
+    $("st-fleets").style.color = fl.quotas > 0 ? "#7dff9d" : "#fff";
+    $("st-fleets").title = T("in service / the maximum the Soviet permits") + " (" + fl.quotas + " " + T("quota(s) waiting") + ")";
+
     $("st-seats").textContent = ov.seats;
     $("st-need").textContent = ov.majority + " / " + ov.supermajority;
     $("st-need").title = "votes needed: majority / three fifths";
@@ -492,7 +499,8 @@ function renderMember() {
 --------------------------------------------------------- */
 function renderTabs() {
 
-    const tabs = [["directives", "DIRECTIVES"], ["secretary", "GENERAL SECRETARY"], ["new", "NEW DIRECTIVE"], ["news", "NEWS"]];
+    const tabs = [["directives", "DIRECTIVES"], ["secretary", "GENERAL SECRETARY"], ["new", "NEW DIRECTIVE"],
+        ["worlds", "OCCUPIED WORLDS"], ["authority", "SOVIET POWER"], ["news", "NEWS"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + esc(T(t[1])) + '</div>').join("");
     $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
@@ -502,6 +510,8 @@ function renderTabs() {
     if (tab === "directives") { body.innerHTML = directivesHtml(); wireDirectives(); }
     else if (tab === "secretary") { body.innerHTML = secretaryHtml(); wireSecretary(); }
     else if (tab === "new") { body.innerHTML = newHtml(); wireNew(); }
+    else if (tab === "worlds") { body.innerHTML = worldsHtml(); wireWorlds(); }
+    else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
     else { body.innerHTML = newsHtml(); }
 
 }
@@ -725,6 +735,143 @@ function wireSecretary() {
 
 }
 
+/* ---- occupied worlds ---- */
+function worldsHtml() {
+
+    const worlds = ov.worlds || [];
+    const whole = worlds.filter(w => w.whole).length;
+    const cities = worlds.reduce((n, w) => n + Number(w.held), 0);
+
+    const tokens = '<div class="tokens">' +
+        '<div class="token">' + esc(T("WORLDS HELD")) + '<b>' + worlds.length + '</b></div>' +
+        '<div class="token">' + esc(T("WHOLE WORLDS")) + '<b>' + whole + '</b></div>' +
+        '<div class="token">' + esc(T("CITIES HELD")) + '<b>' + cities + '</b></div></div>' +
+        '<div class="sub" style="margin-bottom:10px">' +
+        esc(T("Every world where the Combine holds at least one city. A world is whole only when no other faction holds a city there, and only a whole world pays into the plan; the rest still has to be taken, and a campaign needs the Soviet's approval.")) + '</div>';
+
+    if (!worlds.length) {
+        return tokens + '<div class="sub">' + esc(T("The Combine holds no world yet. Take one with a military campaign (NEW DIRECTIVE), and it is listed here.")) + '</div>';
+    }
+
+    return tokens + worlds.map(function(w) {
+
+        const pct = w.total ? Math.round(w.held / w.total * 100) : 0;
+        let actions = "";
+
+        if (w.whole) {
+            actions = '<div class="sub" style="color:#7dff9d">' + esc(T("Incorporated into the Union: the plan collects this world.")) + '</div>';
+        }
+        else if (w.declared) {
+            actions = '<div class="sub" style="color:#7dff9d">' + esc(T("Campaign approved: the fleets may attack it.")) + '</div>';
+        }
+        else if (w.live) {
+            actions = '<div class="sub" style="color:#ffd37a">' + esc(T("A campaign against it is before the Soviet.")) + '</div>';
+        }
+        else {
+            actions = '<div style="margin-top:8px"><button class="btn small camp-btn" data-p="' + esc(w.planet) + '">' + esc(T("PUT A CAMPAIGN BEFORE THE SOVIET")) + '</button></div>';
+        }
+
+        return '<div class="card' + (w.whole ? "" : " active") + '"><h3>' + esc(w.planet) + ' ' +
+            (w.whole ? '<span class="badge pass">' + esc(T("WHOLE")) + '</span>' : '<span class="badge live">' + esc(T("CONTESTED")) + '</span>') + '</h3>' +
+            '<div class="sub">' + w.held + ' ' + T("of") + ' ' + w.total + ' ' + esc(T("cities held")) +
+            (w.others ? ' &middot; ' + esc(T("also held by")) + ' ' + esc(w.others) : "") + '</div>' +
+            '<div class="bar"><i style="width:' + pct + '%;background:' + (w.whole ? "#2fbf6a" : "#d6a84b") + '"></i></div>' +
+            '<div class="sub">' + esc(T("PRODUCTION")) + ' ' +
+            (w.whole ? '<b style="color:#7dff9d">' + fmt(w.income) + '</b>' : '<b style="color:#b89598">0</b>') +
+            ' ' + esc(T("into the plan every 5 minutes")) + '</div>' + actions + '</div>';
+
+    }).join("");
+
+}
+
+function wireWorlds() {
+    $("tabbody").querySelectorAll(".camp-btn").forEach(el => el.addEventListener("click", function() {
+        draft.type = "military_campaign";
+        draft.planet = el.dataset.p;
+        tab = "new";
+        renderTabs();
+    }));
+}
+
+/* ---- the authority the Soviet has granted ---- */
+function authorityHtml() {
+
+    const a = ov.authorizations;
+    const fl = ov.fleets || { total: 0, max: 0, quotas: 0, next_price: 500 };
+    const rel = ov.state.relations || {};
+    const st = ov.state;
+    const liveQuota = ov.directives.some(d => d.type === "fleet_construction" && (d.status === "introduction" || d.status === "debate"));
+
+    let h = '<div class="tokens">' +
+        '<div class="token">' + esc(T("FLEETS IN SERVICE")) + '<b>' + fl.total + ' / ' + fl.max + '</b><span class="sub">' + esc(T("of the maximum the Soviet permits")) + '</span></div>' +
+        '<div class="token">' + esc(T("QUOTAS WAITING")) + '<b>' + fl.quotas + '</b><span class="sub">' + esc(T("one fleet each")) + '</span></div>' +
+        '<div class="token">' + esc(T("ARMOURED DETACHMENTS")) + '<b>' + a.knightmare + '</b><span class="sub">' + esc(T("recruit into a fleet")) + '</span></div>' +
+        '<div class="token">' + esc(T("APPROVED CAMPAIGNS")) + '<b>' + a.war.length + '</b><span class="sub">' + (a.war.length ? esc(a.war.join(", ")) : esc(T("none"))) + '</span></div></div>';
+
+    h += '<div class="card active"><h3>' + esc(T("The fleet quota")) + '</h3>' +
+        '<div class="sub">' + esc(T("The Soviet permits")) + ' <b style="color:#fff">' + fl.max + '</b> ' + esc(T("fleets:")) + ' ' +
+        fl.total + ' ' + esc(T("in service and")) + ' ' + fl.quotas + ' ' + esc(T("quota(s) not yet spent")) + '. ' +
+        esc(T("Every approved quota directive raises the maximum by one; building a fleet spends the quota instead of raising it.")) + '</div>' +
+        '<div class="sub" style="margin-top:6px">' + esc(T("The next fleet costs")) + ' <b>' + fmt(fl.next_price) + '</b> ' +
+        esc(T("credits, paid when it is built and not when the directive passes.")) + '</div>' +
+        '<div style="margin-top:10px"><button class="btn" id="quota-go"' + (liveQuota ? " disabled" : "") + '>' +
+        esc(T(liveQuota ? "A QUOTA IS ALREADY BEFORE THE SOVIET" : "PUT A FLEET QUOTA BEFORE THE SOVIET")) + '</button></div></div>';
+
+    h += '<div class="card"><h3>' + esc(T("War room: a campaign against a world")) + '</h3>' +
+        '<div class="sub" style="margin-bottom:8px">' + esc(T("Only players bring a campaign; the commissars never declare one. A majority is enough. Without an approved campaign Combine fleets cannot attack the planet.")) + '</div>';
+
+    const fronts = ov.targets.filter(t => t.owners !== "Combine" && t.owners !== "Unclaimed");
+
+    h += (fronts.length ? fronts.map(function(t) {
+
+        const live = ov.directives.some(d => d.type === "military_campaign" && d.planet === t.planet && (d.status === "introduction" || d.status === "debate"));
+
+        return '<div class="fc" style="margin:7px 0"><span class="nm">' + esc(t.planet) + '</span>' +
+            '<span class="sub" style="flex:1">' + esc(T(t.owners)) + '</span>' +
+            (t.declared
+                ? '<span class="badge pass">' + esc(T("APPROVED")) + '</span>'
+                : live
+                    ? '<span class="badge live">' + esc(T("BEFORE THE SOVIET")) + '</span>'
+                    : '<button class="btn small camp-btn" data-p="' + esc(t.planet) + '">' + esc(T("PROPOSE")) + '</button>') + '</div>';
+
+    }).join("") : '<div class="sub">' + esc(T("Every world is already ours.")) + '</div>') + '</div>';
+
+    h += '<div class="card"><h3>' + esc(T("Standing")) + '</h3><div class="sub">' + esc(T("CONFIDENCE")) + ' ' + Math.round(st.popularity) + '% ' +
+        esc(T("(it shifts every vote by up to \u00b110 points: a confident Party gets its way more often)")) + '</div>' +
+        '<div class="bar"><i style="width:' + st.popularity + '%;background:#b32424"></i></div>' +
+        '<div class="sub" style="margin-top:8px">' + esc(T("PRODUCTION PLAN")) + ' ' + st.tax_level + ' ' + esc(T("of")) + ' 2 &middot; ' +
+        esc(T("300-500 credits every 15 minutes per level")) + '</div>' +
+        '<div class="sub" style="margin-top:4px">' + esc(T("relations:")) + ' Freedom Authority ' + (rel["Freedom Authority"] || 0) + ', ' +
+        esc(T("Independents")) + ' ' + (rel.Independents || 0) + '</div></div>';
+
+    h += '<div class="card"><h3>' + esc(T("The three currents")) + '</h3>' + ov.currents.map(function(c) {
+        return '<div class="sub" style="padding:4px 0"><span class="dot" style="background:' + esc(c.color) + '"></span> <b style="color:#fff">' +
+            esc(T(c.name)) + '</b> (' + c.seats + ' ' + esc(T("seats")) + '): ' + esc(T(c.description)) + '</div>';
+    }).join("") + '</div>';
+
+    return h;
+
+}
+
+function wireAuthority() {
+
+    $("tabbody").querySelectorAll(".camp-btn").forEach(el => el.addEventListener("click", function() {
+        draft.type = "military_campaign";
+        draft.planet = el.dataset.p;
+        tab = "new";
+        renderTabs();
+    }));
+
+    if ($("quota-go")) {
+        $("quota-go").addEventListener("click", function() {
+            draft.type = "fleet_construction";
+            tab = "new";
+            renderTabs();
+        });
+    }
+
+}
+
 /* ---- a new directive ---- */
 function newHtml() {
 
@@ -734,6 +881,12 @@ function newHtml() {
     let h = '<label class="row">' + esc(T("WHAT SHOULD THE SOVIET DECIDE?")) + '</label><select id="n-type" style="width:100%">' +
         Object.keys(TYPES).map(k => '<option value="' + k + '"' + (draft.type === k ? " selected" : "") + '>' + esc(T(TYPES[k].name)) + '</option>').join("") + '</select>' +
         '<div class="sub" style="margin-top:6px">' + esc(T(t.desc)) + '</div>';
+
+    if (draft.type === "fleet_construction") {
+        const fl = ov.fleets || { total: 0, max: 0, quotas: 0 };
+        h += '<div class="sub" style="margin-top:6px">' + esc(T("FLEETS NOW:")) + ' <b style="color:#fff">' + fl.total + ' / ' + fl.max + '</b> ' +
+            esc(T("(in service / the maximum the Soviet permits). This directive raises the maximum to")) + ' <b style="color:#7dff9d">' + (fl.max + 1) + '</b>.</div>';
+    }
 
     if (draft.type === "military_campaign") {
         h += '<label class="row">' + esc(T("PLANET TO ATTACK")) + '</label><select id="n-planet" style="width:100%">' +

@@ -638,6 +638,76 @@
         "PUT BEFORE THE SOVIET": "LEVAR AO SOVIETE",
         "Your directive is before the Soviet.": "Sua diretiva está no Soviete.",
 
+        /* ---------- the Soviet: occupied worlds ---------- */
+        "SOVIET POWER": "PODER SOVIÉTICO",
+        "WORLDS HELD": "MUNDOS TOMADOS",
+        "WHOLE WORLDS": "MUNDOS INTEIROS",
+        "CITIES HELD": "CIDADES EM MÃOS",
+        "Every world where the Combine holds at least one city. A world is whole only when no other faction holds a city there, and only a whole world pays into the plan; the rest still has to be taken, and a campaign needs the Soviet's approval.":
+            "Todo mundo onde o Combine tem pelo menos uma cidade. Um mundo só é inteiro quando nenhuma outra facção tem cidade lá, e só um mundo inteiro paga ao plano; o resto ainda precisa ser tomado, e uma campanha precisa da aprovação do Soviete.",
+        "The Combine holds no world yet. Take one with a military campaign (NEW DIRECTIVE), and it is listed here.":
+            "O Combine ainda não tomou nenhum mundo. Tome um com uma campanha militar (NOVA DIRETIVA) e ele aparece aqui.",
+        "WHOLE": "INTEIRO",
+        "CONTESTED": "DISPUTADO",
+        "cities held": "cidades em mãos",
+        "also held by": "também em mãos de",
+        "PRODUCTION": "PRODUÇÃO",
+        "into the plan every 5 minutes": "para o plano a cada 5 minutos",
+        "Incorporated into the Union: the plan collects this world.":
+            "Incorporado à União: o plano recolhe deste mundo.",
+        "Campaign approved: the fleets may attack it.": "Campanha aprovada: as frotas podem atacá-lo.",
+        "A campaign against it is before the Soviet.": "Há uma campanha contra ele no Soviete.",
+        "PUT A CAMPAIGN BEFORE THE SOVIET": "LEVAR UMA CAMPANHA AO SOVIETE",
+        "Every world is already ours.": "Todo mundo já é nosso.",
+        "Contested": "Disputado",
+        "Unclaimed": "Não reclamado",
+        "none": "nenhuma",
+
+        /* ---------- the Soviet: what it has authorised ---------- */
+        "FLEETS IN SERVICE": "FROTAS EM SERVIÇO",
+        "of the maximum the Soviet permits": "do máximo que o Soviete permite",
+        "QUOTAS WAITING": "COTAS EM ESPERA",
+        "one fleet each": "uma frota cada",
+        "ARMOURED DETACHMENTS": "DESTACAMENTOS BLINDADOS",
+        "APPROVED CAMPAIGNS": "CAMPANHAS APROVADAS",
+        "APPROVED": "APROVADA",
+        "BEFORE THE SOVIET": "NO SOVIETE",
+        "PROPOSE": "PROPOR",
+        "The fleet quota": "A cota de frotas",
+        "The Soviet permits": "O Soviete permite",
+        "fleets:": "frotas:",
+        "in service and": "em serviço e",
+        "quota(s) not yet spent": "cota(s) ainda não gasta(s)",
+        "Every approved quota directive raises the maximum by one; building a fleet spends the quota instead of raising it.":
+            "Cada diretiva de cota aprovada eleva o máximo em uma frota; construir uma frota gasta a cota em vez de elevar o máximo.",
+        "The next fleet costs": "A próxima frota custa",
+        "credits, paid when it is built and not when the directive passes.":
+            "créditos, pagos quando ela é construída e não quando a diretiva passa.",
+        "A QUOTA IS ALREADY BEFORE THE SOVIET": "JÁ HÁ UMA COTA NO SOVIETE",
+        "PUT A FLEET QUOTA BEFORE THE SOVIET": "LEVAR UMA COTA DE FROTA AO SOVIETE",
+        "War room: a campaign against a world": "Sala de guerra: uma campanha contra um mundo",
+        "Only players bring a campaign; the commissars never declare one. A majority is enough. Without an approved campaign Combine fleets cannot attack the planet.":
+            "Só jogadores trazem uma campanha; os comissários nunca declaram uma. A maioria simples basta. Sem campanha aprovada, as frotas do Combine não podem atacar o planeta.",
+        "(it shifts every vote by up to ±10 points: a confident Party gets its way more often)":
+            "(ela desloca cada votação em até ±10 pontos: um Partido confiante impõe sua vontade com mais frequência)",
+        "PRODUCTION PLAN": "PLANO DE PRODUÇÃO",
+        "300-500 credits every 15 minutes per level": "300-500 créditos a cada 15 minutos por nível",
+        "The three currents": "As três correntes",
+        "FLEETS NOW:": "FROTAS AGORA:",
+        "(in service / the maximum the Soviet permits). This directive raises the maximum to":
+            "(em serviço / o máximo que o Soviete permite). Esta diretiva eleva o máximo para",
+        "Raise the maximum by one fleet (build it from the galaxy map afterwards; it is still paid for there).":
+            "Eleva o máximo em uma frota (construa-a depois no mapa galáctico; ela ainda é paga lá).",
+        "in service / the maximum the Soviet permits": "em serviço / o máximo que o Soviete permite",
+        "quota(s) waiting": "cota(s) em espera",
+
+        /* ---------- the fleet menu on a planet ---------- */
+        "SOVIET FLEET QUOTA": "COTA DE FROTAS DO SOVIETE",
+        "NEXT FLEET": "PRÓXIMA FROTA",
+        "CREDITS": "CRÉDITOS",
+        "fleets": "frotas",
+        "put a new fleet quota before it first": "coloque antes uma nova cota de frota no Soviete",
+
         /* ---------- host tools / overlays ---------- */
         "THE GAME HAS NOT STARTED": "O JOGO NÃO COMEÇOU",
         "Everything is frozen. Waiting for the host to begin the war.":
