@@ -1670,11 +1670,16 @@ declare
     g record;
     d record;
     v_income bigint;
+    v_faction text;
 begin
 
     if auth.uid() is null then return; end if;
     if not exists (select 1 from public.game_control as x where x.id = 1 and x.started) then return; end if;
     if public.game_frozen() then return; end if;
+
+    /* the plenum sits for the Combine: nobody else keeps it in session */
+    select p.faction into v_faction from public.players as p where p.id = auth.uid();
+    if coalesce(v_faction, '') <> 'Combine' then return; end if;
 
     update public.cs_state as s set online_at = now() where s.id = 1;
     select * into st from public.cs_state as s where s.id = 1;
