@@ -526,15 +526,30 @@
         .fleet-marker.freedom svg.fleet-ships { filter: drop-shadow(0 0 2px #3b7bff) drop-shadow(0 0 5px #3b7bff); }
         .fleet-marker.independent svg.fleet-ships { filter: drop-shadow(0 0 3px #ffffff); }
         .fleet-marker.enemy svg.fleet-ships { opacity: 0.85; }
+        /* a lost contact: a dashed chip where it was, counting down */
         .fleet-marker.ghost {
-            border-style: dashed !important;
-            opacity: 0.45;
-            background: rgba(255,255,255,0.05);
+            width: auto;
+            height: auto;
+            flex-direction: column;
+            padding: 3px 7px;
+            border: 1px dashed rgba(255,185,168,0.8) !important;
+            border-radius: 4px !important;
+            background: rgba(8,12,18,0.6) !important;
+            opacity: 0.7;
             box-shadow: none;
             pointer-events: none;
         }
-        .fleet-marker.ghost .ghost-dot { color: #ffb9a8; font-size: 12px; }
-        .fleet-marker.ghost .fleet-label { color: #ffb9a8; }
+        .fleet-marker.ghost .ghost-dot { color: #ffb9a8; font-size: 12px; line-height: 1; }
+        .fleet-marker.ghost .fleet-label {
+            position: static;
+            transform: none;
+            top: auto;
+            margin: 2px 0 0;
+            padding: 0;
+            background: none;
+            font-size: 9px;
+            color: #ffb9a8;
+        }
         .fleet-marker.engaged svg.fleet-ships { animation: engagedPulse 0.8s ease-in-out infinite alternate; }
         @keyframes engagedPulse { from { filter: drop-shadow(0 0 3px #ff5a2a); } to { filter: drop-shadow(0 0 9px #ff2a00); } }
         /* fleets are sent with a right-click on the map, so the old destination picker is hidden */
