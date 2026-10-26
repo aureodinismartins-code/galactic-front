@@ -200,6 +200,16 @@ body {
     color: white;
 }
 
+.faction-note {
+    margin-top: 14px;
+    max-width: 420px;
+    font-size: 11px;
+    line-height: 1.6;
+    letter-spacing: 1px;
+    color: #8a8a8a;
+    text-align: center;
+}
+
 
 /* =========================================================
    LANDING PAGE PANELS

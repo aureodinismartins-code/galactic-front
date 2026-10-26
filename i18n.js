@@ -539,8 +539,8 @@
         "credits spent": "créditos gastos",
         "Only players write a Declaration of War (the delegates never do); Congress then votes on it, and a majority is enough. Without a passed declaration Freedom Authority fleets cannot attack a planet. Click a planet on the map.":
             "Só os jogadores apresentam uma declaração de guerra (os delegados nunca o fazem); o Congresso vota-a depois e a maioria simples basta. Sem uma declaração aprovada, as frotas da Freedom Authority não podem atacar um planeta. Clique em um planeta no mapa.",
-        "war declared · blue = Authority, red = Combine, white = Independents":
-            "guerra declarada · azul = Freedom Authority, vermelho = Combine, branco = Independents",
+        "war declared · blue = Authority, red = Combine, white = independent worlds":
+            "guerra declarada · azul = Freedom Authority, vermelho = Combine, branco = mundos independentes",
         "Ring colour = occupation stage (gold occupied, light blue civilian administration, violet protected, green integrated)":
             "Cor do anel = estágio de ocupação (dourado ocupado, azul-claro administração civil, violeta protegido, verde integrado)",
 
@@ -549,11 +549,10 @@
         "Supreme Soviet of the Combine": "Soviete Supremo do Combine",
         "SUPREME SOVIET": "SOVIETE SUPREMO",
         "THE PLENUM": "O PLENO",
-        "SECRETARY": "SECRETÁRIO",
+        "HIGH COMMISSAR": "ALTO COMISSÁRIO",
         "CONFIDENCE": "CONFIANÇA",
         "QUOTA": "COTA",
         "DIRECTIVES": "DIRETIVAS",
-        "GENERAL SECRETARY": "SECRETÁRIO-GERAL",
         "NEW DIRECTIVE": "NOVA DIRETIVA",
         "discipline": "disciplina",
         "DISCIPLINE": "DISCIPLINA",
@@ -611,21 +610,20 @@
             "Selecione uma diretiva em debate (aba DIRETIVAS) para conceder privilégios a este comissário.",
         "Privileges granted:": "Privilégios concedidos:",
         "credits in total on this commissar.": "créditos no total para este comissário.",
-        "General Secretary of the Combine": "Secretário-Geral do Combine",
-        "Election of the General Secretary": "Eleição do Secretário-Geral",
-        "The General Secretary may keep 5 directives before the Soviet (others 3), has used the veto of this term, and the ruling current's agenda is heard more often.":
-            "O Secretário-Geral pode manter 5 diretivas no Soviete (os outros 3), já usou o veto deste mandato e a agenda da corrente no poder é ouvida com mais frequência.",
-        "The General Secretary may keep 5 directives before the Soviet (others 3), may veto one directive per term, and the ruling current's agenda is heard more often.":
-            "O Secretário-Geral pode manter 5 diretivas no Soviete (os outros 3), pode vetar uma diretiva por mandato e a agenda da corrente no poder é ouvida com mais frequência.",
-        "Your current": "Sua corrente",
-        "Every Combine player belongs to a current of the Party. You need one to stand for General Secretary or to vote.":
-            "Todo jogador do Combine pertence a uma corrente do Partido. Você precisa de uma para se candidatar a Secretário-Geral ou votar.",
+        "High Commissar of the Combine": "Alto Comissário do Combine",
+        "Election of the High Commissar": "Eleição do Alto Comissário",
+        "elected by the players of the Combine, for a two week term":
+            "eleito pelos jogadores do Combine, para um mandato de duas semanas",
+        "The High Commissar may keep 5 directives before the Soviet (others 3), has used the veto of this term, and the ruling current's agenda is heard more often.":
+            "O Alto Comissário pode manter 5 diretivas no Soviete (os outros 3), já usou o veto deste mandato e a agenda da corrente no poder é ouvida com mais frequência.",
+        "The High Commissar may keep 5 directives before the Soviet (others 3), may veto one directive per term, and the ruling current's agenda is heard more often.":
+            "O Alto Comissário pode manter 5 diretivas no Soviete (os outros 3), pode vetar uma diretiva por mandato e a agenda da corrente no poder é ouvida com mais frequência.",
         "The next election starts when the term ends (in": "A próxima eleição começa quando o mandato terminar (em",
         "An election is called as soon as a Combine player is online.":
             "Uma eleição é convocada assim que um jogador do Combine estiver online.",
-        "STAND FOR GENERAL SECRETARY": "CANDIDATAR-SE A SECRETÁRIO-GERAL",
+        "STAND FOR HIGH COMMISSAR": "CANDIDATAR-SE A ALTO COMISSÁRIO",
         "Current chosen.": "Corrente escolhida.",
-        "You are a candidate for General Secretary.": "Você é candidato a Secretário-Geral.",
+        "You are a candidate for High Commissar.": "Você é candidato a Alto Comissário.",
         "WHAT SHOULD THE SOVIET DECIDE?": "O QUE O SOVIETE DEVE DECIDIR?",
         "PLANET TO ATTACK": "PLANETA A ATACAR",
         "campaign approved": "campanha aprovada",
@@ -799,6 +797,76 @@
         "The reset finished, but some parts could not be done:":
             "A reinicialização terminou, mas algumas partes não puderam ser feitas:",
 
+        /* ---------- the elected leaders and the parties (2026-10-31) ---------- */
+        "CONGRESS LEADER": "LÍDER DO CONGRESSO",
+        "Congress Leader": "Líder do Congresso",
+        "Election of the Congress Leader": "Eleição do Líder do Congresso",
+        "elected by the players, for a two week term": "eleito pelos jogadores, para um mandato de duas semanas",
+        "PARTY": "PARTIDO",
+        "DIPLOMACY": "DIPLOMACIA",
+        "Every Freedom Authority player belongs to a party, and a party is joined here at any time - not only when an election is called. You need one to stand for Congress Leader or to vote.":
+            "Todo jogador da Freedom Authority pertence a um partido, e o partido é escolhido aqui a qualquer momento - não apenas quando uma eleição é convocada. Você precisa de um para se candidatar a Líder do Congresso ou votar.",
+        "You sit with": "Você senta com",
+        "Click another party to cross the floor.": "Clique em outro partido para mudar de lado.",
+        "You belong to no party yet: choose one above.": "Você ainda não tem partido: escolha um acima.",
+        "Your current of the Party": "Sua corrente do Partido",
+        "Every Combine player belongs to one of the Party's three currents, and a current is joined here at any time - not only when an election is called. You need one to stand for High Commissar or to vote.":
+            "Todo jogador do Combine pertence a uma das três correntes do Partido, e a corrente é escolhida aqui a qualquer momento - não apenas quando uma eleição é convocada. Você precisa de uma para se candidatar a Alto Comissário ou votar.",
+        "Click another current to cross the floor.": "Clique em outra corrente para mudar de lado.",
+        "You belong to no current yet: choose one above.": "Você ainda não tem corrente: escolha uma acima.",
+        "Join a current in the PARTY tab first.": "Entre em uma corrente na aba PARTIDO primeiro.",
+        "Join a current in the PARTY tab to vote.": "Entre em uma corrente na aba PARTIDO para votar.",
+
+        /* ---------- diplomacy with the independent worlds (2026-10-31) ---------- */
+        "THE TWO MAIN FACTIONS": "AS DUAS FACÇÕES PRINCIPAIS",
+        "the Combine thinks of us": "o Combine pensa de nós",
+        "we think of the Combine": "pensamos do Combine",
+        "the Freedom Authority thinks of us": "a Freedom Authority pensa de nós",
+        "we think of the Freedom Authority": "pensamos da Freedom Authority",
+        "TRADING TRUCE: both sides hold the other at 50 or better, so every income payment of both treasuries is ten percent bigger.":
+            "TRÉGUA COMERCIAL: os dois lados se enxergam com 50 ou mais, então cada pagamento de renda dos dois tesouros é dez por cento maior.",
+        "No truce. Both sides must hold the other at 50 or better, and a diplomatic mission raises the reading by 10.":
+            "Sem trégua. Os dois lados precisam se enxergar com 50 ou mais, e uma missão diplomática eleva a leitura em 10.",
+        "No truce. Both sides must hold the other at 50 or better, and a fraternal pact raises the reading by 10.":
+            "Sem trégua. Os dois lados precisam se enxergar com 50 ou mais, e um pacto fraterno eleva a leitura em 10.",
+        "A bill in the NEW PROPOSAL tab sends envoys to the other faction.":
+            "Uma proposta na aba NOVA PROPOSTA envia emissários à outra facção.",
+        "A directive in the NEW DIRECTIVE tab sends envoys to the other faction.":
+            "Uma diretiva na aba NOVA DIRETIVA envia emissários à outra facção.",
+        "INDEPENDENT WORLDS": "MUNDOS INDEPENDENTES",
+        "The Independents are not a faction any more: every independent world is its own partner. Send envoys until the reading reaches 100 and the world signs the pact and joins the Freedom Authority without a single shot.":
+            "Os Independents não são mais uma facção: cada mundo independente é um parceiro próprio. Envie emissários até a leitura chegar a 100 e o mundo assinar o pacto e entrar na Freedom Authority sem um único tiro.",
+        "The Independents are not a faction any more: every independent world is its own partner. Send envoys until the reading reaches 100 and the world signs the pact and joins the Union without a single shot.":
+            "Os Independents não são mais uma facção: cada mundo independente é um parceiro próprio. Envie emissários até a leitura chegar a 100 e o mundo assinar o pacto e entrar na União sem um único tiro.",
+        "Treasury:": "Tesouro:",
+        "an embassy costs": "uma embaixada custa",
+        "one send per world every five minutes": "um envio por mundo a cada cinco minutos",
+        "the Combine is at": "o Combine está em",
+        "the Freedom Authority is at": "a Freedom Authority está em",
+        "relations": "relações",
+        "envoys sent": "emissários enviados",
+        "the world signs the pact at 100": "o mundo assina o pacto aos 100",
+        "the court will see you again in": "a corte receberá você novamente em",
+        "SEND ENVOYS": "ENVIAR EMISSÁRIOS",
+        "No independent world is left: every one of them answers to somebody now.":
+            "Não resta nenhum mundo independente: todos eles respondem a alguém agora.",
+        "The embassies arrive with sql/2026-10-31_leaders_parties_and_diplomacy.sql. Run it, then reload this page.":
+            "As embaixadas chegam com sql/2026-10-31_leaders_parties_and_diplomacy.sql. Execute-o e recarregue esta página.",
+        "The independents are not a bloc any more: their worlds are dealt with one by one in the DIPLOMACY tab.":
+            "Os independents não são mais um bloco: seus mundos são tratados um a um na aba DIPLOMACIA.",
+
+        /* ---------- the economy reading and the menu note (2026-10-31) ---------- */
+        "IDLE: NOBODY HAS TOUCHED THE GAME, SO THE INCOME IS HALVED":
+            "OCIOSO: NINGUÉM TOCOU NO JOGO, ENTÃO A RENDA É PELA METADE",
+        "NOBODY HAS PLAYED FOR TWO HOURS: THE INCOME IS OFF FOR EVERY SIDE UNTIL SOMEBODY PLAYS":
+            "NINGUÉM JOGA HÁ DUAS HORAS: A RENDA ESTÁ DESLIGADA PARA TODOS OS LADOS ATÉ ALGUÉM JOGAR",
+        "INDEPENDENT WORLDS ARE UNALIGNED: they are not a faction you can play, and each one is negotiated with on its own.":
+            "MUNDOS INDEPENDENTES NÃO TÊM ALINHAMENTO: não são uma facção jogável, e cada um é negociado individualmente.",
+        "- the Soviet's directives, parties and its High Commissar are cleared":
+            "- as diretivas do Soviete, seus partidos e seu Alto Comissário são apagados",
+        "- every embassy, the truce and the list of who is playing are cleared":
+            "- todas as embaixadas, a trégua e a lista de quem está jogando são apagadas",
+
         /* ---------- page titles ---------- */
         "Galactic Front - Galaxy Map": "Galactic Front - Mapa da Galáxia",
         "Galactic Front - Planet": "Galactic Front - Planeta",
@@ -951,19 +1019,25 @@
             "The fleet could not be dismantled (it no longer exists or is in battle).",
         "A frota foi desativada: 500 créditos de sucata.":
             "The fleet is dismantled: 500 credits of salvage.",
-        "O Secretário-Geral vetou esta diretiva.": "The General Secretary vetoed this directive.",
+        "O Alto Comissário vetou esta diretiva.": "The High Commissar vetoed this directive.",
         "Uma nova frota foi autorizada: construa-a no mapa galáctico.":
             "A new fleet is authorised: build it from the galaxy map.",
         "Um destacamento blindado foi autorizado: recrute-o para uma frota (a cadeia da Instalação Knightmare ainda é necessária).":
             "An armoured detachment is authorised: recruit it into a fleet (the Knightmare Facility chain is still required).",
         "Plano de produção elevado: 300-500 créditos a cada 15 minutos por nível (máximo 2); o Partido perde confiança.":
             "Production quota raised: 300-500 credits every 15 minutes per level (max 2); the Party loses confidence.",
-        "ELEIÇÃO: uma campanha para Secretário-Geral foi aberta. Entre em uma corrente do Partido, declare a candidatura (8 minutos) e então todos votam (8 minutos).":
-            "ELECTION: a campaign for General Secretary is open. Join a current of the Party, declare your candidacy (8 minutes), then all players vote (8 minutes).",
+        "ELEIÇÃO: uma campanha para Alto Comissário foi aberta. Entre em uma corrente do Partido, declare a candidatura (8 minutos) e então todos votam (8 minutos).":
+            "ELECTION: a campaign for High Commissar is open. Join a current of the Party, declare your candidacy (8 minutes), then all players vote (8 minutes).",
         "ELEIÇÃO: a votação está aberta. Todo jogador do Combine que entrou em uma corrente pode votar.":
             "ELECTION: voting is open. Every Combine player who has joined a current may vote.",
         "ELEIÇÃO: ninguém se apresentou. O cargo continua vago.":
             "ELECTION: nobody stood. The office stays vacant.",
+
+        /* the embassies of 2026-10-31 */
+        "O mundo assina o pacto e entra na União.":
+            "The world signs the pact and joins the Union.",
+        "O mundo assina o pacto e entra na Autoridade.":
+            "The world signs the pact and joins the Authority.",
     };
 
     /* lines that carry names, planets or numbers: matched by shape */
@@ -1058,8 +1132,8 @@
                 return (verdict === "APROVADA" ? "PASSED" : "REJECTED") + ': "' + (lookupServer(title) || title) + '" (' +
                     yes + " yes, " + no + " no, " + abstain + " abstain; " + need + " needed). " + (lookupServer(effect) || effect);
             }],
-        [/^VETO: o Secretário-Geral (.*) veta "(.*)"\.$/, function (all, who, title) {
-            return 'VETO: General Secretary ' + who + ' vetoes "' + (lookupServer(title) || title) + '".';
+        [/^VETO: o Alto Comissário (.*) veta "(.*)"\.$/, function (all, who, title) {
+            return 'VETO: High Commissar ' + who + ' vetoes "' + (lookupServer(title) || title) + '".';
         }],
         [/^PLANO: ([0-9]+) créditos produzidos pelos mundos do Combine\.$/,
             "PLAN: $1 credits produced by the Combine's worlds."],
@@ -1068,10 +1142,14 @@
         [/^PARTIDO: (.+) entra em (Vanguarda Proletária|Aparato do Partido|Comando Vermelho)\.$/, function (all, who, current) {
             return who + ' joins ' + (lookupServer(current) || current) + '.';
         }],
-        [/^CANDIDATURA: (.+) apresenta-se a Secretário-Geral\.$/,
-            "CANDIDACY: $1 stands for General Secretary."],
-        [/^ELEIÇÃO: (.*) é eleito Secretário-Geral do Combine \(([0-9]+) voto\(s\)\)\.$/,
-            "ELECTION: $1 is elected General Secretary of the Combine ($2 vote(s))."],
+        [/^CANDIDATURA: (.+) apresenta-se a Alto Comissário\.$/,
+            "CANDIDACY: $1 stands for High Commissar."],
+        [/^ELEIÇÃO: (.*) é eleito Alto Comissário do Combine \(([0-9]+) voto\(s\)\)\.$/,
+            "ELECTION: $1 is elected High Commissar of the Combine ($2 vote(s))."],
+        [/^EMBAIXADA: (.+) recebeu enviados (?:do Combine|da Freedom Authority): relações ([0-9]+)\/100\. ?(.*)$/,
+            function (all, planet, relation, note) {
+                return 'EMBASSY: ' + planet + ' received envoys: relations ' + relation + '/100. ' + (lookupServer(note) || note);
+            }],
         [/^O assalto a (.+) teve sucesso\.$/, "The assault on $1 succeeded."],
         [/^O assalto a (.+) foi repelido\.$/, "The assault on $1 was repelled."]
     ];

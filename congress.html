@@ -6,9 +6,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=22"></script>
+<script src="i18n.js?v=23"></script>
 <script>window.GC_NO_BANNER = false;</script>
-<script src="gamecontrol.js"></script>
+<script src="gamecontrol.js?v=23"></script>
 <style>
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: #070b14; color: #e3ebf5; font-family: Arial, sans-serif; }
@@ -84,7 +84,7 @@ label.row { display: block; margin: 10px 0 4px; font-size: 11px; letter-spacing:
     <a class="back" href="galaxy.html">&larr; GALAXY</a>
     <h1>FREEDOM AUTHORITY CONGRESS</h1>
     <div class="grow"></div>
-    <div class="stat">PRESIDENT<br><b id="st-pres">-</b></div>
+    <div class="stat">CONGRESS LEADER<br><b id="st-pres">-</b></div>
     <div class="stat">CREDITS<br><b id="st-credits">-</b></div>
     <div class="stat">POPULARITY<br><b id="st-pop">-</b></div>
     <div class="stat">TAX LEVEL<br><b id="st-tax">-</b></div>
@@ -150,6 +150,8 @@ let propState = null;     /* cooldowns and treasury for the propaganda tab */
 let propError = null;     /* set when the propaganda functions are not installed yet */
 let debate = null;        /* the sides every live bill's delegates are on */
 let debateError = null;
+let dip = null;           /* the embassies with the independent worlds */
+let dipError = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -272,6 +274,12 @@ async function load() {
     debateError = dr.error ? dr.error.message : null;
 
     if (!dr.error) { supabaseClient.rpc("cg_debate_tick"); }
+
+    /* the diplomacy screen: the embassies with the independent worlds and the
+       reading between the two main factions (2026-10-31) */
+    const dp = await supabaseClient.rpc("diplomacy_state");
+    dip = dp.error ? null : dp.data;
+    dipError = dp.error ? dp.error.message : null;
 
     if (!draft.sponsor) { draft.sponsor = "old_guard"; }
     if (!draft.planet && ov.targets.length) { draft.planet = ov.targets[0].planet; }
@@ -602,7 +610,8 @@ function renderMember() {
 --------------------------------------------------------- */
 function renderTabs() {
 
-    const tabs = [["proposals", "PROPOSALS"], ["election", "ELECTION"], ["new", "NEW PROPOSAL"], ["propaganda", "PROPAGANDA"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
+    const tabs = [["proposals", "PROPOSALS"], ["leader", "CONGRESS LEADER"], ["party", "PARTY"], ["new", "NEW PROPOSAL"],
+        ["diplomacy", "DIPLOMACY"], ["propaganda", "PROPAGANDA"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + t[1] + '</div>').join("");
     $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
@@ -610,8 +619,10 @@ function renderTabs() {
     const body = $("tabbody");
 
     if (tab === "proposals") { body.innerHTML = proposalsHtml(); wireProposals(); }
-    else if (tab === "election") { body.innerHTML = electionHtml(); wireElection(); }
+    else if (tab === "leader") { body.innerHTML = leaderHtml(); wireLeader(); }
+    else if (tab === "party") { body.innerHTML = partyHtml(); wireParty(); }
     else if (tab === "new") { body.innerHTML = newHtml(); wireNew(); }
+    else if (tab === "diplomacy") { body.innerHTML = diplomacyHtml(); wireDiplomacy(); }
     else if (tab === "propaganda") { body.innerHTML = propagandaHtml(); wirePropaganda(); }
     else if (tab === "occupied") { body.innerHTML = occupiedHtml(); wireOccupied(); }
     else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
@@ -739,15 +750,15 @@ function wireProposals() {
     }));
 }
 
-/* ---- election ---- */
-function electionHtml() {
+/* ---- the Congress Leader: the player the players elected ---- */
+function leaderHtml() {
 
     const pres = ov.president;
     const el = ov.election;
     const myParty = ov.my_party;
-    const parties = ov.parties || [];
 
-    let h = '<div class="card"><h3>President of the Freedom Authority</h3>';
+    let h = '<div class="card"><h3>' + T("Congress Leader") + '</h3>' +
+        '<div class="sub">' + T("President of the Freedom Authority") + ' &middot; ' + T("elected by the players, for a two week term") + '</div>';
 
     if (pres && pres.name) {
         const f = factionById(pres.faction);
@@ -761,14 +772,7 @@ function electionHtml() {
 
     h += '</div>';
 
-    h += '<div class="card"><h3>Your party</h3><div class="sub">Every Freedom Authority player belongs to a party. You need one to stand for President or to vote.</div><div class="spons" style="margin-top:8px">' +
-        ov.factions.map(function(f) {
-            const pl = (parties.find(x => x.faction === f.id) || { players: [] }).players;
-            return '<div class="opt party' + (myParty === f.id ? " on" : "") + '" data-k="' + f.key + '"><span class="dot" style="background:' + esc(f.color) + '"></span> <b>' + esc(f.name) + '</b>' +
-                '<small>' + esc(f.description) + '</small><small>' + T("Players:") + ' ' + (pl.length ? esc(pl.join(", ")) : T("none yet")) + '</small></div>';
-        }).join("") + '</div></div>';
-
-    h += '<div class="card active"><h3>Presidential election</h3>';
+    h += '<div class="card active"><h3>' + T("Election of the Congress Leader") + '</h3>';
 
     if (!el) {
         h += '<div class="sub">' + (pres && pres.name ? 'The next election starts when the term ends (in <b class="cdt" data-ts="' + esc(pres.term_end) + '">' + mmss(secondsLeft(pres.term_end)) + '</b>).' : "An election will be called as soon as a Freedom Authority player is online.") + '</div>';
@@ -810,14 +814,7 @@ function electionHtml() {
 
 }
 
-function wireElection() {
-
-    $("tabbody").querySelectorAll(".party").forEach(el => el.addEventListener("click", async function() {
-        const { error } = await supabaseClient.rpc("congress_join_party", { p_key: el.dataset.k });
-        if (error) { toast(error.message, true); return; }
-        toast("Party chosen.");
-        await load();
-    }));
+function wireLeader() {
 
     if ($("run-btn")) {
         $("run-btn").addEventListener("click", async function() {
@@ -832,6 +829,99 @@ function wireElection() {
         const { error } = await supabaseClient.rpc("congress_vote", { p_candidate: el.dataset.c });
         if (error) { toast(error.message, true); return; }
         toast("Vote cast.");
+        await load();
+    }));
+
+}
+
+/* ---- the party: yours to join or change at any time, election or not ---- */
+function partyHtml() {
+
+    const myParty = ov.my_party;
+    const parties = ov.parties || [];
+    /* the chamber's unaligned delegates are not a party players may join */
+    const joinable = ov.factions.filter(f => f.key !== "independents");
+    const mine = ov.factions.find(f => f.id === myParty);
+
+    let h = '<div class="card"><h3>' + T("Your party") + '</h3>' +
+        '<div class="sub">' + T("Every Freedom Authority player belongs to a party, and a party is joined here at any time - not only when an election is called. You need one to stand for Congress Leader or to vote.") + '</div>' +
+        '<div class="spons" style="margin-top:8px">' +
+        joinable.map(function(f) {
+            const pl = (parties.find(x => x.faction === f.id) || { players: [] }).players;
+            return '<div class="opt party' + (myParty === f.id ? " on" : "") + '" data-k="' + f.key + '"><span class="dot" style="background:' + esc(f.color) + '"></span> <b>' + esc(f.name) + '</b>' +
+                '<small>' + esc(f.description) + '</small><small>' + T("Players:") + ' ' + (pl.length ? esc(pl.join(", ")) : T("none yet")) + '</small></div>';
+        }).join("") + '</div>' +
+        (mine
+            ? '<div class="sub" style="margin-top:8px">' + T("You sit with") + ' <b style="color:#fff">' + esc(mine.name) + '</b>. ' + T("Click another party to cross the floor.") + '</div>'
+            : '<div class="sub" style="margin-top:8px">' + T("You belong to no party yet: choose one above.") + '</div>') +
+        '</div>';
+
+    return h;
+
+}
+
+function wireParty() {
+
+    $("tabbody").querySelectorAll(".party").forEach(el => el.addEventListener("click", async function() {
+        const { error } = await supabaseClient.rpc("congress_join_party", { p_key: el.dataset.k });
+        if (error) { toast(error.message, true); return; }
+        toast("Party chosen.");
+        await load();
+    }));
+
+}
+
+/* ---- diplomacy: the independent worlds, and the other main faction ---- */
+function diplomacyHtml() {
+
+    if (!dip) {
+        return '<div class="card"><h3>' + esc(T("DIPLOMACY")) + '</h3><div class="sub">' +
+            esc(T("The embassies arrive with sql/2026-10-31_leaders_parties_and_diplomacy.sql. Run it, then reload this page.")) +
+            (dipError ? '<br><br>' + esc(dipError) : "") + '</div></div>';
+    }
+
+    const rel = dip.relations || {};
+
+    let h = '<div class="card' + (rel.truce ? " active" : "") + '"><h3>' + esc(T("THE TWO MAIN FACTIONS")) + '</h3>' +
+        '<div class="fc" style="margin:6px 0"><span class="nm">' + esc(T("the Combine thinks of us")) + '</span><b style="flex:1;text-align:right">' + (rel.combine || 0) + ' / 100</b></div>' +
+        '<div class="fc" style="margin:6px 0"><span class="nm">' + esc(T("we think of the Combine")) + '</span><b style="flex:1;text-align:right">' + (rel.authority || 0) + ' / 100</b></div>' +
+        '<div class="sub" style="margin-top:8px">' + esc(T(rel.truce
+            ? "TRADING TRUCE: both sides hold the other at 50 or better, so every income payment of both treasuries is ten percent bigger."
+            : "No truce. Both sides must hold the other at 50 or better, and a diplomatic mission raises the reading by 10.")) + '</div>' +
+        '<div class="sub" style="margin-top:4px">' + esc(T("A bill in the NEW PROPOSAL tab sends envoys to the other faction.")) + '</div></div>';
+
+    h += '<div class="card"><h3>' + esc(T("INDEPENDENT WORLDS")) + '</h3>' +
+        '<div class="sub">' + esc(T("The Independents are not a faction any more: every independent world is its own partner. Send envoys until the reading reaches 100 and the world signs the pact and joins the Freedom Authority without a single shot.")) + '</div>' +
+        '<div class="sub" style="margin-top:6px">' + esc(T("Treasury:")) + ' <b>' + fmt(dip.credits) + '</b> &middot; ' + esc(T("an embassy costs")) + ' <b>' + dip.cost + '</b> ' + esc(T("CREDITS")) + ' &middot; ' + esc(T("one send per world every five minutes")) + '</div>';
+
+    h += (dip.planets || []).map(function(p) {
+
+        const seen = new Date(new Date(dip.now).getTime() + p.wait * 1000).toISOString();
+
+        return '<div style="margin-top:10px;border-top:1px solid #1f3354;padding-top:8px">' +
+            '<div class="fc" style="margin:2px 0"><b style="flex:1;font-size:14px">' + esc(p.planet) + '</b>' +
+            '<span class="sub">' + esc(T("the Combine is at")) + ' ' + (p.theirs || 0) + '</span></div>' +
+            '<div class="bar"><i style="width:' + Math.max(0, Math.min(100, p.relation)) + '%;background:#4cc2ff"></i></div>' +
+            '<div class="sub">' + esc(T("relations")) + ' ' + p.relation + ' / 100 &middot; ' + esc(T("envoys sent")) + ' ' + p.envoys + ' &middot; ' + esc(T("the world signs the pact at 100")) +
+            (p.wait > 0 ? ' &middot; ' + esc(T("the court will see you again in")) + ' <b class="cdt" data-ts="' + esc(seen) + '">' + mmss(p.wait) + '</b>' : "") + '</div>' +
+            '<div style="margin-top:6px"><button class="btn small envoy-btn" data-p="' + esc(p.planet) + '"' + (p.wait > 0 ? " disabled" : "") + '>' +
+            T("SEND ENVOYS") + ' (' + dip.cost + ' ' + T("CREDITS") + ')</button></div></div>';
+
+    }).join("") || '<div class="sub" style="margin-top:8px">' + esc(T("No independent world is left: every one of them answers to somebody now.")) + '</div>';
+
+    return h + '</div>';
+
+}
+
+function wireDiplomacy() {
+
+    $("tabbody").querySelectorAll(".envoy-btn").forEach(el => el.addEventListener("click", async function() {
+        el.disabled = true;
+        const { data, error } = await supabaseClient.rpc("send_envoy", { p_planet: el.dataset.p });
+        if (error) { toast(error.message, true); el.disabled = false; return; }
+        toast(data && data.annexed
+            ? el.dataset.p + " signed the pact: the world is ours."
+            : el.dataset.p + " received our envoys: relations " + data.relation + "/100.");
         await load();
     }));
 
@@ -886,7 +976,7 @@ function miniMapHtml(kind) {
 
     svg += '</svg><div class="sub" style="margin-top:4px">' +
         (kind === "war"
-            ? '<span style="color:#ffd24c">&#9711;</span> chosen target &middot; <span style="color:#ff4a4a">&#10010;</span> war declared &middot; blue = Authority, red = Combine, white = Independents'
+            ? '<span style="color:#ffd24c">&#9711;</span> chosen target &middot; <span style="color:#ff4a4a">&#10010;</span> war declared &middot; blue = Authority, red = Combine, white = independent worlds'
             : 'Ring colour = occupation stage (gold occupied, light blue civilian administration, violet protected, green integrated)') + '</div>';
 
     return svg;
@@ -912,7 +1002,8 @@ function newHtml() {
             ov.occupations.map(o => '<option value="' + esc(o.planet) + '"' + (draft.planet === o.planet ? " selected" : "") + '>' + esc(o.planet) + ' (stability ' + o.stability + ')</option>').join("") + '</select>';
     }
     else if (draft.type === "diplomacy") {
-        h += '<label class="row">ENVOYS TO</label><select id="n-target" style="width:100%"><option' + (draft.target === "Combine" ? " selected" : "") + '>Combine</option><option' + (draft.target === "Independents" ? " selected" : "") + '>Independents</option></select>';
+        h += '<label class="row">ENVOYS TO</label><select id="n-target" style="width:100%"><option' + (draft.target === "Combine" ? " selected" : "") + '>Combine</option></select>' +
+            '<div class="sub" style="margin-top:4px">The independents are not a bloc any more: their worlds are dealt with one by one in the DIPLOMACY tab.</div>';
     }
     else if (draft.type === "fleet_revocation") {
         h += '<label class="row">FLEET TO DECOMMISSION</label><select id="n-fleet" style="width:100%">' +
@@ -1107,7 +1198,7 @@ function authorityHtml() {
         T("(it shifts every vote by up to \u00b110 points: a popular Authority gets its way more often)") + '</div>' +
         '<div class="bar"><i style="width:' + ov.state.popularity + '%;background:#4cc2ff"></i></div>' +
         '<div class="sub" style="margin-top:8px">' + T("TAX LEVEL") + ' ' + ov.state.tax_level + ' ' + T("of") + ' 2 &middot; ' + T("relations:") +
-        ' Combine ' + (rel.Combine || 0) + ', Independents ' + (rel.Independents || 0) + '</div></div>';
+        ' Combine ' + (rel.Combine || 0) + ' / 100</div></div>';
 
     h += '<div class="card"><h3>The four factions</h3>' + ov.factions.map(f =>
         '<div class="sub" style="padding:4px 0"><span class="dot" style="background:' + esc(f.color) + '"></span> <b style="color:#fff">' + esc(f.name) + '</b> (' + f.seats + ' ' + T("seats") + '): ' + esc(f.description) + '</div>').join("") + '</div>';

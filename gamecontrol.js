@@ -12,6 +12,18 @@
     let resetButton = null;
     let lastStarted = null;
 
+    /* ---------- what counts as playing ----------
+       The economy reads a touch of the game, not an open window: ten minutes
+       without a mouse, a key or a finger and this player counts as away, so a
+       window left open and forgotten no longer keeps the full rhythm up. */
+    const IDLE_MS = 10 * 60 * 1000;
+    let lastTouch = Date.now();
+
+    function noteTouch() { lastTouch = Date.now(); }
+
+    ["mousemove", "mousedown", "mouseup", "click", "wheel", "keydown", "touchstart", "touchmove", "scroll"]
+        .forEach(function(ev) { window.addEventListener(ev, noteTouch, { passive: true }); });
+
     function ensureOverlay() {
 
         if (overlay) { return overlay; }
@@ -67,7 +79,9 @@
                 "- all fleets, buildings and garrison levels are wiped\n" +
                 "- every faction's credits go back to 500\n" +
                 "- Combine and Freedom Authority keep only their capital\n" +
-                "- the civil wars on Krieg and Vraks restart\n\n" +
+                "- the civil wars on Krieg and Vraks restart\n" +
+                "- the Soviet's directives, its parties and its High Commissar are cleared\n" +
+                "- every embassy, the truce and the list of who is playing are cleared\n\n" +
                 "Type RESET to confirm."
             );
 
@@ -76,6 +90,17 @@
             const { data, error } = await supabaseClient.rpc("game_reset");
 
             if (error) { alert("Reset failed: " + error.message); return; }
+
+            /* The game's own reset knows nothing about the Supreme Soviet, the
+               party rolls, the embassies or the list of who is playing, so the
+               newer systems are wiped here. On a database without the newer
+               patch the call simply does not exist, and the reset still stands. */
+            const extras = await supabaseClient.rpc("game_reset_extras");
+
+            if (extras.error && !/function|schema cache|does not exist/i.test(extras.error.message)) {
+                alert("The reset finished, but the newer systems could not be cleared:\n\n" + extras.error.message);
+                return;
+            }
 
             if (data && data.warnings && data.warnings.length) {
                 alert("The reset finished, but some parts could not be done:\n\n- " + data.warnings.join("\n- "));
@@ -180,12 +205,45 @@
 
     }
 
+    /* ---------- the economy, as the server reads it ---------- */
+    let economyBadge = null;
+
+    function applyEconomy(status) {
+
+        if (!economyBadge) {
+
+            economyBadge = document.createElement("div");
+            economyBadge.id = "game-economy-badge";
+            economyBadge.style.cssText =
+                "position:fixed;left:25px;bottom:170px;z-index:9000;padding:7px 12px;background:#2b2410;" +
+                "color:#ffd98a;border:1px solid #8a702c;font:bold 11px Arial;letter-spacing:1px;" +
+                "max-width:270px;line-height:1.45;display:none;";
+            document.body.appendChild(economyBadge);
+
+        }
+
+        /* while somebody is playing there is nothing to say */
+        if (!status || status.income === "full") { economyBadge.style.display = "none"; return; }
+
+        const shut = status.income === "closed";
+
+        economyBadge.textContent = shut
+            ? "NOBODY HAS PLAYED FOR TWO HOURS: THE INCOME IS OFF FOR EVERY SIDE UNTIL SOMEBODY PLAYS"
+            : "IDLE: NOBODY HAS TOUCHED THE GAME, SO THE INCOME IS HALVED";
+
+        economyBadge.style.background = shut ? "#2a0f0f" : "#2b2410";
+        economyBadge.style.color = shut ? "#ff9b9b" : "#ffd98a";
+        economyBadge.style.borderColor = shut ? "#8a3030" : "#8a702c";
+        economyBadge.style.display = "block";
+
+    }
+
     async function beat() {
 
         let result;
 
         try {
-            result = await supabaseClient.rpc("game_heartbeat");
+            result = await supabaseClient.rpc("game_heartbeat", { p_active: Date.now() - lastTouch < IDLE_MS });
         }
         catch (e) {
             return;
@@ -198,6 +256,7 @@
         window.gameStatus = status;
 
         applyMaintenance(status);
+        applyEconomy(status);
 
         if (lastStarted === null) { lastStarted = status.started; }
 
