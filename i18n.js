@@ -852,8 +852,41 @@
             "Não resta nenhum mundo independente: todos eles respondem a alguém agora.",
         "The embassies arrive with sql/2026-10-31_leaders_parties_and_diplomacy.sql. Run it, then reload this page.":
             "As embaixadas chegam com sql/2026-10-31_leaders_parties_and_diplomacy.sql. Execute-o e recarregue esta página.",
-        "The independents are not a bloc any more: their worlds are dealt with one by one in the DIPLOMACY tab.":
-            "Os independents não são mais um bloco: seus mundos são tratados um a um na aba DIPLOMACIA.",
+        "The independents are not a bloc any more: their worlds are dealt with one by one in the DIPLOMACY tab of the galactic map.":
+            "Os independentes não são mais um bloco: seus mundos são tratados um a um na aba DIPLOMACIA do mapa galáctico.",
+
+        /* ---------- the DIPLOMACY tab of the galactic map (2026-11-02) ---------- */
+        "BACK TO THE MAP": "VOLTAR AO MAPA",
+        "THE OTHER FACTION": "A OUTRA FACÇÃO",
+        "The ceasefire arrives with sql/2026-11-02_temporary_ceasefire.sql. Run it, then reload this page.":
+            "O cessar-fogo chega com sql/2026-11-02_temporary_ceasefire.sql. Rode o arquivo e recarregue esta página.",
+        "The Freedom Authority and the Combine can agree on one thing only: a stretch of quiet. A ceasefire freezes every assault, weapons shipment and reinforcement on both sides, at most an hour, and it ends by itself. Nothing is signed away and the war always comes back.":
+            "A Freedom Authority e o Combine só conseguem concordar numa coisa: um período de silêncio. Um cessar-fogo congela todo assalto, envio de armas e reforço dos dois lados, no máximo por uma hora, e termina sozinho. Nada é assinado em definitivo e a guerra sempre volta.",
+        "CEASEFIRE IN FORCE": "CESSAR-FOGO EM VIGOR",
+        "offered by": "proposto por",
+        "signed by": "assinado por",
+        "The front is frozen: no assault, no weapons, no reinforcements, on either side, until the clock runs out.":
+            "O fronte está congelado: nenhum assalto, nenhuma arma, nenhum reforço, de nenhum dos lados, até o relógio chegar a zero.",
+        "YOUR CEASEFIRE IS ON THE TABLE": "SEU CESSAR-FOGO ESTÁ NA MESA",
+        "THE OTHER SIDE OFFERS A CEASEFIRE": "O OUTRO LADO PROPÕE UM CESSAR-FOGO",
+        "MINUTES": "MINUTOS",
+        "Waiting for the other side to answer.": "Esperando a resposta do outro lado.",
+        "Your answer, before the offer lapses:": "Sua resposta, antes que a oferta caduque:",
+        "An offer lapses ten minutes after it is made. The other side has to sign it.":
+            "Uma oferta caduca dez minutos depois de feita. O outro lado precisa assiná-la.",
+        "ACCEPT THE CEASEFIRE": "ACEITAR O CESSAR-FOGO",
+        "REFUSE": "RECUSAR",
+        "NO CEASEFIRE": "SEM CESSAR-FOGO",
+        "Offer the other side a stretch of quiet. It cannot last longer than an hour, and the other side has to sign it.":
+            "Ofereça ao outro lado um período de silêncio. Não dura mais que uma hora, e o outro lado precisa assinar.",
+        "THE BOOK": "O LIVRO",
+        "SIGNED": "ASSINADO",
+        "REFUSED": "RECUSADO",
+        "LAPSED": "CADUCADO",
+        "ON THE TABLE": "NA MESA",
+        "signed the pact.": "assinou o pacto.",
+        "The embassies arrive with sql/2026-10-31_leaders_parties_and_diplomacy.sql. Run it, then reload this page.":
+            "As embaixadas chegam com sql/2026-10-31_leaders_parties_and_diplomacy.sql. Rode o arquivo e recarregue esta página.",
 
         /* ---------- the economy reading and the menu note (2026-10-31) ---------- */
         "IDLE: NOBODY HAS TOUCHED THE GAME, SO THE INCOME IS HALVED":

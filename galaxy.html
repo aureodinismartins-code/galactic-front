@@ -22,7 +22,7 @@
     ></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=23"></script>
+    <script src="i18n.js?v=24"></script>
         <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js?v=23"></script>
     <script src="ships.js"></script>
@@ -3709,6 +3709,353 @@ supabaseClient
     .on("postgres_changes", { event: "*", schema: "public", table: "cities" }, loadPlanetStatus)
     .on("postgres_changes", { event: "*", schema: "public", table: "planets" }, loadPlanetStatus)
     .subscribe();
+
+</script>
+
+
+<script>
+
+/* =========================================================
+   DIPLOMACY — the embassies with the independent worlds, and
+   the only thing the Freedom Authority and the Combine ever
+   agree on: a ceasefire that lasts a while and then ends by
+   itself. Nothing here can sign the war away for good.
+========================================================= */
+(function () {
+
+    "use strict";
+
+    if (playerFaction !== "Freedom Authority" && playerFaction !== "Combine") { return; }
+
+    const T = s => (typeof window.t === "function" ? window.t(s) : s);
+    const esc = escapeHTML;
+    const mmss = s => Math.floor(Math.max(0, s) / 60) + ":" + String(Math.max(0, s) % 60).padStart(2, "0");
+
+    let ov = null, ovErr = null;         /* the embassies */
+    let cf = null, cfErr = null;         /* the ceasefire */
+    let stamp = 0;                       /* when the two were read, for the clocks */
+    let msg = "";
+    let busy = false;
+    let opened = false;
+    let lastAuto = 0;
+
+    const style = document.createElement("style");
+    style.textContent =
+        "#dip-open{position:fixed;top:126px;right:20px;z-index:60;padding:12px 26px;background:#0b1a2e;color:#cfe3ff;" +
+        "border:1px solid #3b6fd0;font:bold 13px Arial;letter-spacing:3px;cursor:pointer;}" +
+        "#dip-open:hover{background:#152c4d;}" +
+        "#dip-tab{position:fixed;inset:0;z-index:80;display:none;overflow:auto;padding:26px 34px 70px;" +
+        "background:radial-gradient(circle at 50% 0%,#0a1830 0%,#04080f 70%);color:#cfe6f0;font:13px Arial,sans-serif;}" +
+        "#dip-tab.on{display:block;}" +
+        "#dip-tab h2{font:bold 26px Arial;letter-spacing:6px;color:#fff;margin:0 0 4px;}" +
+        "#dip-tab .dip-top{display:flex;align-items:flex-start;gap:16px;max-width:900px;}" +
+        "#dip-tab .dip-close{margin-left:auto;background:#0c1a28;color:#e6f6ff;border:1px solid #4fb8d8;" +
+        "padding:8px 14px;font:bold 11px Arial;letter-spacing:2px;cursor:pointer;}" +
+        "#dip-tab .dip-card{background:rgba(4,12,22,.9);border:1px solid rgba(127,220,255,.35);padding:14px 16px;margin:16px 0;max-width:900px;}" +
+        "#dip-tab .dip-card h3{font:bold 13px Arial;letter-spacing:3px;color:#7fdcff;margin:0 0 8px;}" +
+        "#dip-tab .dip-card.live{border-color:#ffd27a;box-shadow:0 0 18px rgba(255,210,122,.18);}" +
+        "#dip-tab .dip-big{font:bold 16px Arial;letter-spacing:2px;color:#fff;margin:6px 0;}" +
+        "#dip-tab .dip-clock{font:bold 42px Arial;color:#ffd27a;letter-spacing:2px;line-height:1.2;}" +
+        "#dip-tab .dip-sub{color:#9fb8c4;margin:4px 0;line-height:1.5;}" +
+        "#dip-tab .dip-line{color:#bcd3de;margin:3px 0;}" +
+        "#dip-tab .dip-row{margin:10px 0 2px;display:flex;gap:8px;flex-wrap:wrap;}" +
+        "#dip-tab .dip-btn{background:#0c1a28;color:#e6f6ff;border:1px solid #4fb8d8;padding:8px 12px;" +
+        "font:bold 11px Arial;letter-spacing:2px;cursor:pointer;}" +
+        "#dip-tab .dip-btn:hover:not(:disabled){background:#17324a;}" +
+        "#dip-tab .dip-btn:disabled{opacity:.45;cursor:default;}" +
+        "#dip-tab .dip-btn.ghost{border-color:#5f7488;color:#b9cae3;}" +
+        "#dip-tab .dip-bar{height:7px;background:#10202c;margin:5px 0;}" +
+        "#dip-tab .dip-bar > i{display:block;height:100%;background:#4cc2ff;}" +
+        "#dip-tab .dip-world{border-top:1px solid #1f3354;padding-top:8px;margin-top:10px;}" +
+        "#dip-tab .dip-msg{color:#ffd27a;min-height:18px;margin:6px 0 0;}";
+    document.head.appendChild(style);
+
+    const openBtn = document.createElement("button");
+    openBtn.id = "dip-open";
+    openBtn.type = "button";
+    openBtn.textContent = "DIPLOMACY";
+    document.body.appendChild(openBtn);
+
+    const tab = document.createElement("div");
+    tab.id = "dip-tab";
+    document.body.appendChild(tab);
+
+    /* ---------- the clocks ---------- */
+    function left(seconds) {
+        return Math.max(0, Math.round(Number(seconds || 0) - (performance.now() - stamp) / 1000));
+    }
+
+    /* ---------- data ---------- */
+    async function refresh() {
+
+        const [a, b] = await Promise.all([
+            supabaseClient.rpc("diplomacy_state"),
+            supabaseClient.rpc("ceasefire_state")
+        ]);
+
+        ov = a.error ? null : a.data;
+        ovErr = a.error ? a.error.message : null;
+        cf = b.error ? null : b.data;
+        cfErr = b.error ? b.error.message : null;
+        stamp = performance.now();
+
+        if (opened) { render(); }
+
+    }
+
+    async function act(call) {
+
+        if (busy) { return; }
+        busy = true;
+        msg = "";
+
+        try {
+            const r = await call();
+            if (r && r.error) { msg = r.error.message; }
+        }
+        catch (e) { msg = String((e && e.message) || e); }
+
+        busy = false;
+        await refresh();
+
+    }
+
+    /* ---------- the cards ---------- */
+    function card(title, body, live) {
+        return '<div class="dip-card' + (live ? " live" : "") + '"><h3>' + esc(title) + '</h3>' + body + '</div>';
+    }
+
+    const STATUS = { active: "SIGNED", refused: "REFUSED", expired: "LAPSED", offered: "ON THE TABLE" };
+
+    function ceasefireCard() {
+
+        if (cf === null) {
+            return card(T("THE OTHER FACTION"),
+                '<div class="dip-sub">' + esc(T("The ceasefire arrives with sql/2026-11-02_temporary_ceasefire.sql. Run it, then reload this page.")) +
+                (cfErr ? '<br><br>' + esc(cfErr) : "") + '</div>');
+        }
+
+        let body = '<div class="dip-sub">' + esc(T("The Freedom Authority and the Combine can agree on one thing only: a stretch of quiet. A ceasefire freezes every assault, weapons shipment and reinforcement on both sides, at most an hour, and it ends by itself. Nothing is signed away and the war always comes back.")) + '</div>';
+
+        if (cf.active) {
+
+            body += '<div class="dip-big">' + esc(T("CEASEFIRE IN FORCE")) + '</div>' +
+                '<div class="dip-clock" data-dip-cd="active">' + mmss(left(cf.active.seconds)) + '</div>' +
+                '<div class="dip-sub">' + esc(T("offered by")) + ' <b>' + esc(T(cf.active.offered_side)) + '</b> &middot; ' +
+                esc(T("signed by")) + ' <b>' + esc(cf.active.signed_by || "—") + '</b></div>' +
+                '<div class="dip-sub">' + esc(T("The front is frozen: no assault, no weapons, no reinforcements, on either side, until the clock runs out.")) + '</div>';
+
+        }
+        else if (cf.offer) {
+
+            const mine = !!cf.offer.mine;
+
+            body += '<div class="dip-big">' + esc(T(mine ? "YOUR CEASEFIRE IS ON THE TABLE" : "THE OTHER SIDE OFFERS A CEASEFIRE")) + '</div>' +
+                '<div class="dip-sub"><b>' + cf.offer.minutes + ' ' + esc(T("MINUTES")) + '</b> &middot; ' +
+                esc(T("offered by")) + ' ' + esc(T(cf.offer.offered_side)) +
+                (cf.offer.offered_by ? ' (' + esc(cf.offer.offered_by) + ')' : "") + '</div>' +
+                '<div class="dip-sub">' + esc(T(mine ? "Waiting for the other side to answer." : "Your answer, before the offer lapses:")) + ' ' +
+                '<b data-dip-cd="offer">' + mmss(left(cf.offer.seconds)) + '</b></div>';
+
+            if (mine) {
+                body += '<div class="dip-sub">' + esc(T("An offer lapses ten minutes after it is made. The other side has to sign it.")) + '</div>';
+            }
+            else {
+                body += '<div class="dip-row">' +
+                    '<button class="dip-btn" type="button" data-cf-accept="' + cf.offer.id + '">' + esc(T("ACCEPT THE CEASEFIRE")) + '</button>' +
+                    '<button class="dip-btn ghost" type="button" data-cf-refuse="' + cf.offer.id + '">' + esc(T("REFUSE")) + '</button></div>';
+            }
+
+        }
+        else {
+
+            body += '<div class="dip-big">' + esc(T("NO CEASEFIRE")) + '</div>' +
+                '<div class="dip-sub">' + esc(T("Offer the other side a stretch of quiet. It cannot last longer than an hour, and the other side has to sign it.")) + '</div>' +
+                '<div class="dip-row">' + [15, 30, 60].map(function (m) {
+                    return '<button class="dip-btn" type="button" data-cf-offer="' + m + '">' + m + ' ' + esc(T("MINUTES")) + '</button>';
+                }).join("") + '</div>';
+
+        }
+
+        if (cf.last && cf.last.length) {
+
+            body += '<div class="dip-sub" style="margin-top:12px;color:#7fdcff;letter-spacing:2px">' + esc(T("THE BOOK")) + '</div>' +
+                cf.last.map(function (r) {
+                    return '<div class="dip-line"><b>' + esc(T(STATUS[r.status] || r.status)) + '</b> — ' + r.minutes + ' ' +
+                        esc(T("MINUTES")) + ' &middot; ' + esc(T(r.offered_side)) +
+                        (r.offered_name ? ' ' + esc(r.offered_name) : "") +
+                        (r.answered_name ? ' / ' + esc(r.answered_name) : "") + '</div>';
+                }).join("");
+
+        }
+
+        return card(T("THE OTHER FACTION"), body, !!cf.active);
+
+    }
+
+    function embassyCard() {
+
+        if (ov === null) {
+            return card(T("INDEPENDENT WORLDS"),
+                '<div class="dip-sub">' + esc(T("The embassies arrive with sql/2026-10-31_leaders_parties_and_diplomacy.sql. Run it, then reload this page.")) +
+                (ovErr ? '<br><br>' + esc(ovErr) : "") + '</div>');
+        }
+
+        let body = '<div class="dip-sub">' + esc(T(playerFaction === "Combine"
+            ? "The Independents are not a faction any more: every independent world is its own partner. Send envoys until the reading reaches 100 and the world signs the pact and joins the Union without a single shot."
+            : "The Independents are not a faction any more: every independent world is its own partner. Send envoys until the reading reaches 100 and the world signs the pact and joins the Freedom Authority without a single shot.")) + '</div>';
+
+        body += '<div class="dip-sub">' + esc(T("Treasury:")) + ' <b>' + Number(ov.credits || 0).toLocaleString() + '</b> &middot; ' +
+            esc(T("an embassy costs")) + ' <b>' + ov.cost + '</b> ' + esc(T("CREDITS")) + ' &middot; ' +
+            esc(T("one send per world every five minutes")) + '</div>';
+
+        const theirs = playerFaction === "Combine" ? "the Freedom Authority is at" : "the Combine is at";
+
+        body += (ov.planets || []).map(function (p) {
+
+            return '<div class="dip-world">' +
+                '<div><b style="font-size:14px">' + esc(p.planet) + '</b> ' +
+                '<span class="dip-sub">' + esc(T(theirs)) + ' ' + (p.theirs || 0) + '</span></div>' +
+                '<div class="dip-bar"><i style="width:' + Math.max(0, Math.min(100, p.relation)) + '%"></i></div>' +
+                '<div class="dip-sub">' + esc(T("relations")) + ' ' + p.relation + ' / 100 &middot; ' +
+                esc(T("envoys sent")) + ' ' + p.envoys + ' &middot; ' + esc(T("the world signs the pact at 100")) +
+                (p.wait > 0 ? ' &middot; ' + esc(T("the court will see you again in")) + ' <b data-dip-wait="' + p.wait + '">' + mmss(p.wait) + '</b>' : "") + '</div>' +
+                '<div class="dip-row"><button class="dip-btn dip-envoy" type="button" data-p="' + esc(p.planet) + '"' +
+                (p.wait > 0 ? " disabled" : "") + '>' + esc(T("SEND ENVOYS")) + ' (' + ov.cost + ' ' + esc(T("CREDITS")) + ')</button></div></div>';
+
+        }).join("") || '<div class="dip-sub">' + esc(T("No independent world is left: every one of them answers to somebody now.")) + '</div>';
+
+        return card(T("INDEPENDENT WORLDS"), body);
+
+    }
+
+    /* ---------- drawing ---------- */
+    function render() {
+
+        tab.innerHTML =
+            '<div class="dip-top"><div><h2>' + esc(T("DIPLOMACY")) + '</h2>' +
+            '<div class="dip-sub">' + esc(T("FACTION:")) + ' <b>' + esc(T(playerFaction)) + '</b></div></div>' +
+            '<button class="dip-close" type="button">' + esc(T("BACK TO THE MAP")) + '</button></div>' +
+            '<div class="dip-msg">' + esc(msg) + '</div>' +
+            ceasefireCard() + embassyCard();
+
+        wire();
+
+    }
+
+    function wire() {
+
+        const close = tab.querySelector(".dip-close");
+        if (close) {
+            close.addEventListener("click", function () {
+                tab.classList.remove("on");
+                opened = false;
+            });
+        }
+
+        tab.querySelectorAll("[data-cf-offer]").forEach(function (el) {
+            el.addEventListener("click", function () {
+                el.disabled = true;
+                act(function () {
+                    return supabaseClient.rpc("ceasefire_offer", { p_minutes: Number(el.dataset.cfOffer) });
+                });
+            });
+        });
+
+        const yes = tab.querySelector("[data-cf-accept]");
+        if (yes) {
+            yes.addEventListener("click", function () {
+                yes.disabled = true;
+                act(function () {
+                    return supabaseClient.rpc("ceasefire_answer", { p_id: Number(yes.dataset.cfAccept), p_accept: true });
+                });
+            });
+        }
+
+        const no = tab.querySelector("[data-cf-refuse]");
+        if (no) {
+            no.addEventListener("click", function () {
+                no.disabled = true;
+                act(function () {
+                    return supabaseClient.rpc("ceasefire_answer", { p_id: Number(no.dataset.cfRefuse), p_accept: false });
+                });
+            });
+        }
+
+        tab.querySelectorAll(".dip-envoy").forEach(function (el) {
+            el.addEventListener("click", async function () {
+
+                el.disabled = true;
+                msg = "";
+
+                const { data, error } = await supabaseClient.rpc("send_envoy", { p_planet: el.dataset.p });
+
+                if (error) { msg = error.message; }
+                else {
+                    msg = el.dataset.p + (data && data.annexed
+                        ? " — " + T("signed the pact.")
+                        : " — " + T("relations") + " " + data.relation + "/100.");
+                }
+
+                await refresh();
+
+            });
+        });
+
+    }
+
+    /* ---------- open, and the clocks ---------- */
+    openBtn.addEventListener("click", function () {
+
+        opened = true;
+        msg = "";
+        tab.classList.add("on");
+        tab.innerHTML = '<div class="dip-sub">' + esc(T("Loading...")) + '</div>';
+
+        refresh();
+
+    });
+
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && tab.classList.contains("on")) {
+            tab.classList.remove("on");
+            opened = false;
+        }
+    });
+
+    setInterval(function () {
+
+        if (!tab.classList.contains("on")) { return; }
+
+        tab.querySelectorAll("[data-dip-cd]").forEach(function (el) {
+            const kind = el.dataset.dipCd;
+            let secs = 0;
+            if (kind === "active" && cf && cf.active) { secs = left(cf.active.seconds); }
+            if (kind === "offer" && cf && cf.offer) { secs = left(cf.offer.seconds); }
+            el.textContent = mmss(secs);
+        });
+
+        tab.querySelectorAll("[data-dip-wait]").forEach(function (el) {
+            el.textContent = mmss(left(Number(el.dataset.dipWait)));
+        });
+
+        /* a clock ran out: take the book out of the database once more */
+        const done = Array.prototype.some.call(tab.querySelectorAll("[data-dip-cd]"), function (el) {
+            return el.textContent === "0:00";
+        });
+
+        if (done && performance.now() - lastAuto > 10000) {
+            lastAuto = performance.now();
+            refresh();
+        }
+
+    }, 1000);
+
+    setInterval(function () {
+        if (opened && tab.classList.contains("on")) { refresh(); }
+    }, 20000);
+
+})();
 
 </script>
 

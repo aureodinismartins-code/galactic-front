@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=23"></script>
+<script src="i18n.js?v=24"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js?v=23"></script>
 <style>
@@ -150,8 +150,6 @@ let propState = null;     /* cooldowns and treasury for the propaganda tab */
 let propError = null;     /* set when the propaganda functions are not installed yet */
 let debate = null;        /* the sides every live bill's delegates are on */
 let debateError = null;
-let dip = null;           /* the embassies with the independent worlds */
-let dipError = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -274,12 +272,6 @@ async function load() {
     debateError = dr.error ? dr.error.message : null;
 
     if (!dr.error) { supabaseClient.rpc("cg_debate_tick"); }
-
-    /* the diplomacy screen: the embassies with the independent worlds and the
-       reading between the two main factions (2026-10-31) */
-    const dp = await supabaseClient.rpc("diplomacy_state");
-    dip = dp.error ? null : dp.data;
-    dipError = dp.error ? dp.error.message : null;
 
     if (!draft.sponsor) { draft.sponsor = "old_guard"; }
     if (!draft.planet && ov.targets.length) { draft.planet = ov.targets[0].planet; }
@@ -611,7 +603,7 @@ function renderMember() {
 function renderTabs() {
 
     const tabs = [["proposals", "PROPOSALS"], ["leader", "CONGRESS LEADER"], ["party", "PARTY"], ["new", "NEW PROPOSAL"],
-        ["diplomacy", "DIPLOMACY"], ["propaganda", "PROPAGANDA"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
+        ["propaganda", "PROPAGANDA"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + t[1] + '</div>').join("");
     $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
@@ -622,7 +614,6 @@ function renderTabs() {
     else if (tab === "leader") { body.innerHTML = leaderHtml(); wireLeader(); }
     else if (tab === "party") { body.innerHTML = partyHtml(); wireParty(); }
     else if (tab === "new") { body.innerHTML = newHtml(); wireNew(); }
-    else if (tab === "diplomacy") { body.innerHTML = diplomacyHtml(); wireDiplomacy(); }
     else if (tab === "propaganda") { body.innerHTML = propagandaHtml(); wirePropaganda(); }
     else if (tab === "occupied") { body.innerHTML = occupiedHtml(); wireOccupied(); }
     else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
@@ -871,62 +862,6 @@ function wireParty() {
 
 }
 
-/* ---- diplomacy: the independent worlds, and the other main faction ---- */
-function diplomacyHtml() {
-
-    if (!dip) {
-        return '<div class="card"><h3>' + esc(T("DIPLOMACY")) + '</h3><div class="sub">' +
-            esc(T("The embassies arrive with sql/2026-10-31_leaders_parties_and_diplomacy.sql. Run it, then reload this page.")) +
-            (dipError ? '<br><br>' + esc(dipError) : "") + '</div></div>';
-    }
-
-    const rel = dip.relations || {};
-
-    let h = '<div class="card' + (rel.truce ? " active" : "") + '"><h3>' + esc(T("THE TWO MAIN FACTIONS")) + '</h3>' +
-        '<div class="fc" style="margin:6px 0"><span class="nm">' + esc(T("the Combine thinks of us")) + '</span><b style="flex:1;text-align:right">' + (rel.combine || 0) + ' / 100</b></div>' +
-        '<div class="fc" style="margin:6px 0"><span class="nm">' + esc(T("we think of the Combine")) + '</span><b style="flex:1;text-align:right">' + (rel.authority || 0) + ' / 100</b></div>' +
-        '<div class="sub" style="margin-top:8px">' + esc(T(rel.truce
-            ? "TRADING TRUCE: both sides hold the other at 50 or better, so every income payment of both treasuries is ten percent bigger."
-            : "No truce. Both sides must hold the other at 50 or better, and a diplomatic mission raises the reading by 10.")) + '</div>' +
-        '<div class="sub" style="margin-top:4px">' + esc(T("A bill in the NEW PROPOSAL tab sends envoys to the other faction.")) + '</div></div>';
-
-    h += '<div class="card"><h3>' + esc(T("INDEPENDENT WORLDS")) + '</h3>' +
-        '<div class="sub">' + esc(T("The Independents are not a faction any more: every independent world is its own partner. Send envoys until the reading reaches 100 and the world signs the pact and joins the Freedom Authority without a single shot.")) + '</div>' +
-        '<div class="sub" style="margin-top:6px">' + esc(T("Treasury:")) + ' <b>' + fmt(dip.credits) + '</b> &middot; ' + esc(T("an embassy costs")) + ' <b>' + dip.cost + '</b> ' + esc(T("CREDITS")) + ' &middot; ' + esc(T("one send per world every five minutes")) + '</div>';
-
-    h += (dip.planets || []).map(function(p) {
-
-        const seen = new Date(new Date(dip.now).getTime() + p.wait * 1000).toISOString();
-
-        return '<div style="margin-top:10px;border-top:1px solid #1f3354;padding-top:8px">' +
-            '<div class="fc" style="margin:2px 0"><b style="flex:1;font-size:14px">' + esc(p.planet) + '</b>' +
-            '<span class="sub">' + esc(T("the Combine is at")) + ' ' + (p.theirs || 0) + '</span></div>' +
-            '<div class="bar"><i style="width:' + Math.max(0, Math.min(100, p.relation)) + '%;background:#4cc2ff"></i></div>' +
-            '<div class="sub">' + esc(T("relations")) + ' ' + p.relation + ' / 100 &middot; ' + esc(T("envoys sent")) + ' ' + p.envoys + ' &middot; ' + esc(T("the world signs the pact at 100")) +
-            (p.wait > 0 ? ' &middot; ' + esc(T("the court will see you again in")) + ' <b class="cdt" data-ts="' + esc(seen) + '">' + mmss(p.wait) + '</b>' : "") + '</div>' +
-            '<div style="margin-top:6px"><button class="btn small envoy-btn" data-p="' + esc(p.planet) + '"' + (p.wait > 0 ? " disabled" : "") + '>' +
-            T("SEND ENVOYS") + ' (' + dip.cost + ' ' + T("CREDITS") + ')</button></div></div>';
-
-    }).join("") || '<div class="sub" style="margin-top:8px">' + esc(T("No independent world is left: every one of them answers to somebody now.")) + '</div>';
-
-    return h + '</div>';
-
-}
-
-function wireDiplomacy() {
-
-    $("tabbody").querySelectorAll(".envoy-btn").forEach(el => el.addEventListener("click", async function() {
-        el.disabled = true;
-        const { data, error } = await supabaseClient.rpc("send_envoy", { p_planet: el.dataset.p });
-        if (error) { toast(error.message, true); el.disabled = false; return; }
-        toast(data && data.annexed
-            ? el.dataset.p + " signed the pact: the world is ours."
-            : el.dataset.p + " received our envoys: relations " + data.relation + "/100.");
-        await load();
-    }));
-
-}
-
 /* ---- mini map of the galaxy (planet positions are % of the galaxy map) ---- */
 const OWNER_COLORS = { "Freedom Authority": "#4a8cff", "Combine": "#ff4a4a", "Independents": "#e6e6e6" };
 
@@ -1003,7 +938,7 @@ function newHtml() {
     }
     else if (draft.type === "diplomacy") {
         h += '<label class="row">ENVOYS TO</label><select id="n-target" style="width:100%"><option' + (draft.target === "Combine" ? " selected" : "") + '>Combine</option></select>' +
-            '<div class="sub" style="margin-top:4px">The independents are not a bloc any more: their worlds are dealt with one by one in the DIPLOMACY tab.</div>';
+            '<div class="sub" style="margin-top:4px">The independents are not a bloc any more: their worlds are dealt with one by one in the DIPLOMACY tab of the galactic map.</div>';
     }
     else if (draft.type === "fleet_revocation") {
         h += '<label class="row">FLEET TO DECOMMISSION</label><select id="n-fleet" style="width:100%">' +
