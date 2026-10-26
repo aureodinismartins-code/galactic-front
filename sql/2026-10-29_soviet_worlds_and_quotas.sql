@@ -68,6 +68,143 @@ $function$;
 
 
 -- ---------------------------------------------------------
+-- 1b. how the Combine administers a world it has taken
+--     (the Congress's occupation stages, in Soviet dress)
+-- ---------------------------------------------------------
+
+create table if not exists public.cs_occupations (
+    planet text primary key,
+    stage integer not null default 0 check (stage between 0 and 3),
+    stability integer not null default 30 check (stability between 0 and 100),
+    progress integer not null default 0,
+    last_turn_at timestamptz,
+    created_at timestamptz not null default now(),
+    integrated_at timestamptz
+);
+
+alter table public.cs_occupations enable row level security;
+
+/* 0 occupied, 1 military administration, 2 collectivised, 3 incorporated */
+create or replace function public.cs_occupation_threshold(p_stage integer)
+returns integer
+language sql
+immutable
+as $function$
+    select case when coalesce(p_stage, 0) <= 0 then 30
+                when p_stage = 1 then 40
+                when p_stage = 2 then 50
+                else 100 end
+$function$;
+
+create or replace function public.cs_stage_name(p_stage integer)
+returns text
+language sql
+immutable
+as $function$
+    select case coalesce(p_stage, 0)
+               when 0 then 'ocupado'
+               when 1 then 'administração militar'
+               when 2 then 'coletivizado'
+               else 'incorporado à União' end
+$function$;
+
+/* every world held whole is under administration; a contested one is not */
+create or replace function public.cs_seed_occupations()
+returns void
+language plpgsql
+security definer
+set search_path to ''
+as $function$
+begin
+
+    insert into public.cs_occupations (planet, stage, stability, progress, last_turn_at)
+    select p.name, 0, 30, 0, now()
+    from public.planets as p
+    where exists (select 1 from public.cities as c where c.planet_id = p.id)
+      and not exists (select 1 from public.cities as c
+                      where c.planet_id = p.id and c.faction is distinct from 'Combine')
+      and not exists (select 1 from public.cs_occupations as o where o.planet = p.name);
+
+end;
+$function$;
+
+/* five turns of five minutes per stage, counted only while the world is held
+   whole and its stability is at least the threshold of the stage */
+create or replace function public.cs_process_occupations()
+returns void
+language plpgsql
+security definer
+set search_path to ''
+as $function$
+declare
+    c_turn constant interval := interval '5 minutes';
+    o record;
+    v_whole boolean;
+    v_need integer;
+    v_stage integer;
+begin
+
+    for o in select x.* from public.cs_occupations as x order by x.planet loop
+
+        if o.stage >= 3 then continue; end if;
+
+        if o.last_turn_at is null then
+            update public.cs_occupations as x set last_turn_at = now() where x.planet = o.planet;
+            continue;
+        end if;
+
+        /* one turn per call at most, so a long absence cannot skip a stage */
+        if o.last_turn_at > now() - c_turn then continue; end if;
+
+        select exists (select 1 from public.cities as c where c.planet_id = p.id)
+           and not exists (select 1 from public.cities as c
+                           where c.planet_id = p.id and c.faction is distinct from 'Combine')
+        into v_whole
+        from public.planets as p
+        where p.name = o.planet;
+
+        /* lost ground: the administration waits where it stands */
+        if not coalesce(v_whole, false) then
+            update public.cs_occupations as x set last_turn_at = o.last_turn_at + c_turn where x.planet = o.planet;
+            continue;
+        end if;
+
+        v_need := public.cs_occupation_threshold(o.stage);
+
+        if o.stability < v_need then
+            update public.cs_occupations as x set last_turn_at = o.last_turn_at + c_turn where x.planet = o.planet;
+            continue;
+        end if;
+
+        if o.progress + 1 >= 5 then
+
+            v_stage := o.stage + 1;
+
+            update public.cs_occupations as x
+            set stage = v_stage, progress = 0, last_turn_at = o.last_turn_at + c_turn,
+                integrated_at = case when v_stage = 3 then now() else x.integrated_at end
+            where x.planet = o.planet;
+
+            perform public.cs_log('ADMINISTRAÇÃO: ' || o.planet || ' passou a ' || public.cs_stage_name(v_stage) || '.');
+
+            if v_stage = 3 then
+                update public.cs_state as s set confidence = least(100, s.confidence + 1) where s.id = 1;
+                perform public.cs_log('UNIÃO: ' || o.planet || ' foi incorporado à União: o Partido ganha confiança.');
+            end if;
+
+        else
+            update public.cs_occupations as x
+            set progress = o.progress + 1, last_turn_at = o.last_turn_at + c_turn
+            where x.planet = o.planet;
+        end if;
+
+    end loop;
+
+end;
+$function$;
+
+
+-- ---------------------------------------------------------
 -- 2. the fleet quota, for the fleet menu on a planet
 -- ---------------------------------------------------------
 
@@ -307,7 +444,14 @@ begin
                                            where a.kind = 'war' and a.planet = w.name and not a.used),
                        'live', exists (select 1 from public.cs_directives as d
                                        where d.dtype = 'military_campaign' and d.planet = w.name
-                                         and d.status in ('introduction', 'debate'))
+                                         and d.status in ('introduction', 'debate')),
+                       'stage', o.stage,
+                       'stability', o.stability,
+                       'progress', o.progress,
+                       'integrated', (o.integrated_at is not null),
+                       'consolidating', exists (select 1 from public.cs_directives as d
+                                                where d.dtype = 'consolidation' and d.planet = w.name
+                                                  and d.status in ('introduction', 'debate'))
                    ) order by w.whole desc, w.name)
             from (
                 select p.name,
@@ -323,6 +467,7 @@ begin
                 group by p.id, p.name, p.income
                 having count(*) filter (where c.faction = 'Combine') > 0
             ) as w
+            left join public.cs_occupations as o on o.planet = w.name
         ), '[]'::jsonb),
 
         'my_fleets', coalesce((
@@ -463,7 +608,7 @@ begin
 
     for v_try in 1..8 loop
 
-        v_kind := 1 + floor(random() * 5)::integer;
+        v_kind := 1 + floor(random() * 6)::integer;
         v_ok := false;
         v_fleet_id := null;
         v_fleet_name := null;
@@ -507,7 +652,7 @@ begin
                 v_title := 'Cota de nova frota';
             end if;
 
-        else
+        elsif v_kind = 5 then
 
             select count(*) into v_fleets from public.fleets as f
             where f.faction = 'Combine' and coalesce(f.status::text, '') not in ('building', 'engaged');
@@ -525,6 +670,25 @@ begin
                     v_ok := true; v_type := 'fleet_revocation'; v_current := 2;
                     v_title := 'Reatribuir e desmontar a frota "' || coalesce(v_fleet_name, 'sem nome') || '"';
                 end if;
+            end if;
+
+        else
+
+            /* a world whose administration has stalled: the Party asks for
+               stability to push it to the next stage */
+            select o.planet into v_planet
+            from public.cs_occupations as o
+            where o.stage < 3
+              and o.stability < public.cs_occupation_threshold(o.stage)
+              and not exists (select 1 from public.cs_directives as d
+                              where d.dtype = 'consolidation' and d.planet = o.planet
+                                and d.status in ('introduction', 'debate'))
+            order by o.stage desc, random()
+            limit 1;
+
+            if v_planet is not null then
+                v_ok := true; v_type := 'consolidation'; v_current := 2;
+                v_title := 'Consolidar a administração de ' || v_planet;
             end if;
 
         end if;
@@ -581,7 +745,7 @@ begin
     end if;
 
     if p_type not in ('military_campaign', 'fleet_construction', 'knightmare_construction',
-                      'production_quota', 'diplomacy', 'fleet_revocation') then
+                      'production_quota', 'diplomacy', 'fleet_revocation', 'consolidation') then
         raise exception 'Unknown directive';
     end if;
 
@@ -632,6 +796,19 @@ begin
         end if;
     end if;
 
+    if p_type = 'consolidation' then
+        if coalesce(p_planet, '') = '' then raise exception 'Choose a world to consolidate'; end if;
+        if not exists (select 1 from public.cs_occupations as o
+                       where o.planet = p_planet and o.stage < 3) then
+            raise exception 'That world is not under Combine administration';
+        end if;
+        if exists (select 1 from public.cs_directives as d
+                   where d.dtype = 'consolidation' and d.planet = p_planet
+                     and d.status in ('introduction', 'debate')) then
+            raise exception 'A consolidation of % is already before the Soviet', p_planet;
+        end if;
+    end if;
+
     if p_type = 'production_quota' then
         if st.quota >= 2 then raise exception 'The production quota is already at its highest level'; end if;
         if exists (select 1 from public.cs_directives as d
@@ -647,6 +824,7 @@ begin
         when 'production_quota' then 'Plano de produção: elevar a cota'
         when 'diplomacy' then 'Pacto fraterno com os ' || coalesce(nullif(p_target, ''), 'Independents')
         when 'fleet_revocation' then 'Reatribuir e desmontar a frota "' || coalesce(v_fleet_name, '?') || '"'
+        when 'consolidation' then 'Consolidar a administração de ' || coalesce(p_planet, '?')
         else initcap(replace(p_type, '_', ' ')) end;
 
     insert into public.cs_directives (dtype, title, sponsor_current, source, proposer_name, proposer_player,
@@ -664,12 +842,175 @@ $function$;
 
 
 -- ---------------------------------------------------------
+-- 6. what a passed directive does
+-- ---------------------------------------------------------
+
+create or replace function public.cs_execute(p_id integer)
+returns text
+language plpgsql
+security definer
+set search_path to ''
+as $function$
+declare
+    d record;
+    v_planet text;
+    v_credits numeric;
+begin
+
+    select * into d from public.cs_directives as x where x.id = p_id;
+    if d.id is null then return ''; end if;
+
+    if d.dtype = 'military_campaign' then
+
+        insert into public.cs_authorizations (kind, planet) values ('war', d.planet);
+        return 'Campanha aprovada contra ' || coalesce(d.planet, 'o alvo') || ': as frotas do Combine podem atacá-lo.';
+
+    elsif d.dtype = 'fleet_construction' then
+
+        insert into public.cs_authorizations (kind, player_id) values ('fleet', d.proposer_player);
+        return 'Uma nova frota foi autorizada: construa-a no mapa galáctico.';
+
+    elsif d.dtype = 'knightmare_construction' then
+
+        insert into public.cs_authorizations (kind, player_id) values ('knightmare', d.proposer_player);
+        return 'Um destacamento blindado foi autorizado: recrute-o para uma frota (a cadeia da Instalação Knightmare ainda é necessária).';
+
+    elsif d.dtype = 'production_quota' then
+
+        update public.cs_state as s
+        set quota = least(2, s.quota + 1),
+            confidence = greatest(0, s.confidence - 5)
+        where s.id = 1;
+        return 'Plano de produção elevado: 300-500 créditos a cada 15 minutos por nível (máximo 2); o Partido perde confiança.';
+
+    elsif d.dtype = 'diplomacy' then
+
+        update public.cs_state as s
+        set relations = jsonb_set(s.relations, array[coalesce(d.target_faction, 'Independents')],
+                                  to_jsonb(coalesce((s.relations ->> coalesce(d.target_faction, 'Independents'))::numeric, 0) + 10), true)
+        where s.id = 1;
+        return 'Emissários enviados aos ' || coalesce(d.target_faction, 'Independents') || ': as relações melhoram.';
+
+    elsif d.dtype = 'consolidation' then
+
+        update public.cs_occupations as o
+        set stability = least(100, o.stability + 10)
+        where o.planet = d.planet;
+
+        return 'Administração de ' || coalesce(d.planet, 'o mundo') || ' consolidada: estabilidade +10.';
+
+    elsif d.dtype = 'fleet_revocation' then
+
+        if d.fleet_id is null or not exists (select 1 from public.fleets as f where f.id::text = d.fleet_id) then
+            return 'A frota não pôde ser desativada (ela não existe mais ou está em batalha).';
+        end if;
+
+        delete from public.fleets as f where f.id::text = d.fleet_id;
+
+        update public.faction_treasury as ft set credits = ft.credits + 500 where ft.faction = 'Combine';
+        select ft.credits into v_credits from public.faction_treasury as ft where ft.faction = 'Combine';
+
+        return 'A frota foi desativada: 500 créditos de sucata.';
+    end if;
+
+    return '';
+
+end;
+$function$;
+
+
+-- ---------------------------------------------------------
+-- 7. the tick the screen calls
+-- ---------------------------------------------------------
+
+create or replace function public.cs_tick()
+returns void
+language plpgsql
+security definer
+set search_path to ''
+as $function$
+declare
+    st record;
+    g record;
+    d record;
+    v_income bigint;
+    v_faction text;
+begin
+
+    if auth.uid() is null then return; end if;
+    if not exists (select 1 from public.game_control as x where x.id = 1 and x.started) then return; end if;
+    if public.game_frozen() then return; end if;
+
+    /* the plenum sits for the Combine: nobody else keeps it in session */
+    select p.faction into v_faction from public.players as p where p.id = auth.uid();
+    if coalesce(v_faction, '') <> 'Combine' then return; end if;
+
+    update public.cs_state as s set online_at = now() where s.id = 1;
+    select * into st from public.cs_state as s where s.id = 1;
+
+    /* 1. the clock: a directive moves on when its phase is over */
+    for d in
+        select x.* from public.cs_directives as x
+        where x.status in ('introduction', 'debate')
+          and case when x.status = 'introduction' then x.debate_at <= now() else x.vote_at <= now() end
+        order by x.id
+    loop
+        if d.status = 'introduction' then
+            update public.cs_directives as x set status = 'debate' where x.id = d.id;
+            perform public.cs_log('DEBATE: o Soviete começa a debater "' || d.title || '".');
+        else
+            perform public.cs_resolve(d.id);
+        end if;
+    end loop;
+
+    /* 2. the plenum moves */
+    perform public.cs_debate_tick();
+
+    /* 3. the world is administered: new worlds enter, old ones move on */
+    perform public.cs_seed_occupations();
+    perform public.cs_process_occupations();
+
+    /* 4. the Party brings its own directives */
+    perform public.cs_npc_directive();
+
+    /* 5. the General Secretary */
+    perform public.cs_election_tick();
+
+    /* 6. the production quota pays out every 15 minutes */
+    if st.quota > 0 and st.online_at is not null then
+
+        if st.last_quota_at is null then
+            update public.cs_state as s set last_quota_at = now() where s.id = 1;
+        elsif st.last_quota_at <= now() - interval '15 minutes' then
+
+            v_income := 0;
+            while st.last_quota_at <= now() - interval '15 minutes' loop
+                v_income := v_income + 300 + floor(random() * 201)::integer;
+                st.last_quota_at := st.last_quota_at + interval '15 minutes';
+            end loop;
+
+            if v_income > 0 then
+                update public.faction_treasury as ft set credits = ft.credits + v_income * st.quota where ft.faction = 'Combine';
+                perform public.cs_log('PLANO: ' || (v_income * st.quota) || ' créditos produzidos pelos mundos do Combine.');
+            end if;
+
+            update public.cs_state as s set last_quota_at = st.last_quota_at where s.id = 1;
+        end if;
+
+    end if;
+
+end;
+$function$;
+
+
+-- ---------------------------------------------------------
 -- sanity output
 -- ---------------------------------------------------------
 
 select
     (select count(*) from public.cs_authorizations where kind = 'fleet' and not used) as quotas_waiting,
     (select count(*) from public.fleets where faction = 'Combine') as combine_fleets,
+    (select count(*) from public.cs_occupations) as occupations,
     (select count(*) from information_schema.routines
       where routine_schema = 'public'
         and routine_name in ('cs_player_online', 'cs_fleet_quota', 'cs_overview', 'cs_npc_directive', 'cs_submit')) as functions,

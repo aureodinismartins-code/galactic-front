@@ -643,8 +643,32 @@
         "WORLDS HELD": "MUNDOS TOMADOS",
         "WHOLE WORLDS": "MUNDOS INTEIROS",
         "CITIES HELD": "CIDADES EM MÃOS",
-        "Every world where the Combine holds at least one city. A world is whole only when no other faction holds a city there, and only a whole world pays into the plan; the rest still has to be taken, and a campaign needs the Soviet's approval.":
-            "Todo mundo onde o Combine tem pelo menos uma cidade. Um mundo só é inteiro quando nenhuma outra facção tem cidade lá, e só um mundo inteiro paga ao plano; o resto ainda precisa ser tomado, e uma campanha precisa da aprovação do Soviete.",
+        "Every world where the Combine holds at least one city. A world held whole comes under Soviet administration and moves through four stages — occupied, military administration, collectivised, incorporated — five turns of five minutes each, counted only while its stability is at least the threshold of the stage. Only a whole world pays into the plan; the rest still has to be taken, and a campaign needs the Soviet's approval.":
+            "Todo mundo onde o Combine tem pelo menos uma cidade. Um mundo tomado por inteiro entra na administração soviética e passa por quatro estágios — ocupado, administração militar, coletivizado, incorporado — cinco turnos de cinco minutos cada, contados só enquanto a estabilidade for pelo menos o limite do estágio. Só um mundo inteiro paga ao plano; o resto ainda precisa ser tomado, e uma campanha precisa da aprovação do Soviete.",
+        "MILITARY ADMIN": "ADMINISTRAÇÃO MILITAR",
+        "COLLECTIVISED": "COLETIVIZADO",
+        "INCORPORATED INTO THE UNION": "INCORPORADO À UNIÃO",
+        "INCORPORATED": "INCORPORADOS",
+        "military administration": "administração militar",
+        "collectivised": "coletivizado",
+        "incorporated into the Union": "incorporado à União",
+        "dashed = contested, not yet a whole world": "tracejado = disputado, ainda não é um mundo inteiro",
+        "hover a world for its stability, its cities and its fleets": "passe o rato num mundo para ver estabilidade, cidades e frotas",
+        "A consolidation of this world is before the Soviet.": "Uma consolidação deste mundo está no Soviete.",
+        "PUT A CONSOLIDATION BEFORE THE SOVIET": "LEVAR UMA CONSOLIDAÇÃO AO SOVIETE",
+        "Stability is enough: the administration advances one turn every five minutes.":
+            "A estabilidade basta: a administração avança um turno a cada cinco minutos.",
+        "Stability is below the threshold: the administration does not advance until it is consolidated.":
+            "A estabilidade está abaixo do limite: a administração não avança até ser consolidada.",
+        "Incorporated into the Union: the plan collects this world and the Party has its confidence.":
+            "Incorporado à União: o plano recolhe deste mundo e o Partido ganha confiança.",
+        "WORLD TO CONSOLIDATE": "MUNDO A CONSOLIDAR",
+        "no world under administration": "nenhum mundo sob administração",
+        "The directive raises that world's stability by 10; the administration stops advancing while it is below the threshold of its stage.":
+            "A diretiva sobe a estabilidade desse mundo em 10; a administração para de avançar enquanto estiver abaixo do limite do estágio.",
+        "Consolidate a World": "Consolidar um Mundo",
+        "Stability +10 for one world under Combine administration: each stage of its administration needs a stability threshold.":
+            "Estabilidade +10 para um mundo sob administração do Combine: cada estágio da administração exige um limite de estabilidade.",
         "The Combine holds no world yet. Take one with a military campaign (NEW DIRECTIVE), and it is listed here.":
             "O Combine ainda não tomou nenhum mundo. Tome um com uma campanha militar (NOVA DIRETIVA) e ele aparece aqui.",
         "WHOLE": "INTEIRO",

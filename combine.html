@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=19"></script>
+<script src="i18n.js?v=20"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -70,6 +70,10 @@ label.row { display: block; margin: 10px 0 4px; font-size: 11px; letter-spacing:
 .log { font-size: 12px; line-height: 1.5; padding: 5px 0; border-bottom: 1px solid #2a1618; }
 .log time { color: #9a7274; margin-right: 8px; }
 hr.rule { border: 0; border-top: 1px solid #5a1d20; margin: 10px 0; }
+.steps { display: flex; gap: 4px; margin: 8px 0; }
+.steps > div { flex: 1; text-align: center; padding: 5px 3px; font-size: 9px; letter-spacing: 1px; border: 1px solid #5a1d20; background: #1c1011; color: #b89598; }
+.steps > div.done { background: #2b1c0d; color: #e8c46a; border-color: #8f6a2c; }
+.steps > div.cur { background: #5c1a1d; color: #fff; border-color: #b32424; }
 @media (max-width: 1150px) { #main { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -127,7 +131,8 @@ const TYPES = {
     knightmare_construction: { name: "Armoured Detachment", votes: "qualified", desc: "Approve one elite armoured detachment (the Knightmare Facility chain is still needed)." },
     production_quota: { name: "Five-Year Plan: Raise the Quota", votes: "qualified", desc: "Raise the production quota: 300-500 credits every 15 minutes per level (max 2), confidence -5." },
     diplomacy: { name: "Fraternal Pact", votes: "majority", desc: "Send envoys to another faction: relations +10." },
-    fleet_revocation: { name: "Reassign and Dismantle a Fleet", votes: "qualified", desc: "Break up one Combine fleet for 500 credits of salvage." }
+    fleet_revocation: { name: "Reassign and Dismantle a Fleet", votes: "qualified", desc: "Break up one Combine fleet for 500 credits of salvage." },
+    consolidation: { name: "Consolidate a World", votes: "majority", desc: "Stability +10 for one world under Combine administration: each stage of its administration needs a stability threshold." }
 };
 
 let ov = null;
@@ -751,6 +756,12 @@ function wireSecretary() {
 /* the galaxy, as the Congress draws it: planet_positions are percentages */
 const MAP_COLORS = { "Freedom Authority": "#4a8cff", "Combine": "#ff4a4a", "Independents": "#e6e6e6" };
 
+/* the four stages a world held whole passes through */
+const STAGE_KEYS = ["OCCUPIED", "MILITARY ADMIN", "COLLECTIVISED", "INCORPORATED INTO THE UNION"];
+const STAGE_COLORS = ["#d6a84b", "#4cc2ff", "#7a8cff", "#2fbf6a"];
+const STAGE_NEED = [30, 40, 50, 100];
+const STAGE_TURNS = 5;
+
 function miniMapHtml(kind) {
 
     const W = 480, H = 270;
@@ -804,11 +815,18 @@ function miniMapHtml(kind) {
             const w = held[p.name];
             dim = !w;
 
-            /* the ring says which kind of world it is; the number of cities
-               and the fleets are in the hover, so no fraction is shown here
-               (on the Congress map a fraction like 1/4 is an occupation stage) */
+            /* a whole world shows its administration stage (1/4 ... 4/4), the
+               same convention as the Congress map; a contested one is dashed
+               and has no stage yet */
             if (w) {
-                ring = '<circle cx="' + x + '" cy="' + y + '" r="10" fill="none" stroke="' + (w.whole ? "#2fbf6a" : "#d6a84b") + '" stroke-width="3"/>';
+
+                const st = w.whole ? (w.stage == null ? 0 : Number(w.stage)) : null;
+
+                ring = '<circle cx="' + x + '" cy="' + y + '" r="10" fill="none" stroke="' +
+                    (st == null ? "#d6a84b" : STAGE_COLORS[st]) + '" stroke-width="3"' +
+                    (st == null ? ' stroke-dasharray="3 2"' : '') + '/>';
+
+                if (st != null) { label = (st + 1) + "/4"; }
             }
 
         }
@@ -828,9 +846,12 @@ function miniMapHtml(kind) {
               ' &middot; <span style="color:#e8c46a">&#9711;</span> ' + esc(T("your target")) + ' &middot; ' +
               esc(T("click a planet to put a campaign against it before the Soviet")) +
               ' &middot; <span style="color:#ff4a4a">red</span> = ' + esc(T("Combine")) + ', <span style="color:#4a8cff">blue</span> = ' + esc(T("Freedom Authority"))
-            : '<span style="color:#d6a84b">&#9711;</span> ' + esc(T("contested world")) +
-              ' &middot; <span style="color:#2fbf6a">&#9711;</span> ' + esc(T("whole world")) + ' &middot; ' +
-              esc(T("dim = not ours yet")) + ' &middot; ' + esc(T("hover a world for its cities and its fleets"))) + '</div>';
+            : '<span style="color:#d6a84b">&#9711;</span> ' + esc(T("occupied")) +
+              ' &middot; <span style="color:#4cc2ff">&#9711;</span> ' + esc(T("military administration")) +
+              ' &middot; <span style="color:#7a8cff">&#9711;</span> ' + esc(T("collectivised")) +
+              ' &middot; <span style="color:#2fbf6a">&#9711;</span> ' + esc(T("incorporated into the Union")) +
+              ' &middot; <span style="color:#d6a84b">&#9711;</span> ' + esc(T("dashed = contested, not yet a whole world")) + ' &middot; ' +
+              esc(T("hover a world for its stability, its cities and its fleets"))) + '</div>';
 
     return svg;
 
@@ -849,11 +870,16 @@ function wireMiniMap() {
             const w = (ov.worlds || []).find(x => x.planet === p.name);
             const fleets = p.fleets || [];
             const t = $("tip");
+            const stage = w && w.whole && w.stage != null ? Number(w.stage) : null;
 
             t.style.display = "block";
             t.style.left = (ev.clientX + 14) + "px";
             t.style.top = (ev.clientY + 14) + "px";
             t.innerHTML = '<b>' + esc(p.name) + '</b><br><span style="color:#b89598">' + esc(T(p.owner)) + '</span>' +
+                (stage != null
+                    ? '<br><span style="color:' + STAGE_COLORS[stage] + '">' + esc(T(STAGE_KEYS[stage])) + '</span>' +
+                      ' &middot; ' + esc(T("STABILITY")) + ' ' + Math.round(w.stability) + ' / ' + (stage < 3 ? STAGE_NEED[stage] : "-")
+                    : "") +
                 (w ? '<br>' + w.held + ' ' + T("of") + ' ' + w.total + ' ' + esc(T("cities held")) : "") +
                 '<br>' + (fleets.length
                     ? esc(T("Our fleets here:")) + ' ' +
@@ -955,14 +981,16 @@ function worldsHtml() {
     const worlds = ov.worlds || [];
     const whole = worlds.filter(w => w.whole).length;
     const cities = worlds.reduce((n, w) => n + Number(w.held), 0);
+    const incorporated = worlds.filter(w => Number(w.stage) === 3).length;
 
     const tokens = '<div class="tokens">' +
         '<div class="token">' + esc(T("WORLDS HELD")) + '<b>' + worlds.length + '</b></div>' +
         '<div class="token">' + esc(T("WHOLE WORLDS")) + '<b>' + whole + '</b></div>' +
-        '<div class="token">' + esc(T("CITIES HELD")) + '<b>' + cities + '</b></div></div>';
+        '<div class="token">' + esc(T("CITIES HELD")) + '<b>' + cities + '</b></div>' +
+        '<div class="token">' + esc(T("INCORPORATED")) + '<b>' + incorporated + '</b></div></div>';
 
     const note = '<div class="sub" style="margin-bottom:10px">' +
-        esc(T("Every world where the Combine holds at least one city. A world is whole only when no other faction holds a city there, and only a whole world pays into the plan; the rest still has to be taken, and a campaign needs the Soviet's approval.")) + '</div>';
+        esc(T("Every world where the Combine holds at least one city. A world held whole comes under Soviet administration and moves through four stages — occupied, military administration, collectivised, incorporated — five turns of five minutes each, counted only while its stability is at least the threshold of the stage. Only a whole world pays into the plan; the rest still has to be taken, and a campaign needs the Soviet's approval.")) + '</div>';
 
     /* nothing held yet: the map would be a blank grid, so it is left out */
     const map = worlds.length ? '<div class="card">' + miniMapHtml("held") + '</div>' : "";
@@ -974,10 +1002,27 @@ function worldsHtml() {
     return tokens + map + note + worlds.map(function(w) {
 
         const pct = w.total ? Math.round(w.held / w.total * 100) : 0;
+        const stage = w.whole && w.stage != null ? Number(w.stage) : null;
+        const need = stage == null ? 100 : STAGE_NEED[stage];
+
         let actions = "";
 
         if (w.whole) {
-            actions = '<div class="sub" style="color:#7dff9d">' + esc(T("Incorporated into the Union: the plan collects this world.")) + '</div>';
+
+            if (stage >= 3) {
+                actions = '<div class="sub" style="color:#7dff9d">' + esc(T("Incorporated into the Union: the plan collects this world and the Party has its confidence.")) + '</div>';
+            }
+            else if (w.consolidating) {
+                actions = '<div class="sub" style="color:#ffd37a">' + esc(T("A consolidation of this world is before the Soviet.")) + '</div>';
+            }
+            else {
+                actions = '<div style="margin-top:8px"><button class="btn small consolidate-btn" data-p="' + esc(w.planet) + '">' + esc(T("PUT A CONSOLIDATION BEFORE THE SOVIET")) + '</button></div>' +
+                    '<div class="sub" style="margin-top:4px">' +
+                    esc(T(Number(w.stability) >= need
+                        ? "Stability is enough: the administration advances one turn every five minutes."
+                        : "Stability is below the threshold: the administration does not advance until it is consolidated.")) + '</div>';
+            }
+
         }
         else if (w.declared) {
             actions = '<div class="sub" style="color:#7dff9d">' + esc(T("Campaign approved: the fleets may attack it.")) + '</div>';
@@ -990,10 +1035,25 @@ function worldsHtml() {
         }
 
         return '<div class="card' + (w.whole ? "" : " active") + '"><h3>' + esc(w.planet) + ' ' +
-            (w.whole ? '<span class="badge pass">' + esc(T("WHOLE")) + '</span>' : '<span class="badge live">' + esc(T("CONTESTED")) + '</span>') + '</h3>' +
+            (w.whole && stage != null
+                ? '<span class="badge pass">' + esc(T(STAGE_KEYS[stage])) + '</span>'
+                : '<span class="badge live">' + esc(T("CONTESTED")) + '</span>') + '</h3>' +
             '<div class="sub">' + w.held + ' ' + T("of") + ' ' + w.total + ' ' + esc(T("cities held")) +
             (w.others ? ' &middot; ' + esc(T("also held by")) + ' ' + esc(w.others) : "") + '</div>' +
             '<div class="bar"><i style="width:' + pct + '%;background:' + (w.whole ? "#2fbf6a" : "#d6a84b") + '"></i></div>' +
+            (stage != null
+                ? '<div class="steps">' + STAGE_KEYS.map(function(n, i) {
+                      return '<div class="' + (i < stage ? "done" : i === stage ? "cur" : "") + '">' + esc(T(n)) + '</div>';
+                  }).join("") + '</div>' +
+                  '<div class="sub">' + esc(T("STABILITY")) + ' ' + Math.round(w.stability) + ' / ' + (stage < 3 ? need : "-") + '</div>' +
+                  '<div class="bar"><i style="width:' + Math.min(100, Number(w.stability)) + '%;background:' +
+                      (Number(w.stability) >= need ? "#2fbf6a" : "#d6a84b") + '"></i></div>' +
+                  (stage < 3
+                      ? '<div class="sub">' + esc(T("STAGE PROGRESS")) + ' ' + w.progress + ' / ' + STAGE_TURNS + ' ' +
+                        esc(T("turns (5 minutes each, only counted while stability is high enough)")) + '</div>' +
+                        '<div class="bar"><i style="width:' + (Number(w.progress) / STAGE_TURNS * 100) + '%;background:#4cc2ff"></i></div>'
+                      : "")
+                : "") +
             '<div class="sub">' + esc(T("PRODUCTION")) + ' ' +
             (w.whole ? '<b style="color:#7dff9d">' + fmt(w.income) + '</b>' : '<b style="color:#b89598">0</b>') +
             ' ' + esc(T("into the plan every 5 minutes")) + '</div>' + actions + '</div>';
@@ -1006,6 +1066,12 @@ function wireWorlds() {
     wireMiniMap();
     $("tabbody").querySelectorAll(".camp-btn").forEach(el => el.addEventListener("click", function() {
         draft.type = "military_campaign";
+        draft.planet = el.dataset.p;
+        tab = "new";
+        renderTabs();
+    }));
+    $("tabbody").querySelectorAll(".consolidate-btn").forEach(el => el.addEventListener("click", function() {
+        draft.type = "consolidation";
         draft.planet = el.dataset.p;
         tab = "new";
         renderTabs();
@@ -1125,6 +1191,19 @@ function newHtml() {
                 esc(x.planet) + ' (' + esc(x.owners) + ')' + (x.declared ? " - " + esc(T("campaign approved")) : "") + '</option>').join("") ||
              '<option value="">' + esc(T("no targets")) + '</option>') + '</select>';
     }
+    else if (draft.type === "consolidation") {
+
+        const admin = (ov.worlds || []).filter(w => w.whole && w.stage != null && Number(w.stage) < 3);
+
+        if (!admin.some(w => w.planet === draft.planet)) { draft.planet = admin.length ? admin[0].planet : ""; }
+
+        h += '<label class="row">' + esc(T("WORLD TO CONSOLIDATE")) + '</label><select id="n-planet" style="width:100%">' +
+            (admin.map(w => '<option value="' + esc(w.planet) + '"' + (draft.planet === w.planet ? " selected" : "") + '>' +
+                esc(w.planet) + ' (' + esc(T("STABILITY")) + ' ' + w.stability + ' / ' + STAGE_NEED[Number(w.stage)] + ')</option>').join("") ||
+             '<option value="">' + esc(T("no world under administration")) + '</option>') + '</select>' +
+            '<div class="sub" style="margin-top:6px">' + esc(T("The directive raises that world's stability by 10; the administration stops advancing while it is below the threshold of its stage.")) + '</div>';
+
+    }
     else if (draft.type === "fleet_revocation") {
         h += '<label class="row">' + esc(T("FLEET TO DISMANTLE")) + '</label><select id="n-fleet" style="width:100%">' +
             (ov.my_fleets.map(f => '<option value="' + esc(f.id) + '"' + (draft.fleet === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>').join("") || '<option value="">' + esc(T("you have no fleets")) + '</option>') + '</select>';
@@ -1165,7 +1244,7 @@ function wireNew() {
 
         const { error } = await supabaseClient.rpc("cs_submit", {
             p_type: draft.type,
-            p_planet: draft.type === "military_campaign" ? (draft.planet || null) : null,
+            p_planet: (draft.type === "military_campaign" || draft.type === "consolidation") ? (draft.planet || null) : null,
             p_fleet: draft.type === "fleet_revocation" ? (draft.fleet || null) : null,
             p_target: draft.type === "diplomacy" ? draft.target : null,
             p_current: draft.current
