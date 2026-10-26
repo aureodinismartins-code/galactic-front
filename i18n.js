@@ -98,7 +98,7 @@
         "War room: declare war on a planet": "Sala de guerra: declarar guerra a um planeta",
 
         /* ---------- congress: propaganda ---------- */
-        "PROPAGANDA": "PROPAGANDA",
+
         "TREASURY": "TESOURO",
 
         /* ---------- congress: the pieces a card builds itself ---------- */
@@ -108,7 +108,7 @@
         "by": "por",
         "spoken for by": "apresentada por",
         "INTRODUCTION": "APRESENTAÇÃO",
-        "DEBATE": "DEBATE",
+
         "PASSED": "APROVADA",
         "REJECTED": "REJEITADA",
         "NO FUNDS": "SEM FUNDOS",
@@ -174,7 +174,7 @@
         "Loading fleet...": "Carregando frota...",
         "Loading fleets...": "Carregando frotas...",
         "ETA:": "PREVISÃO:",
-        "Status:": "Status:",
+
         "Location:": "Localização:",
         "Cities:": "Cidades:",
         "Provinces:": "Províncias:",
@@ -544,6 +544,100 @@
         "Ring colour = occupation stage (gold occupied, light blue civilian administration, violet protected, green integrated)":
             "Cor do anel = estágio de ocupação (dourado ocupado, azul-claro administração civil, violeta protegido, verde integrado)",
 
+        /* ---------- the Combine's Supreme Soviet ---------- */
+        "SUPREME SOVIET OF THE COMBINE": "SOVIETE SUPREMO DO COMBINE",
+        "Supreme Soviet of the Combine": "Soviete Supremo do Combine",
+        "SUPREME SOVIET": "SOVIETE SUPREMO",
+        "THE PLENUM": "O PLENO",
+        "SECRETARY": "SECRETÁRIO",
+        "CONFIDENCE": "CONFIANÇA",
+        "QUOTA": "COTA",
+        "DIRECTIVES": "DIRETIVAS",
+        "GENERAL SECRETARY": "SECRETÁRIO-GERAL",
+        "NEW DIRECTIVE": "NOVA DIRETIVA",
+        "discipline": "disciplina",
+        "DISCIPLINE": "DISCIPLINA",
+        "Discipline": "Disciplina",
+        "under investigation": "sob investigação",
+        "Under investigation": "Sob investigação",
+        "Under investigation for corruption.": "Sob investigação por corrupção.",
+        "qualified": "três quintos",
+        "The Proletarian Vanguard": "A Vanguarda Proletária",
+        "The Party Apparatus": "O Aparato do Partido",
+        "Red Command": "O Comando Vermelho",
+        "Military Campaign against a Planet": "Campanha militar contra um planeta",
+        "New Fleet Quota": "Cota de nova frota",
+        "Armoured Detachment": "Destacamento blindado",
+        "Five-Year Plan: Raise the Quota": "Plano de cinco anos: elevar a cota",
+        "Fraternal Pact": "Pacto fraterno",
+        "Reassign and Dismantle a Fleet": "Reatribuir e desmontar uma frota",
+        "Authorise an attack on one planet. Without it Combine fleets cannot attack.":
+            "Autoriza um ataque a um planeta. Sem isso, as frotas do Combine não podem atacar.",
+        "Approve one new fleet (build it from the galaxy map afterwards; it is still paid for there).":
+            "Aprova uma nova frota (construa-a depois no mapa galáctico; ela continua sendo paga lá).",
+        "Approve one elite armoured detachment (the Knightmare Facility chain is still needed).":
+            "Aprova um destacamento blindado de elite (a cadeia da Instalação Knightmare ainda é necessária).",
+        "Raise the production quota: 300-500 credits every 15 minutes per level (max 2), confidence -5.":
+            "Eleva a cota de produção: 300-500 créditos a cada 15 minutos por nível (máximo 2), confiança -5.",
+        "Send envoys to another faction: relations +10.":
+            "Envia emissários a outra facção: relações +10.",
+        "Break up one Combine fleet for 500 credits of salvage.":
+            "Desmonta uma frota do Combine em troca de 500 créditos de sucata.",
+        "The Soviet sits only while a Combine player is online. Its commissars bring directives of their own every few minutes.":
+            "O Soviete só funciona enquanto um jogador do Combine estiver online. Seus comissários trazem diretivas próprias a cada poucos minutos.",
+        "The Soviet has no directives before it yet. Bring one in NEW DIRECTIVE, or wait for the commissars.":
+            "O Soviete ainda não tem diretivas. Leve uma em NOVA DIRETIVA ou aguarde os comissários.",
+        "SELECTED FOR PRIVILEGES": "SELECIONADA PARA PRIVILÉGIOS",
+        "SELECT TO GRANT PRIVILEGES": "SELECIONAR PARA CONCEDER PRIVILÉGIOS",
+        "Your privileges:": "Seus privilégios:",
+        "the plenum is still moving": "o plenário ainda se mexe",
+        "yes votes (chance of a YES per current, before privileges and surprises).":
+            "votos sim (chance de SIM por corrente, antes de privilégios e surpresas).",
+        "PRIVILEGED": "PRIVILEGIADO",
+        "privileges taken:": "privilégios aceitos:",
+        "Click a commissar to see who they are. While a directive is debated you can grant them cadre privileges.":
+            "Clique em um comissário para ver quem ele é. Enquanto uma diretiva está em debate, você pode conceder privilégios de quadro a ele.",
+        "PRIVILEGES FOR:": "PRIVILÉGIOS PARA:",
+        "Already granted:": "Já concedido:",
+        "privileges for a YES": "privilégios por um SIM",
+        "privileges for a NO": "privilégios por um NÃO",
+        "GRANT": "CONCEDER",
+        "Chance the privileges change the vote:": "Chance de os privilégios mudarem o voto:",
+        "A grant that fails is still spent.": "Uma concessão que falha é gasta de qualquer forma.",
+        "Cadre privileges can be granted once the debate opens.":
+            "Privilégios de quadro podem ser concedidos quando o debate abrir.",
+        "This directive is no longer open.": "Esta diretiva não está mais aberta.",
+        "Select a directive in debate (DIRECTIVES tab) to grant this commissar cadre privileges.":
+            "Selecione uma diretiva em debate (aba DIRETIVAS) para conceder privilégios a este comissário.",
+        "Privileges granted:": "Privilégios concedidos:",
+        "credits in total on this commissar.": "créditos no total para este comissário.",
+        "General Secretary of the Combine": "Secretário-Geral do Combine",
+        "Election of the General Secretary": "Eleição do Secretário-Geral",
+        "The General Secretary may keep 5 directives before the Soviet (others 3), has used the veto of this term, and the ruling current's agenda is heard more often.":
+            "O Secretário-Geral pode manter 5 diretivas no Soviete (os outros 3), já usou o veto deste mandato e a agenda da corrente no poder é ouvida com mais frequência.",
+        "The General Secretary may keep 5 directives before the Soviet (others 3), may veto one directive per term, and the ruling current's agenda is heard more often.":
+            "O Secretário-Geral pode manter 5 diretivas no Soviete (os outros 3), pode vetar uma diretiva por mandato e a agenda da corrente no poder é ouvida com mais frequência.",
+        "Your current": "Sua corrente",
+        "Every Combine player belongs to a current of the Party. You need one to stand for General Secretary or to vote.":
+            "Todo jogador do Combine pertence a uma corrente do Partido. Você precisa de uma para se candidatar a Secretário-Geral ou votar.",
+        "The next election starts when the term ends (in": "A próxima eleição começa quando o mandato terminar (em",
+        "An election is called as soon as a Combine player is online.":
+            "Uma eleição é convocada assim que um jogador do Combine estiver online.",
+        "STAND FOR GENERAL SECRETARY": "CANDIDATAR-SE A SECRETÁRIO-GERAL",
+        "Current chosen.": "Corrente escolhida.",
+        "You are a candidate for General Secretary.": "Você é candidato a Secretário-Geral.",
+        "WHAT SHOULD THE SOVIET DECIDE?": "O QUE O SOVIETE DEVE DECIDIR?",
+        "PLANET TO ATTACK": "PLANETA A ATACAR",
+        "campaign approved": "campanha aprovada",
+        "FLEET TO DISMANTLE": "FROTA A DESMONTAR",
+        "WHICH CURRENT SPEAKS FOR IT?": "QUAL CORRENTE APRESENTA A DIRETIVA?",
+        "Commissars of the sponsoring current vote for it far more often; currents near it tend to follow, distant ones oppose.":
+            "Os comissários da corrente proponente votam a favor com muito mais frequência; correntes próximas tendem a acompanhar, as distantes se opõem.",
+        "Introduction 3 minutes, then 5 minutes of debate (privileges are possible), then the vote. A commander may have 3 directives before the Soviet at once.":
+            "Apresentação de 3 minutos, depois 5 minutos de debate (privilégios são possíveis) e então a votação. Um comandante pode ter 3 diretivas no Soviete ao mesmo tempo.",
+        "PUT BEFORE THE SOVIET": "LEVAR AO SOVIETE",
+        "Your directive is before the Soviet.": "Sua diretiva está no Soviete.",
+
         /* ---------- host tools / overlays ---------- */
         "THE GAME HAS NOT STARTED": "O JOGO NÃO COMEÇOU",
         "Everything is frozen. Waiting for the host to begin the war.":
@@ -715,7 +809,37 @@
         "Reformas progressistas e investimento em tecnologia e infraestrutura civil":
             "Progressive reforms and investment in technology and civil infrastructure",
         "Membros sem alinhamento, imprevisíveis, influenciados por argumentos ou subornos":
-            "Unaligned members, unpredictable, swayed by argument or bribes"
+            "Unaligned members, unpredictable, swayed by argument or bribes",
+
+        /* ---------- the Supreme Soviet, as the database stores it ---------- */
+        "Vanguarda Proletária": "The Proletarian Vanguard",
+        "Aparato do Partido": "The Party Apparatus",
+        "Comando Vermelho": "Red Command",
+        "Conselhos de operários e soldados: o plano vem de baixo e a guerra é de todos":
+            "Workers' and soldiers' councils: the plan comes from below and the war belongs to everyone",
+        "Engenheiros, planejadores e burocratas: tudo se mede em toneladas e em ordens cumpridas":
+            "Engineers, planners and bureaucrats: everything is measured in tonnage and in orders carried out",
+        "O exército fala no plenário, e fala alto": "The army speaks in the plenum, and speaks loudly",
+        "Cota de nova frota": "New fleet quota",
+        "Destacamento blindado": "Armoured detachment",
+        "Plano de produção: elevar a cota": "Five-Year Plan: raise the quota",
+        "A frota não pôde ser desativada (ela não existe mais ou está em batalha).":
+            "The fleet could not be dismantled (it no longer exists or is in battle).",
+        "A frota foi desativada: 500 créditos de sucata.":
+            "The fleet is dismantled: 500 credits of salvage.",
+        "O Secretário-Geral vetou esta diretiva.": "The General Secretary vetoed this directive.",
+        "Uma nova frota foi autorizada: construa-a no mapa galáctico.":
+            "A new fleet is authorised: build it from the galaxy map.",
+        "Um destacamento blindado foi autorizado: recrute-o para uma frota (a cadeia da Instalação Knightmare ainda é necessária).":
+            "An armoured detachment is authorised: recruit it into a fleet (the Knightmare Facility chain is still required).",
+        "Plano de produção elevado: 300-500 créditos a cada 15 minutos por nível (máximo 2); o Partido perde confiança.":
+            "Production quota raised: 300-500 credits every 15 minutes per level (max 2); the Party loses confidence.",
+        "ELEIÇÃO: uma campanha para Secretário-Geral foi aberta. Entre em uma corrente do Partido, declare a candidatura (8 minutos) e então todos votam (8 minutos).":
+            "ELECTION: a campaign for General Secretary is open. Join a current of the Party, declare your candidacy (8 minutes), then all players vote (8 minutes).",
+        "ELEIÇÃO: a votação está aberta. Todo jogador do Combine que entrou em uma corrente pode votar.":
+            "ELECTION: voting is open. Every Combine player who has joined a current may vote.",
+        "ELEIÇÃO: ninguém se apresentou. O cargo continua vago.":
+            "ELECTION: nobody stood. The office stays vacant.",
     };
 
     /* lines that carry names, planets or numbers: matched by shape */
@@ -785,6 +909,45 @@
         [/^PROPAGANDA: a campanha pela (.+) custou ([0-9]+) créditos e subiu a lealdade dos seus delegados em ([0-9]+) pontos; ([0-9]+) delegado\(s\) passaram-se para ela: (.*)\.$/,
             "PROPAGANDA: the campaign for $1 cost $2 credits and lifted the loyalty of its delegates by $3 points; $4 delegate(s) crossed over to it: $5."],
 
+
+        /* the Supreme Soviet (2026-10-28) */
+        [/^Campanha militar contra (.+)$/, "Military campaign against $1"],
+        [/^Pacto fraterno com os (.+)$/, "Fraternal pact with the $1"],
+        [/^Reatribuir e desmontar a frota "(.*)"$/, 'Reassign and dismantle the fleet "$1"'],
+        [/^Campanha aprovada contra (.+): as frotas do Combine podem atacá-lo\.$/,
+            "Campaign approved against $1: Combine fleets may attack it."],
+        [/^Emissários enviados aos (.+): as relações melhoram\.$/, "Envoys sent to the $1: relations improve."],
+        [/^DIRETIVA: (.+) leva "(.*)" ao Soviete\.$/, function (all, who, title) {
+            return 'DIRECTIVE: ' + who + ' puts "' + (lookupServer(title) || title) + '" before the Soviet.';
+        }],
+        [/^DEBATE: o Soviete começa a debater "(.*)"\.$/, function (all, title) {
+            return 'DEBATE: the Soviet takes up "' + (lookupServer(title) || title) + '".';
+        }],
+        [/^PLENO: o Soviete volta-se a favor de "(.*)": ([0-9]+) de ([0-9]+) votos prometidos\.$/, function (all, title, yes, need) {
+            return 'PLENARY: the Soviet turns for "' + (lookupServer(title) || title) + '": ' + yes + ' of ' + need + ' votes promised.';
+        }],
+        [/^PLENO: o Soviete volta-se contra "(.*)": só ([0-9]+) de ([0-9]+) votos prometidos\.$/, function (all, title, yes, need) {
+            return 'PLENARY: the Soviet turns against "' + (lookupServer(title) || title) + '": only ' + yes + ' of ' + need + ' votes promised.';
+        }],
+        [/^(APROVADA|REJEITADA): "(.*)" \(([0-9]+) sim, ([0-9]+) não, ([0-9]+) abstenções; ([0-9]+) necessários\)\.? ?(.*)$/,
+            function (all, verdict, title, yes, no, abstain, need, effect) {
+                return (verdict === "APROVADA" ? "PASSED" : "REJECTED") + ': "' + (lookupServer(title) || title) + '" (' +
+                    yes + " yes, " + no + " no, " + abstain + " abstain; " + need + " needed). " + (lookupServer(effect) || effect);
+            }],
+        [/^VETO: o Secretário-Geral (.*) veta "(.*)"\.$/, function (all, who, title) {
+            return 'VETO: General Secretary ' + who + ' vetoes "' + (lookupServer(title) || title) + '".';
+        }],
+        [/^PLANO: ([0-9]+) créditos produzidos pelos mundos do Combine\.$/,
+            "PLAN: $1 credits produced by the Combine's worlds."],
+        [/^Eleito com ([0-9]+) voto\(s\)\.$/, "Elected with $1 vote(s)."],
+        [/^Nenhum candidato\.$/, "No candidate."],
+        [/^PARTIDO: (.+) entra em (Vanguarda Proletária|Aparato do Partido|Comando Vermelho)\.$/, function (all, who, current) {
+            return who + ' joins ' + (lookupServer(current) || current) + '.';
+        }],
+        [/^CANDIDATURA: (.+) apresenta-se a Secretário-Geral\.$/,
+            "CANDIDACY: $1 stands for General Secretary."],
+        [/^ELEIÇÃO: (.*) é eleito Secretário-Geral do Combine \(([0-9]+) voto\(s\)\)\.$/,
+            "ELECTION: $1 is elected General Secretary of the Combine ($2 vote(s))."],
         [/^O assalto a (.+) teve sucesso\.$/, "The assault on $1 succeeded."],
         [/^O assalto a (.+) foi repelido\.$/, "The assault on $1 was repelled."]
     ];
@@ -855,7 +1018,7 @@
         const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(raw);
         if (!m || !m[2]) { return; }
         const out = (activeLookup || lookup)(m[2]);
-        if (out === null) { return; }
+        if (out === null || out === m[2]) { return; }
         node.nodeValue = m[1] + out + m[3];
     }
 
@@ -872,12 +1035,12 @@
             if (!el.hasAttribute(a)) { continue; }
             const cur = el.getAttribute(a);
             const out = (activeLookup || lookup)(cur);
-            if (out !== null) { el.setAttribute(a, out); }
+            if (out !== null && out !== cur) { el.setAttribute(a, out); }
         }
 
         if (tag === "INPUT" && (el.type === "button" || el.type === "submit" || el.type === "reset")) {
             const out = (activeLookup || lookup)(el.value);
-            if (out !== null) { el.value = out; }
+            if (out !== null && out !== el.value) { el.value = out; }
         }
     }
 

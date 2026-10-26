@@ -20,7 +20,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=13"></script>
+    <script src="i18n.js?v=14"></script>
     <script src="gamecontrol.js"></script>
     <script src="ships.js"></script>
 
@@ -1533,7 +1533,19 @@ if (createFleetButton) {
 
     createFleetButton.addEventListener(
         "click",
-        function() {
+        async function() {
+
+            /* the Combine builds a fleet only with a quota the Soviet approved */
+            if (playerFaction === "Combine") {
+
+                const quota = await supabaseClient.rpc("cs_can_build_fleet");
+
+                if (!quota.error && quota.data === false) {
+                    gameNotice("The Supreme Soviet has not authorised a new fleet. Put a new fleet quota before it first.");
+                    return;
+                }
+
+            }
 
             fleetMessage.textContent =
                 "";
@@ -2066,14 +2078,30 @@ async function startAttack(city) {
 
 
     
-    /* Freedom Authority needs a declaration of war from Congress */
-    {
+    /*
+     * The freedom to attack depends on the chamber of your faction:
+     * the Freedom Authority needs a declaration of war from Congress,
+     * the Combine needs an approved military campaign from the Soviet.
+     */
+    if (playerFaction === "Combine") {
+
+        const campaign = await supabaseClient.rpc("cs_can_attack", { p_planet: planetName });
+
+        if (!campaign.error && campaign.data === false) {
+            gameNotice("The Supreme Soviet has not authorised a campaign against " + planetName + ". Put a military campaign before it first.");
+            return;
+        }
+
+    }
+    else {
+
         const war = await supabaseClient.rpc("congress_can_attack", { p_planet: planetName });
 
         if (!war.error && war.data === false) {
             gameNotice("Congress has not declared war on " + planetName + ". Put a Declaration of War before Congress first.");
             return;
         }
+
     }
 
     /*

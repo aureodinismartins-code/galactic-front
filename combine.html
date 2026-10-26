@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Supreme Soviet of the Combine</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="i18n.js?v=14"></script>
+<script>window.GC_NO_BANNER = false;</script>
+<script src="gamecontrol.js"></script>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: #0b0708; color: #ecdfe0; font-family: Arial, sans-serif; }
+body { background: radial-gradient(ellipse at 50% -10%, #3a1012 0%, #0b0708 62%); }
+button { font-family: inherit; }
+#top { display: flex; align-items: center; gap: 22px; padding: 12px 22px; background: #150a0b; border-bottom: 1px solid #5a1d20; position: sticky; top: 0; z-index: 20; }
+#top h1 { margin: 0; font-size: 17px; letter-spacing: 4px; font-weight: 900; color: #e8c46a; }
+#top .seal { width: 26px; height: 26px; flex: none; }
+#top .grow { flex: 1; }
+.stat { font-size: 11px; letter-spacing: 1px; color: #b89598; }
+.stat b { color: #fff; font-size: 15px; letter-spacing: 0; }
+.back { padding: 8px 16px; background: #240f11; color: #f0d7a8; border: 1px solid #6d2a2e; cursor: pointer; letter-spacing: 2px; font-weight: bold; font-size: 12px; text-decoration: none; }
+.back:hover { background: #3a1417; }
+#main { display: grid; grid-template-columns: minmax(500px, 1.05fr) minmax(470px, 1fr); gap: 18px; padding: 18px 22px; }
+.panel { background: #140d0e; border: 1px solid #5a1d20; padding: 14px 16px; }
+.panel h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: 3px; color: #e8c46a; font-weight: 800; }
+#chamber svg { width: 100%; height: auto; display: block; }
+.seat { cursor: pointer; transition: opacity .15s; }
+.seat:hover { stroke: #fff; stroke-width: 2; }
+#legend { display: flex; gap: 12px; flex-wrap: wrap; margin: 6px 0 4px; font-size: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid #5a1d20; background: #1c1011; font-size: 11px; letter-spacing: .5px; }
+.dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+#tip { position: fixed; pointer-events: none; z-index: 50; background: #0d0607f0; border: 1px solid #7d2b30; padding: 7px 10px; font-size: 12px; display: none; max-width: 240px; }
+.bar { height: 9px; background: #2a1618; position: relative; margin: 3px 0; }
+.bar > i { position: absolute; left: 0; top: 0; bottom: 0; display: block; }
+#member { margin-top: 10px; min-height: 120px; font-size: 13px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+.tab { padding: 8px 14px; background: #1c1011; border: 1px solid #5a1d20; color: #c8a6a8; cursor: pointer; font-size: 11px; letter-spacing: 2px; font-weight: 700; }
+.tab.on { background: #5c1a1d; color: #fff; border-color: #b32424; }
+.card { border: 1px solid #5a1d20; background: #1a0f10; padding: 11px 13px; margin-bottom: 10px; }
+.card.mine { border-left: 3px solid #e8c46a; }
+.card.active { border-color: #b32424; }
+.card.sel { box-shadow: 0 0 0 2px #e8c46a inset; }
+.card h3 { margin: 0 0 4px; font-size: 14px; color: #f3e7d2; }
+.sub { font-size: 11px; color: #b89598; letter-spacing: .5px; }
+.badge { font-size: 10px; letter-spacing: 1.5px; padding: 2px 7px; border: 1px solid #7d2b30; margin-right: 6px; font-weight: 700; color: #c8a6a8; }
+.badge.pass { color: #7dff9d; border-color: #2c8f4f; }
+.badge.fail { color: #ff8a8a; border-color: #8f2c2c; }
+.badge.live { color: #ffd37a; border-color: #8f6a2c; }
+.btn { padding: 9px 16px; background: #5c1a1d; color: #fff; border: 1px solid #b32424; cursor: pointer; font-weight: 800; letter-spacing: 2px; font-size: 11px; }
+.btn:hover { background: #7a2226; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.gold { background: #3a2a10; border-color: #b08a34; color: #ffd37a; }
+.btn.small { padding: 5px 10px; font-size: 10px; }
+select, input[type=number] { background: #1a0f10; color: #fff; border: 1px solid #7d2b30; padding: 7px 9px; font-size: 13px; min-width: 160px; }
+label.row { display: block; margin: 10px 0 4px; font-size: 11px; letter-spacing: 2px; color: #e8c46a; font-weight: 700; }
+.spons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.spons .opt { padding: 8px 10px; border: 1px solid #5a1d20; background: #1c1011; cursor: pointer; font-size: 12px; }
+.spons .opt.on { border-color: #e8c46a; background: #2b1c0d; }
+.spons .opt small { display: block; color: #b89598; margin-top: 3px; font-size: 10px; }
+.fc { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 11px; }
+.fc .nm { width: 104px; color: #e0c8c9; }
+.fc .bar { flex: 1; }
+.tokens { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.token { padding: 10px 14px; border: 1px solid #7d2b30; background: #1f1112; font-size: 12px; min-width: 118px; }
+.token b { font-size: 20px; display: block; color: #ffd37a; }
+#toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 90; background: #5c1a1d; border: 1px solid #b32424; padding: 10px 20px; font-size: 13px; display: none; max-width: 70vw; }
+#toast.err { background: #4a1214; border-color: #ff8a8a; }
+.log { font-size: 12px; line-height: 1.5; padding: 5px 0; border-bottom: 1px solid #2a1618; }
+.log time { color: #9a7274; margin-right: 8px; }
+hr.rule { border: 0; border-top: 1px solid #5a1d20; margin: 10px 0; }
+@media (max-width: 1150px) { #main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="top">
+    <a class="back" href="galaxy.html">&larr; GALAXY</a>
+    <svg class="seal" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 1.6l2.4 6.3 6.8.3-5.3 4.3 1.9 6.5L12 15.4 6.2 19l1.9-6.5L2.8 8.2l6.8-.3z" fill="#b32424" stroke="#e8c46a" stroke-width="1"/>
+    </svg>
+    <h1>SUPREME SOVIET OF THE COMBINE</h1>
+    <div class="grow"></div>
+    <div class="stat">SECRETARY<br><b id="st-pres">-</b></div>
+    <div class="stat">CREDITS<br><b id="st-credits">-</b></div>
+    <div class="stat">CONFIDENCE<br><b id="st-pop">-</b></div>
+    <div class="stat">QUOTA<br><b id="st-quota">-</b></div>
+    <div class="stat">SEATS<br><b id="st-seats">-</b></div>
+    <div class="stat">NEEDED<br><b id="st-need">-</b></div>
+</div>
+
+<div id="main">
+
+    <div>
+        <div class="panel" id="chamber">
+            <h2>THE PLENUM</h2>
+            <div id="legend"></div>
+            <svg id="hemi" viewBox="-70 0 900 420"></svg>
+            <div id="member"></div>
+        </div>
+    </div>
+
+    <div>
+        <div class="panel">
+            <div class="tabs" id="tabs"></div>
+            <div id="tabbody"></div>
+        </div>
+    </div>
+
+</div>
+
+<div id="tip"></div>
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+   SUPREME SOVIET OF THE COMBINE (screen)
+   Everything is decided by the server (2026-10-28_combine_soviet.sql);
+   this page shows the plenum, sends directives and grants privileges.
+========================================================= */
+
+const TYPES = {
+    military_campaign: { name: "Military Campaign against a Planet", votes: "majority", desc: "Authorise an attack on one planet. Without it Combine fleets cannot attack." },
+    fleet_construction: { name: "New Fleet Quota", votes: "qualified", desc: "Approve one new fleet (build it from the galaxy map afterwards; it is still paid for there)." },
+    knightmare_construction: { name: "Armoured Detachment", votes: "qualified", desc: "Approve one elite armoured detachment (the Knightmare Facility chain is still needed)." },
+    production_quota: { name: "Five-Year Plan: Raise the Quota", votes: "qualified", desc: "Raise the production quota: 300-500 credits every 15 minutes per level (max 2), confidence -5." },
+    diplomacy: { name: "Fraternal Pact", votes: "majority", desc: "Send envoys to another faction: relations +10." },
+    fleet_revocation: { name: "Reassign and Dismantle a Fleet", votes: "qualified", desc: "Break up one Combine fleet for 500 credits of salvage." }
+};
+
+let ov = null;
+let tab = "directives";
+let selMember = null;
+let selDirective = null;
+let currentFilter = null;
+let warTarget = null;
+let skew = 0;
+let draft = { type: "fleet_construction", planet: "", fleet: "", target: "Independents", current: "" };
+let positions = [];
+let debate = null;
+let debateError = null;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = n => Number(n || 0).toLocaleString();
+const T = s => (typeof window.t === "function" ? window.t(s) : s);
+
+function toast(text, err) {
+    const t = $("toast");
+    t.textContent = text;
+    t.className = err ? "err" : "";
+    t.style.display = "block";
+    clearTimeout(toast.h);
+    toast.h = setTimeout(() => { t.style.display = "none"; }, 5200);
+}
+
+function secondsLeft(ts) { return Math.max(0, Math.round((new Date(ts).getTime() - (Date.now() + skew)) / 1000)); }
+function mmss(s) { return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+function currentById(id) { return (ov.currents || []).find(c => c.id === id) || { name: "?", color: "#888", priorities: [] }; }
+
+/* ---------------------------------------------------------
+   LOAD
+--------------------------------------------------------- */
+async function load() {
+
+    /* the clock first: it may resolve a directive, seat a new Secretary,
+       bring a directive of its own or pay the quota */
+    await supabaseClient.rpc("cs_tick");
+
+    const { data, error } = await supabaseClient.rpc("cs_overview");
+
+    if (error) {
+        $("tabbody").innerHTML = '<div class="card"><h3>The Supreme Soviet is not in session</h3><div class="sub">' +
+            esc(error.message) + '<br><br>Only Combine players sit in the Soviet, and sql/2026-10-28_combine_soviet.sql must have been run.</div></div>';
+        return;
+    }
+
+    ov = data;
+    skew = new Date(ov.now).getTime() - Date.now();
+
+    const dr = await supabaseClient.rpc("cs_debate_view");
+    debate = dr.error ? null : dr.data;
+    debateError = dr.error ? dr.error.message : null;
+
+    if (!draft.current) { draft.current = (ov.currents[0] && ov.currents[0].key) || "proletarian"; }
+    if (!draft.planet && ov.targets.length) { draft.planet = ov.targets[0].planet; }
+    if (!draft.fleet && ov.my_fleets.length) { draft.fleet = ov.my_fleets[0].id; }
+    if (selDirective && !ov.directives.find(d => d.id === selDirective)) { selDirective = null; }
+
+    render();
+
+}
+
+function render() {
+
+    const sec = ov.president;
+    $("st-pres").textContent = sec && sec.name ? sec.name : "vacant";
+    $("st-pres").style.color = sec && sec.name ? currentById(sec.faction).color : "#b89598";
+    $("st-credits").textContent = fmt(ov.credits);
+    $("st-pop").textContent = Math.round(ov.state.popularity) + "%";
+    $("st-quota").textContent = ov.state.tax_level + " / 2";
+    $("st-seats").textContent = ov.seats;
+    $("st-need").textContent = ov.majority + " / " + ov.supermajority;
+    $("st-need").title = "votes needed: majority / three fifths";
+
+    renderLegend();
+    renderHemicycle();
+    renderMember();
+    renderTabs();
+
+}
+
+/* ---------------------------------------------------------
+   THE PLENUM
+--------------------------------------------------------- */
+function liveDebateFor(id) {
+    if (!debate || !debate.proposals) { return null; }
+    return debate.proposals.find(x => x.id === id) || null;
+}
+
+function paintedDebate() {
+    if (!debate || !debate.proposals || !debate.proposals.length) { return null; }
+    return debate.proposals.find(x => x.id === selDirective) || debate.proposals[0];
+}
+
+function renderLegend() {
+
+    const dv = paintedDebate();
+    const dr = dv ? ov.directives.find(x => x.id === dv.id) : null;
+
+    $("legend").innerHTML = ov.currents.map(c =>
+        '<span class="chip fchip" data-f="' + c.id + '" style="cursor:pointer;' + (currentFilter === c.id ? "border-color:#fff;background:#5c1a1d;" : "") + '"><span class="dot" style="background:' + esc(c.color) + '"></span>' + esc(T(c.name)) + ' &middot; <b>' + c.seats + '</b> ' + T("seats") + ' &middot; ' + T("discipline") + ' ' + c.loyalty + '</span>'
+    ).join("") + '<span class="chip"><span class="dot" style="background:transparent;border:2px dashed #ffd37a"></span>' + esc(T("under investigation")) + '</span>' +
+    (dv ? '<span class="chip" style="border-color:#7dff9d"><span class="dot" style="background:transparent;border:2px solid #7dff9d"></span>' + esc(T("voting yes")) +
+        '</span><span class="chip" style="border-color:#ff8a8a"><span class="dot" style="background:transparent;border:2px solid #ff8a8a"></span>' + esc(T("voting no")) +
+        '</span><span class="chip">' + esc(T(dr ? dr.title : "")) + ' &middot; ' + T("YES") + ' ' + dv.yes + ' &middot; ' + T("NO") + ' ' + dv.no + ' &middot; ' + T("UNDECIDED") + ' ' + dv.undecided +
+        '</span>' : "");
+
+    $("legend").querySelectorAll(".fchip").forEach(el => el.addEventListener("click", function() {
+        const id = Number(el.dataset.f);
+        currentFilter = currentFilter === id ? null : id;
+        renderLegend(); renderHemicycle();
+    }));
+
+}
+
+/* seats on concentric half-rings, grouped by current */
+function layoutSeats(n) {
+
+    const rows = n > 120 ? 9 : 8;
+    const r0 = 150, r1 = 360;
+    const radii = [];
+    for (let i = 0; i < rows; i++) { radii.push(r0 + (r1 - r0) * i / (rows - 1)); }
+    const sum = radii.reduce((a, b) => a + b, 0);
+
+    const counts = radii.map(r => Math.round(n * r / sum));
+    let diff = n - counts.reduce((a, b) => a + b, 0);
+    for (let i = rows - 1; diff !== 0; i = (i - 1 + rows) % rows) { counts[i] += diff > 0 ? 1 : -1; diff += diff > 0 ? -1 : 1; }
+
+    const pts = [];
+
+    radii.forEach(function(r, i) {
+        for (let j = 0; j < counts[i]; j++) {
+            const a = Math.PI - Math.PI * (j + 0.5) / counts[i];
+            pts.push({ x: 380 + Math.cos(a) * r, y: 395 - Math.sin(a) * r, a: a, r: r });
+        }
+    });
+
+    pts.sort((p, q) => (q.a - p.a) || (p.r - q.r));
+    return pts;
+
+}
+
+function renderHemicycle() {
+
+    const members = ov.commissars.slice().sort((a, b) => (a.faction - b.faction) || (a.seat - b.seat));
+
+    if (positions.length !== members.length) { positions = layoutSeats(members.length); }
+
+    const privileged = new Set();
+    const dr = ov.directives.find(d => d.id === selDirective);
+    if (dr) { for (const p of dr.privileges) { privileged.add(p.member); } }
+
+    const painting = paintedDebate();
+
+    let svg = '<path d="M20 395 A360 360 0 0 1 740 395" fill="none" stroke="#3a1417" stroke-width="1"/>';
+
+    members.forEach(function(m, i) {
+
+        const p = positions[i];
+        const c = currentById(m.faction);
+        const dim = currentFilter && m.faction !== currentFilter;
+
+        svg += '<circle class="seat" data-i="' + i + '" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="7.4" fill="' + esc(c.color) + '" opacity="' + (dim ? 0.15 : 1) + '"' +
+            (selMember === m.id ? ' stroke="#fff" stroke-width="3"' : m.suspect ? ' stroke="#ffd37a" stroke-width="2.2" stroke-dasharray="3 2"' : privileged.has(m.id) ? ' stroke="#7dff9d" stroke-width="2.5"' : '') + '/>';
+
+        const side = painting && painting.sides ? painting.sides[String(m.id)] : null;
+
+        if (side === "yes" || side === "no") {
+            svg += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="10" fill="none" stroke="' +
+                (side === "yes" ? "#7dff9d" : "#ff8a8a") + '" stroke-width="1.8" opacity="' + (dim ? 0.2 : 0.9) + '" pointer-events="none"/>';
+        }
+
+    });
+
+    const sums = {};
+    members.forEach(function(m, i) {
+        sums[m.faction] = sums[m.faction] || { a: 0, n: 0 };
+        sums[m.faction].a += positions[i].a; sums[m.faction].n++;
+    });
+
+    Object.keys(sums).forEach(function(k) {
+        const c = currentById(Number(k));
+        const a = sums[k].a / sums[k].n;
+        /* the label is drawn inside the dome, so it is translated here */
+        const rr = 388;
+        const x = (380 + Math.cos(a) * rr).toFixed(1);
+        const y = (395 - Math.sin(a) * rr).toFixed(1);
+        const deg = (90 - a * 180 / Math.PI).toFixed(1);
+        svg += '<text transform="translate(' + x + ',' + y + ') rotate(' + deg + ')" text-anchor="middle" ' +
+            'fill="' + esc(c.color) + '" font-size="9.5" font-weight="800" letter-spacing="0.5" ' +
+            'stroke="#0b0708" stroke-width="3" stroke-linejoin="round" paint-order="stroke">' +
+            esc(T(c.name).toUpperCase()) + '</text>';
+    });
+
+    svg += '<text x="380" y="352" text-anchor="middle" fill="#e8c46a" font-size="15" letter-spacing="4" font-weight="800">SUPREME SOVIET</text>' +
+        '<text x="380" y="372" text-anchor="middle" fill="#b89598" font-size="11" letter-spacing="2">' + ov.seats + ' COMMISSARS</text>';
+
+    $("hemi").innerHTML = svg;
+
+    $("hemi").querySelectorAll(".seat").forEach(function(el) {
+        const m = members[Number(el.dataset.i)];
+        el.addEventListener("click", function() { selMember = m.id; render(); });
+        el.addEventListener("mousemove", function(ev) {
+            const c = currentById(m.faction);
+            const t = $("tip");
+            t.style.display = "block";
+            t.style.left = (ev.clientX + 14) + "px";
+            t.style.top = (ev.clientY + 14) + "px";
+            t.innerHTML = '<b>' + esc(m.name) + '</b><br><span style="color:' + esc(c.color) + '">' + esc(c.name) + '</span><br>' +
+                esc(m.region + ", seat " + m.seat) + '<br>' + T("Discipline") + ' ' + m.loyalty + (m.suspect ? "<br>" + T("Under investigation") : "");
+        });
+        el.addEventListener("mouseleave", function() { $("tip").style.display = "none"; });
+    });
+
+}
+
+/* ---------------------------------------------------------
+   A COMMISSAR
+--------------------------------------------------------- */
+let memberHistory = {};
+
+async function loadMemberHistory(id) {
+
+    const known = memberHistory[id];
+    if (known && known.loading) { return; }
+    if (known && (known.votes || known.error) && Date.now() - (known.at || 0) < 120000) { return; }
+
+    memberHistory[id] = { loading: true };
+
+    const { data, error } = await supabaseClient.rpc("cs_commissar_history", { p_commissar: id });
+
+    memberHistory[id] = error ? { error: error.message, at: Date.now() } : Object.assign({ at: Date.now() }, data);
+    paintMemberHistory(id);
+
+}
+
+function paintMemberHistory(id) {
+
+    const box = $("m-hist");
+    if (!box || selMember !== id) { return; }
+
+    const rec = memberHistory[id];
+
+    if (!rec || rec.loading) {
+        box.innerHTML = '<div class="sub">' + esc(T("Loading the voting record...")) + '</div>';
+        return;
+    }
+
+    if (rec.error) {
+        box.innerHTML = '<div class="sub">' + esc(rec.error) + '</div>';
+        return;
+    }
+
+    const rows = rec.votes || [];
+
+    let h = '<div class="sub">' + T("YES") + ' ' + rec.yes + ' &middot; ' + T("NO") + ' ' + rec.no + ' &middot; ' +
+        T("ABSTAIN") + ' ' + rec.abstain + ' &middot; ' + T("privileges taken:") + ' ' + rec.bribed + '</div>';
+
+    if (!rows.length) {
+        box.innerHTML = h + '<div class="sub" style="margin-top:6px">' + esc(T("This commissar has not voted yet.")) + '</div>';
+        return;
+    }
+
+    h += rows.map(function(v) {
+        const word = v.vote === "yes" ? T("YES") : v.vote === "no" ? T("NO") : T("ABSTAIN");
+        const colour = v.vote === "yes" ? "#7dff9d" : v.vote === "no" ? "#ff8a8a" : "#b89598";
+        return '<div class="log"><b style="color:' + colour + '">' + esc(word) + '</b>' +
+            (v.bribed ? ' <span class="badge live">' + esc(T("PRIVILEGED")) + '</span>' : "") +
+            ' ' + esc(T(v.title)) + '</div>';
+    }).join("");
+
+    box.innerHTML = h;
+
+}
+
+function renderMember() {
+
+    const box = $("member");
+    const m = ov.commissars.find(x => x.id === selMember);
+
+    if (!m) {
+        box.innerHTML = '<div class="sub" style="padding:10px 0">' + esc(T("Click a commissar to see who they are. While a directive is debated you can grant them cadre privileges.")) + '</div>';
+        return;
+    }
+
+    const c = currentById(m.faction);
+    const dr = ov.directives.find(d => d.id === selDirective);
+    const live = dr && (dr.status === "introduction" || dr.status === "debate") ? dr : null;
+    const debateOpen = dr && dr.status === "debate" ? dr : null;
+
+    let mine = [];
+    let have = 0;
+
+    let h = '<div class="card"><h3><span class="dot" style="background:' + esc(c.color) + '"></span> ' + esc(m.name) + '</h3>' +
+        '<div class="sub">' + esc(T(c.name)) + ' &middot; ' + esc(m.region) + ', ' + T("seat") + ' ' + m.seat + '</div>' +
+        '<div class="sub" style="margin-top:6px">' + T("DISCIPLINE") + ' ' + m.loyalty + '%</div><div class="bar"><i style="width:' + m.loyalty + '%;background:' + esc(c.color) + '"></i></div>' +
+        (m.suspect ? '<div class="sub" style="color:#ffd37a">' + esc(T("Under investigation for corruption.")) + '</div>' : "");
+
+    if (debateOpen) {
+
+        mine = debateOpen.privileges.filter(p => p.member === m.id);
+        have = mine.reduce((n, p) => n + Number(p.amount), 0);
+        const stance = mine.length ? mine[0].stance : "yes";
+
+        h += '<hr class="rule"><div class="sub">' + T("PRIVILEGES FOR:") + ' <b style="color:#fff">' + esc(T(debateOpen.title)) + '</b></div>' +
+            (have ? '<div class="sub">' + T("Already granted:") + ' ' + fmt(have) + ' ' + T("credits") + ' (' + T("vote") + ' ' + esc(T(stance.toUpperCase())) + ')</div>' : "") +
+            '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">' +
+            '<select id="b-stance" style="min-width:110px"' + (mine.length ? " disabled" : "") + '><option value="yes"' + (stance === "yes" ? " selected" : "") + '>' + T("privileges for a YES") + '</option><option value="no"' + (stance === "no" ? " selected" : "") + '>' + T("privileges for a NO") + '</option></select>' +
+            '<select id="b-amount" style="min-width:110px"><option>100</option><option>250</option><option selected>500</option><option>1000</option><option>1500</option></select>' +
+            '<button class="btn small" id="b-go">' + T("GRANT") + '</button></div><div class="sub" id="b-info" style="margin-top:6px"></div>';
+
+    }
+    else if (live) {
+        h += '<div class="sub" style="margin-top:8px">' + esc(T("Cadre privileges can be granted once the debate opens.")) + '</div>';
+    }
+    else if (dr) {
+        h += '<div class="sub" style="margin-top:8px">' + esc(T("This directive is no longer open.")) + '</div>';
+    }
+    else {
+        h += '<div class="sub" style="margin-top:8px">' + esc(T("Select a directive in debate (DIRECTIVES tab) to grant this commissar cadre privileges.")) + '</div>';
+    }
+
+    box.innerHTML = h + '</div>';
+
+    const histCard = document.createElement("div");
+    histCard.className = "card";
+    histCard.innerHTML = '<h3>' + esc(T("VOTING HISTORY")) + '</h3><div id="m-hist"></div>';
+    box.appendChild(histCard);
+    paintMemberHistory(m.id);
+    loadMemberHistory(m.id);
+
+    if (debateOpen) {
+
+        const info = function() {
+            const add = Number($("b-amount").value);
+            const total = have + add;
+            const eff = Math.min(1, total / 1000 * (1 - m.loyalty / 100));
+            $("b-info").innerHTML = T("Chance the privileges change the vote:") + ' <b>' + Math.round(eff * 100) + '%</b> &middot; ' +
+                T("risk of a scandal:") + ' <b>' + Math.min(95, Math.round(total / 100 * 5)) + '%</b>. ' + T("A grant that fails is still spent.");
+        };
+
+        $("b-amount").addEventListener("change", info);
+        info();
+
+        $("b-go").addEventListener("click", async function() {
+            const { data, error } = await supabaseClient.rpc("cs_privilege", {
+                p_directive: debateOpen.id, p_commissar: m.id, p_amount: Number($("b-amount").value), p_stance: $("b-stance").value
+            });
+            if (error) { toast(error.message, true); return; }
+            toast(T("Privileges granted:") + " " + fmt(data.total) + " " + T("credits in total on this commissar."));
+            await load();
+        });
+
+    }
+
+}
+
+/* ---------------------------------------------------------
+   TABS
+--------------------------------------------------------- */
+function renderTabs() {
+
+    const tabs = [["directives", "DIRECTIVES"], ["secretary", "GENERAL SECRETARY"], ["new", "NEW DIRECTIVE"], ["news", "NEWS"]];
+
+    $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + esc(T(t[1])) + '</div>').join("");
+    $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
+
+    const body = $("tabbody");
+
+    if (tab === "directives") { body.innerHTML = directivesHtml(); wireDirectives(); }
+    else if (tab === "secretary") { body.innerHTML = secretaryHtml(); wireSecretary(); }
+    else if (tab === "new") { body.innerHTML = newHtml(); wireNew(); }
+    else { body.innerHTML = newsHtml(); }
+
+}
+
+/* ---- directives ---- */
+function directivesHtml() {
+
+    const note = '<div class="sub" style="margin-bottom:10px">' + esc(T("The Soviet sits only while a Combine player is online. Its commissars bring directives of their own every few minutes.")) + '</div>';
+
+    if (!ov.directives.length) {
+        return note + '<div class="sub">' + esc(T("The Soviet has no directives before it yet. Bring one in NEW DIRECTIVE, or wait for the commissars.")) + '</div>';
+    }
+
+    return note + ov.directives.map(function(d) {
+
+        const t = TYPES[d.type] || { name: d.type, votes: "majority" };
+        const spons = currentById(d.sponsor);
+        const live = d.status === "introduction" || d.status === "debate";
+        const need = d.required || (t.votes === "qualified" ? ov.supermajority : ov.majority);
+
+        let h = '<div class="card' + (d.mine ? " mine" : "") + (live ? " active" : "") + (selDirective === d.id ? " sel" : "") + '" data-d="' + d.id + '">' +
+            '<h3>' + esc(T(d.title)) + '</h3>' +
+            '<div class="sub"><span class="badge ' + (d.status === "passed" ? "pass" : live ? "live" : "fail") + '">' + esc(T(d.status.toUpperCase())) + '</span>' +
+            (d.by_secretary ? '<span class="badge live">' + esc(T("SECRETARY")) + '</span>' : "") +
+            esc(T(t.votes)) + ' &middot; ' + T("free") + ' &middot; ' + T("by") + ' ' + esc(T(d.proposer)) +
+            ' &middot; ' + T("spoken for by") + ' <span style="color:' + esc(spons.color) + '">' + esc(T(spons.name)) + '</span></div>';
+
+        if (live) {
+
+            const secs = d.status === "introduction" ? secondsLeft(d.debate_at) : secondsLeft(d.vote_at);
+
+            h += '<div class="sub" style="margin:6px 0"><b class="cd" data-d="' + d.id + '" data-s="' + d.status + '"' +
+                ' data-intro="' + esc(T("Debate opens in")) + '" data-vote="' + esc(T("Vote in")) + '" style="color:#ffd37a">' +
+                (d.status === "introduction" ? T("Debate opens in") : T("Vote in")) + ' ' + mmss(secs) + '</b> &middot; ' +
+                T("needs") + ' ' + need + ' ' + T("of") + ' ' + ov.seats + ' ' + T("votes") + '</div>';
+
+            const dv = liveDebateFor(d.id);
+
+            if (dv) {
+
+                let yesN = 0, noN = 0, undN = 0;
+
+                for (const c of ov.currents) {
+
+                    const g = (dv.factions || {})[String(c.id)] || { yes: 0, no: 0, undecided: 0 };
+                    const total = Math.max(1, g.yes + g.no + g.undecided);
+                    const share = Math.round(g.yes / total * 100);
+
+                    yesN += g.yes; noN += g.no; undN += g.undecided;
+
+                    h += '<div class="fc"><span class="nm">' + esc(T(c.name)) + '</span><div class="bar"><i style="width:' + share + '%;background:' + esc(c.color) + '"></i></div><span>' + g.yes + '/' + total + '</span></div>';
+                }
+
+                h += '<div class="sub"><b style="color:' + (yesN >= need ? "#7dff9d" : "#ff8a8a") + '">' + T("YES") + ' ' + yesN + '</b> &middot; ' +
+                    T("NO") + ' ' + noN + ' &middot; ' + T("UNDECIDED") + ' ' + undN + ' &middot; ' + T("the plenum is still moving") + '</div>';
+
+            }
+            else {
+
+                let expected = 0;
+                for (const f of (d.forecast || [])) {
+                    const c = currentById(f.faction);
+                    const p = Number(f.p);
+                    expected += c.seats * p / 100;
+                    h += '<div class="fc"><span class="nm">' + esc(c.name) + '</span><div class="bar"><i style="width:' + p + '%;background:' + esc(c.color) + '"></i></div><span>' + p + '%</span></div>';
+                }
+                h += '<div class="sub">' + T("Forecast: about") + ' <b style="color:' + (expected >= need ? "#7dff9d" : "#ff8a8a") + '">' + Math.round(expected) + '</b> ' +
+                    T("yes votes (chance of a YES per current, before privileges and surprises).") + '</div>';
+
+            }
+
+            if (d.privileges.length) {
+                h += '<div class="sub" style="margin-top:4px">' + T("Your privileges:") + ' ' + d.privileges.length + ' (' +
+                    fmt(d.privileges.reduce((n, p) => n + Number(p.amount), 0)) + ' ' + T("credits") + ')</div>';
+            }
+
+            h += '<div style="margin-top:8px"><button class="btn small sel-btn" data-d="' + d.id + '">' + T(selDirective === d.id ? "SELECTED FOR PRIVILEGES" : "SELECT TO GRANT PRIVILEGES") + '</button>' +
+                (ov.president && ov.president.me && !ov.president.veto_used && !d.mine ? ' <button class="btn small gold veto-btn" data-d="' + d.id + '">' + T("VETO") + '</button>' : "") + '</div>';
+
+        }
+        else {
+
+            const tot = Math.max(1, (d.yes || 0) + (d.no || 0) + (d.abstain || 0));
+            h += '<div style="display:flex;height:11px;margin:8px 0 3px;background:#2a1618"><i style="width:' + (d.yes / tot * 100) + '%;background:#2fbf6a"></i><i style="width:' + (d.no / tot * 100) + '%;background:#c44"></i><i style="width:' + (d.abstain / tot * 100) + '%;background:#667"></i></div>' +
+                '<div class="sub">' + T("YES") + ' ' + d.yes + ' &middot; ' + T("NO") + ' ' + d.no + ' &middot; ' + T("ABSTAIN") + ' ' + d.abstain +
+                (d.required ? ' &middot; ' + T("needed") + ' ' + d.required : '') + '</div>';
+
+            if (d.result) {
+                if (d.result.effect) { h += '<div style="margin-top:6px;font-size:12px;color:#f3e7d2">' + esc(T(d.result.effect)) + '</div>'; }
+                for (const x of d.result.defections || []) { h += '<div class="sub">' + T("Defection:") + ' ' + esc(x) + '</div>'; }
+                for (const x of d.result.removed || []) { h += '<div class="sub" style="color:#ff9a7a">' + T("Scandal:") + ' ' + esc(x) + '</div>'; }
+            }
+
+        }
+
+        return h + '</div>';
+
+    }).join("");
+
+}
+
+function wireDirectives() {
+
+    $("tabbody").querySelectorAll(".veto-btn").forEach(el => el.addEventListener("click", async function() {
+        el.disabled = true;
+        const { error } = await supabaseClient.rpc("cs_veto", { p_directive: Number(el.dataset.d) });
+        if (error) { toast(error.message, true); el.disabled = false; return; }
+        toast(T("Vetoed."));
+        await load();
+    }));
+
+    $("tabbody").querySelectorAll(".sel-btn").forEach(el => el.addEventListener("click", function() {
+        selDirective = Number(el.dataset.d);
+        render();
+    }));
+
+}
+
+/* ---- the General Secretary ---- */
+function secretaryHtml() {
+
+    const sec = ov.president;
+    const el = ov.election;
+    const myCurrent = ov.my_party;
+    const parties = ov.parties || [];
+
+    let h = '<div class="card"><h3>' + esc(T("General Secretary of the Combine")) + '</h3>';
+
+    if (sec && sec.name) {
+        const c = currentById(sec.faction);
+        h += '<div style="font-size:18px;font-weight:800;color:' + esc(c.color) + '">' + esc(sec.name) + (sec.me ? " " + T("(you)") : "") + '</div>' +
+            '<div class="sub">' + esc(T(c.name)) + ' &middot; ' + T("term") + ' ' + sec.term_no + ' &middot; ' + T("term ends in") + ' <b class="cdt" data-ts="' + esc(sec.term_end) + '">' + mmss(secondsLeft(sec.term_end)) + '</b></div>' +
+            '<div class="sub" style="margin-top:6px">' + T(sec.veto_used
+                ? "The General Secretary may keep 5 directives before the Soviet (others 3), has used the veto of this term, and the ruling current's agenda is heard more often."
+                : "The General Secretary may keep 5 directives before the Soviet (others 3), may veto one directive per term, and the ruling current's agenda is heard more often.") + '</div>';
+    }
+    else {
+        h += '<div class="sub">' + esc(T("The office is vacant.")) + '</div>';
+    }
+
+    h += '</div>';
+
+    h += '<div class="card"><h3>' + esc(T("Your current")) + '</h3><div class="sub">' +
+        esc(T("Every Combine player belongs to a current of the Party. You need one to stand for General Secretary or to vote.")) +
+        '</div><div class="spons" style="margin-top:8px">' +
+        ov.currents.map(function(c) {
+            const pl = (parties.find(x => x.faction === c.id) || { players: [] }).players;
+            return '<div class="opt party' + (myCurrent === c.id ? " on" : "") + '" data-k="' + c.key + '"><span class="dot" style="background:' + esc(c.color) + '"></span> <b>' + esc(T(c.name)) + '</b>' +
+                '<small>' + esc(T(c.description)) + '</small><small>' + T("Players:") + ' ' + (pl.length ? esc(pl.join(", ")) : T("none yet")) + '</small></div>';
+        }).join("") + '</div></div>';
+
+    h += '<div class="card active"><h3>' + esc(T("Election of the General Secretary")) + '</h3>';
+
+    if (!el) {
+        h += '<div class="sub">' + (sec && sec.name
+            ? T("The next election starts when the term ends (in") + ' <b class="cdt" data-ts="' + esc(sec.term_end) + '">' + mmss(secondsLeft(sec.term_end)) + '</b>).'
+            : esc(T("An election is called as soon as a Combine player is online."))) + '</div>';
+    }
+    else {
+
+        const campaign = el.phase === "campaign";
+        const iAmCandidate = el.candidates.some(c => c.mine);
+
+        h += '<div class="sub"><span class="badge live">' + T(campaign ? "CAMPAIGN" : "VOTING") + '</span><b class="cdt" data-ts="' + esc(campaign ? el.campaign_end : el.vote_end) + '" style="color:#ffd37a">' +
+            mmss(secondsLeft(campaign ? el.campaign_end : el.vote_end)) + '</b> ' + T("left") + ' &middot; ' +
+            (campaign
+                ? T("players declare their candidacy, then everybody votes")
+                : el.voted + " " + T("of") + " " + el.voters + " " + T("party members have voted (only players vote)")) + '</div>';
+
+        h += el.candidates.map(function(c) {
+            const cur = currentById(c.faction);
+            const mine = el.my_vote === c.player_id;
+            return '<div class="fc" style="margin:8px 0"><span class="dot" style="background:' + esc(cur.color) + '"></span><b style="flex:1;font-size:14px">' + esc(c.name) + (c.mine ? " " + T("(you)") : "") + ' <span class="sub">' + esc(T(cur.name)) + '</span></b>' +
+                (!campaign ? '<button class="btn small vote-btn" data-c="' + esc(c.player_id) + '"' + (el.my_vote ? " disabled" : "") + '>' + T(mine ? "YOUR VOTE" : "VOTE") + '</button>' : "") + '</div>';
+        }).join("") || '<div class="sub" style="margin:8px 0">' + esc(T("No candidates yet.")) + '</div>';
+
+        if (campaign) {
+            h += '<button class="btn" id="run-btn"' + (!myCurrent || iAmCandidate ? " disabled" : "") + '>' + T(iAmCandidate ? "YOU ARE A CANDIDATE" : "STAND FOR GENERAL SECRETARY") + '</button>' +
+                (!myCurrent ? '<div class="sub" style="margin-top:6px">' + esc(T("Choose a current above first.")) + '</div>' : "");
+        }
+        else if (!myCurrent) { h += '<div class="sub">' + esc(T("Choose a current above to vote.")) + '</div>'; }
+
+    }
+
+    h += '</div>';
+
+    if (ov.last_election) {
+        h += '<div class="card"><h3>' + esc(T("Last election")) + '</h3><div class="sub">' + T("Winner:") + ' <b style="color:#fff">' + esc(ov.last_election.winner) + '</b>' +
+            (ov.last_election.result && ov.last_election.result.note ? ' &middot; ' + esc(T(ov.last_election.result.note)) : "") + '</div></div>';
+    }
+
+    return h;
+
+}
+
+function wireSecretary() {
+
+    $("tabbody").querySelectorAll(".party").forEach(el => el.addEventListener("click", async function() {
+        const { error } = await supabaseClient.rpc("cs_join_current", { p_key: el.dataset.k });
+        if (error) { toast(error.message, true); return; }
+        toast(T("Current chosen."));
+        await load();
+    }));
+
+    if ($("run-btn")) {
+        $("run-btn").addEventListener("click", async function() {
+            $("run-btn").disabled = true;
+            const { error } = await supabaseClient.rpc("cs_run");
+            if (error) { toast(error.message, true); $("run-btn").disabled = false; return; }
+            toast(T("You are a candidate for General Secretary."));
+            await load();
+        });
+    }
+
+    $("tabbody").querySelectorAll(".vote-btn").forEach(el => el.addEventListener("click", async function() {
+        const { error } = await supabaseClient.rpc("cs_election_vote", { p_candidate: el.dataset.c });
+        if (error) { toast(error.message, true); return; }
+        toast(T("Vote cast."));
+        await load();
+    }));
+
+}
+
+/* ---- a new directive ---- */
+function newHtml() {
+
+    const t = TYPES[draft.type];
+    const need = t.votes === "qualified" ? ov.supermajority : ov.majority;
+
+    let h = '<label class="row">' + esc(T("WHAT SHOULD THE SOVIET DECIDE?")) + '</label><select id="n-type" style="width:100%">' +
+        Object.keys(TYPES).map(k => '<option value="' + k + '"' + (draft.type === k ? " selected" : "") + '>' + esc(T(TYPES[k].name)) + '</option>').join("") + '</select>' +
+        '<div class="sub" style="margin-top:6px">' + esc(T(t.desc)) + '</div>';
+
+    if (draft.type === "military_campaign") {
+        h += '<label class="row">' + esc(T("PLANET TO ATTACK")) + '</label><select id="n-planet" style="width:100%">' +
+            (ov.targets.map(x => '<option value="' + esc(x.planet) + '"' + (draft.planet === x.planet ? " selected" : "") + (x.declared ? " disabled" : "") + '>' +
+                esc(x.planet) + ' (' + esc(x.owners) + ')' + (x.declared ? " - " + esc(T("campaign approved")) : "") + '</option>').join("") ||
+             '<option value="">' + esc(T("no targets")) + '</option>') + '</select>';
+    }
+    else if (draft.type === "fleet_revocation") {
+        h += '<label class="row">' + esc(T("FLEET TO DISMANTLE")) + '</label><select id="n-fleet" style="width:100%">' +
+            (ov.my_fleets.map(f => '<option value="' + esc(f.id) + '"' + (draft.fleet === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>').join("") || '<option value="">' + esc(T("you have no fleets")) + '</option>') + '</select>';
+    }
+    else if (draft.type === "diplomacy") {
+        h += '<label class="row">' + esc(T("ENVOYS TO")) + '</label><select id="n-target" style="width:100%"><option' + (draft.target === "Independents" ? " selected" : "") + '>Independents</option><option' + (draft.target === "Freedom Authority" ? " selected" : "") + '>Freedom Authority</option></select>';
+    }
+
+    h += '<label class="row">' + esc(T("WHICH CURRENT SPEAKS FOR IT?")) + '</label><div class="spons">' +
+        ov.currents.map(f => {
+            const appeal = (f.priorities || []).indexOf(draft.type) !== -1;
+            return '<div class="opt' + (draft.current === f.key ? " on" : "") + '" data-k="' + f.key + '"><span class="dot" style="background:' + esc(f.color) + '"></span> <b>' + esc(T(f.name)) + '</b> (' + f.seats + ')' +
+                '<small>' + (appeal ? "&#9733; " + T("this is one of their priorities") : T("not a priority for them")) + '</small></div>';
+        }).join("") + '</div><div class="sub" style="margin-top:6px">' +
+        esc(T("Commissars of the sponsoring current vote for it far more often; currents near it tend to follow, distant ones oppose.")) + '</div>';
+
+    h += '<div class="card" style="margin-top:14px"><div class="sub">' + T("COST:") + ' <b style="color:#7dff9d">' + T("free") + '</b> &middot; ' +
+        T("VOTES NEEDED:") + ' <b style="color:#fff">' + need + ' ' + T("of") + ' ' + ov.seats + ' (' + esc(T(t.votes)) + ')</b></div>' +
+        '<div class="sub" style="margin-top:4px">' + esc(T("Introduction 3 minutes, then 5 minutes of debate (privileges are possible), then the vote. A commander may have 3 directives before the Soviet at once.")) + '</div></div>' +
+        '<button class="btn" id="n-go">' + esc(T("PUT BEFORE THE SOVIET")) + '</button>';
+
+    return h;
+
+}
+
+function wireNew() {
+
+    $("n-type").addEventListener("change", function() { draft.type = $("n-type").value; renderTabs(); });
+    if ($("n-planet")) { $("n-planet").addEventListener("change", function() { draft.planet = $("n-planet").value; }); }
+    if ($("n-fleet")) { $("n-fleet").addEventListener("change", function() { draft.fleet = $("n-fleet").value; }); }
+    if ($("n-target")) { $("n-target").addEventListener("change", function() { draft.target = $("n-target").value; }); }
+
+    $("tabbody").querySelectorAll(".spons .opt").forEach(el => el.addEventListener("click", function() { draft.current = el.dataset.k; renderTabs(); }));
+
+    $("n-go").addEventListener("click", async function() {
+
+        $("n-go").disabled = true;
+
+        const { error } = await supabaseClient.rpc("cs_submit", {
+            p_type: draft.type,
+            p_planet: draft.type === "military_campaign" ? (draft.planet || null) : null,
+            p_fleet: draft.type === "fleet_revocation" ? (draft.fleet || null) : null,
+            p_target: draft.type === "diplomacy" ? draft.target : null,
+            p_current: draft.current
+        });
+
+        $("n-go").disabled = false;
+
+        if (error) { toast(error.message, true); return; }
+
+        toast(T("Your directive is before the Soviet."));
+        tab = "directives";
+        await load();
+
+    });
+
+}
+
+/* ---- news ---- */
+function newsHtml() {
+
+    if (!ov.log.length) { return '<div class="sub">' + esc(T("Nothing has happened yet.")) + '</div>'; }
+
+    return ov.log.map(l => '<div class="log"><time>' +
+        new Date(l.at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + '</time>' + esc(T(l.text)) + '</div>').join("");
+
+}
+
+/* ---------------------------------------------------------
+   TIMERS + REFRESH
+--------------------------------------------------------- */
+setInterval(function() {
+
+    if (!ov) { return; }
+
+    document.querySelectorAll(".cdt").forEach(function(el) { el.textContent = mmss(secondsLeft(el.dataset.ts)); });
+
+    document.querySelectorAll(".cd").forEach(function(el) {
+        const d = ov.directives.find(x => x.id === Number(el.dataset.d));
+        if (!d) { return; }
+        const intro = d.status === "introduction";
+        const s = secondsLeft(intro ? d.debate_at : d.vote_at);
+        el.textContent = (intro ? el.dataset.intro : el.dataset.vote) + " " + mmss(s);
+        if (s === 0) { load(); }
+    });
+
+}, 1000);
+
+setInterval(function() { if (document.visibilityState === "visible") { load(); } }, 9000);
+
+load();
+</script>
+</body>
+</html>
