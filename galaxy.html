@@ -4330,7 +4330,28 @@ supabaseClient
    capital, so the lines run inward like a real supply net,
    and an enemy fleet in orbit of either end — or across the
    short corridor between them — cuts every world behind it.
+
+   Every line starts and ends on the RIM of its planet, not at
+   the centre: the nearest point of the circle to the world it
+   is heading for, so nothing is hidden under a planet and the
+   net reads as one continuous thing.
 ========================================================= */
+
+/* the nearest point of a circle's edge to wherever we are heading */
+function supplyRimPoint(fromX, fromY, toX, toY, radius) {
+
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const distance = Math.hypot(dx, dy);
+
+    if (!distance || !(radius > 0)) { return [fromX, fromY]; }
+
+    const step = Math.min(radius, distance / 2);
+
+    return [fromX + dx / distance * step, fromY + dy / distance * step];
+
+}
+
 (function () {
 
     "use strict";
@@ -4397,6 +4418,17 @@ supabaseClient
         return c;
     }
 
+    /* the drawn planet's own radius, plus a breath of space */
+    function planetRadius(name) {
+
+        const el = document.querySelector('.planet[data-name="' + String(name).replace(/"/g, '\\"') + '"]');
+
+        if (el && el.offsetWidth) { return el.offsetWidth / 2 + 2; }
+
+        return 11;
+
+    }
+
     function cross(ctx, x, y) {
         ctx.beginPath();
         ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4);
@@ -4436,10 +4468,25 @@ supabaseClient
         const px = v => v / 100 * w;
         const py = v => v / 100 * h;
 
+        /* a line meets a planet on its rim, never under it */
+        const radii = {};
+
+        for (const world of st.worlds) { radii[world.planet] = planetRadius(world.planet); }
+
         /* one short hop per pair of worlds, never a spoke to the capital */
         for (const link of st.links) {
 
-            if (link.x1 == null || link.x2 == null) { continue; }
+            if (link.x1 == null || link.x2 == null || link.y1 == null || link.y2 == null) { continue; }
+
+            const ax = px(Number(link.x1));
+            const ay = py(Number(link.y1));
+            const bx = px(Number(link.x2));
+            const by = py(Number(link.y2));
+
+            const start = supplyRimPoint(ax, ay, bx, by, radii[link.from] || 12);
+            const end = supplyRimPoint(bx, by, ax, ay, radii[link.to] || 12);
+
+            if (Math.hypot(end[0] - start[0], end[1] - start[1]) < 2) { continue; }
 
             const open = link.open === true;
 
@@ -4448,13 +4495,15 @@ supabaseClient
             ctx.strokeStyle = open ? "rgba(" + rgb + ",0.5)" : "rgba(255,90,70,0.85)";
             ctx.setLineDash(open ? [] : [7, 6]);
             ctx.beginPath();
-            ctx.moveTo(px(Number(link.x1)), py(Number(link.y1)));
-            ctx.lineTo(px(Number(link.x2)), py(Number(link.y2)));
+            ctx.moveTo(start[0], start[1]);
+            ctx.lineTo(end[0], end[1]);
             ctx.stroke();
             ctx.restore();
 
         }
 
+        /* only the capital carries a mark of its own, and only where a line
+           is actually cut do we draw anything at all */
         for (const world of st.worlds) {
 
             if (world.x == null || world.y == null) { continue; }
@@ -4462,32 +4511,28 @@ supabaseClient
             const x = px(Number(world.x));
             const y = py(Number(world.y));
 
-            ctx.save();
-
             if (world.capital) {
+
+                ctx.save();
                 ctx.strokeStyle = "rgba(" + rgb + ",0.95)";
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(x, y, 5, 0, Math.PI * 2);
+                ctx.arc(x, y, (radii[world.planet] || 12) + 3, 0, Math.PI * 2);
                 ctx.stroke();
-            }
-            else {
-                ctx.fillStyle = world.open ? "rgba(" + rgb + ",0.9)" : "rgba(255,90,70,0.95)";
-                ctx.beginPath();
-                ctx.arc(x, y, world.open ? 3.5 : 4, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.restore();
+
             }
 
             if (!world.open) {
+                ctx.save();
                 ctx.strokeStyle = "rgba(255,120,80,0.95)";
                 ctx.lineWidth = 2;
                 for (const b of (world.blockers || [])) {
                     if (b.x == null || b.y == null) { continue; }
                     cross(ctx, px(Number(b.x)), py(Number(b.y)));
                 }
+                ctx.restore();
             }
-
-            ctx.restore();
 
         }
 
