@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=16"></script>
+<script src="i18n.js?v=17"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js"></script>
 <style>
@@ -821,6 +821,38 @@ function miniMapHtml(kind) {
 
 }
 
+/* what sits on a planet, on hover */
+function wireMiniMap() {
+
+    $("tabbody").querySelectorAll(".mm-p").forEach(function(el) {
+
+        el.addEventListener("mousemove", function(ev) {
+
+            const p = (ov.planets || []).find(x => x.name === el.dataset.p);
+            if (!p) { return; }
+
+            const w = (ov.worlds || []).find(x => x.planet === p.name);
+            const fleets = p.fleets || [];
+            const t = $("tip");
+
+            t.style.display = "block";
+            t.style.left = (ev.clientX + 14) + "px";
+            t.style.top = (ev.clientY + 14) + "px";
+            t.innerHTML = '<b>' + esc(p.name) + '</b><br><span style="color:#b89598">' + esc(T(p.owner)) + '</span>' +
+                (w ? '<br>' + w.held + ' ' + T("of") + ' ' + w.total + ' ' + esc(T("cities held")) : "") +
+                '<br>' + (fleets.length
+                    ? esc(T("Our fleets here:")) + ' ' +
+                      fleets.map(f => esc(f.name) + ' (' + f.squads + ' ' + esc(T("squads")) + ')').join(", ")
+                    : esc(T("No fleet of ours here.")));
+
+        });
+
+        el.addEventListener("mouseleave", function() { $("tip").style.display = "none"; });
+
+    });
+
+}
+
 /* ---- occupied worlds ---- */
 function worldsHtml() {
 
@@ -875,6 +907,7 @@ function worldsHtml() {
 }
 
 function wireWorlds() {
+    wireMiniMap();
     $("tabbody").querySelectorAll(".camp-btn").forEach(el => el.addEventListener("click", function() {
         draft.type = "military_campaign";
         draft.planet = el.dataset.p;
@@ -969,6 +1002,8 @@ function wireAuthority() {
             renderTabs();
         });
     }
+
+    wireMiniMap();
 
 }
 

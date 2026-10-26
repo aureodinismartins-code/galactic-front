@@ -268,7 +268,19 @@ begin
                            when not exists (select 1 from public.cities as c
                                             where c.planet_id = p.id and c.faction is distinct from 'Freedom Authority') then 'Freedom Authority'
                            else 'Contested'
-                       end
+                       end,
+                       /* only our own fleets: an enemy fleet is not the map's
+                          business to reveal, the galaxy hides them too */
+                       'fleets', coalesce((
+                           select jsonb_agg(jsonb_build_object(
+                                      'name', f.name,
+                                      'squads', case when jsonb_typeof(f.squads) = 'array'
+                                                     then jsonb_array_length(f.squads) else 0 end) order by f.name)
+                           from public.fleets as f
+                           where f.faction = 'Combine'
+                             and coalesce(f.status::text, '') = 'stationed'
+                             and f.origin = p.name
+                       ), '[]'::jsonb)
                    ) order by p.name)
             from public.planet_positions as pp
             join public.planets as p on p.name = pp.name
