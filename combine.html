@@ -10,6 +10,7 @@
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js?v=23"></script>
     <script src="music.js?v=2"></script>
+    <script src="news.js?v=1"></script>
 <style>
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: #0b0708; color: #ecdfe0; font-family: Arial, sans-serif; }
@@ -517,7 +518,8 @@ function renderMember() {
 function renderTabs() {
 
     const tabs = [["directives", "DIRECTIVES"], ["secretary", "HIGH COMMISSAR"], ["party", "PARTY"], ["new", "NEW DIRECTIVE"],
-        ["propaganda", "AGITPROP"], ["worlds", "OCCUPIED WORLDS"], ["authority", "SOVIET POWER"], ["news", "NEWS"]];
+        ["propaganda", "AGITPROP"], ["worlds", "OCCUPIED WORLDS"], ["authority", "SOVIET POWER"], ["news", "NEWS"],
+        ["front", "THE FRONT PAGE"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + esc(T(t[1])) + '</div>').join("");
     $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
@@ -531,7 +533,25 @@ function renderTabs() {
     else if (tab === "propaganda") { body.innerHTML = agitpropHtml(); wireAgitprop(); }
     else if (tab === "worlds") { body.innerHTML = worldsHtml(); wireWorlds(); }
     else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
+    else if (tab === "front") { body.innerHTML = frontHtml(); wireFront(); }
     else { body.innerHTML = newsHtml(); }
+
+}
+
+/* ---- the front page: the paper of the whole war ---- */
+function frontHtml() {
+
+    return '<div class="sub" style="margin-bottom:10px">' +
+        esc(T("The front page is the paper of the whole war: the host writes it, and the two faction leaders file dispatches that wait for the host to allow them.")) +
+        '</div><div id="gf-news-inline"></div>';
+
+}
+
+function wireFront() {
+
+    const box = $("gf-news-inline");
+
+    if (box && window.GFNews) { window.GFNews.render(box); }
 
 }
 

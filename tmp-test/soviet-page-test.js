@@ -205,7 +205,7 @@ const deadline = setTimeout(function() { console.log("TIMEOUT: the page test did
     check("the header stats", text().indexOf("CONFIANÇA") !== -1 && text().indexOf("COTA") !== -1 && text().indexOf("ALTO COMISSÁRIO") !== -1);
 
     const tabs = [...doc.querySelectorAll(".tab")].map(el => el.textContent);
-    check("the eight tabs", tabs.join(" / ") === "DIRETIVAS / ALTO COMISSÁRIO / PARTIDO / NOVA DIRETIVA / AGITPROP / MUNDOS OCUPADOS / PODER SOVIÉTICO / NOTÍCIAS", tabs.join(" / "));
+    check("the nine tabs", tabs.join(" / ") === "DIRETIVAS / ALTO COMISSÁRIO / PARTIDO / NOVA DIRETIVA / AGITPROP / MUNDOS OCUPADOS / PODER SOVIÉTICO / NOTÍCIAS / PRIMEIRA PÁGINA", tabs.join(" / "));
     check("the header shows the fleet quota",
         text().indexOf("FROTAS") !== -1 && text().indexOf("2 / 3") !== -1, text().slice(0, 220));
 

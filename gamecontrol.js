@@ -118,6 +118,11 @@
             /* and the Combine opens the war with its three fleet quotas again */
             try { await supabaseClient.rpc("game_opening_quotas"); } catch (e) { /* older database */ }
 
+            /* the editor's tray is emptied with the war: a dispatch filed against
+               the last one is nothing but a yellowed clipping. What actually went
+               to print stays on the front page. */
+            try { await supabaseClient.rpc("news_clear_trays"); } catch (e) { /* older database */ }
+
             if (data && data.warnings && data.warnings.length) {
                 alert("The reset finished, but some parts could not be done:\n\n- " + data.warnings.join("\n- "));
             }

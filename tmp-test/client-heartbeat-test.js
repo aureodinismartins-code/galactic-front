@@ -122,6 +122,8 @@ const lastHeartbeat = () => heartbeats()[heartbeats().length - 1];
         order.indexOf("charters_core_capitals") > order.indexOf("game_reset_extras"), order.join(","));
     check("and the Combine's opening fleet quotas come back with it",
         order.indexOf("game_opening_quotas") > order.indexOf("charters_core_capitals"), order.join(","));
+    check("and the newspaper's trays are emptied with the war",
+        order.indexOf("news_clear_trays") > order.indexOf("game_opening_quotas"), order.join(","));
 
     console.log("and a database without the newer patch still resets");
 
@@ -174,6 +176,8 @@ const lastHeartbeat = () => heartbeats()[heartbeats().length - 1];
     check("and hands the Combine its three opening fleet quotas",
         startCalls.indexOf("game_opening_quotas") > startCalls.indexOf("charters_core_capitals"),
         startCalls.join(","));
+    check("a new war keeps the papers that were printed",
+        startCalls.indexOf("news_clear_trays") === -1, startCalls.join(","));
 
     console.log("");
     if (failures) { console.log(failures + " check(s) failed"); process.exit(1); }

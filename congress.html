@@ -10,6 +10,7 @@
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js?v=23"></script>
     <script src="music.js?v=2"></script>
+    <script src="news.js?v=1"></script>
 <style>
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: #070b14; color: #e3ebf5; font-family: Arial, sans-serif; }
@@ -617,7 +618,8 @@ function renderMember() {
 function renderTabs() {
 
     const tabs = [["proposals", "PROPOSALS"], ["leader", "THE TWO PRESIDENTS"], ["party", "PARTY"], ["new", "NEW PROPOSAL"],
-        ["propaganda", "PROPAGANDA"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
+        ["propaganda", "PROPAGANDA"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"],
+        ["front", "THE FRONT PAGE"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + t[1] + '</div>').join("");
     $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
@@ -631,7 +633,25 @@ function renderTabs() {
     else if (tab === "propaganda") { body.innerHTML = propagandaHtml(); wirePropaganda(); }
     else if (tab === "occupied") { body.innerHTML = occupiedHtml(); wireOccupied(); }
     else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
+    else if (tab === "front") { body.innerHTML = frontHtml(); wireFront(); }
     else { body.innerHTML = ov.log.map(l => '<div class="log"><time>' + new Date(l.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + '</time>' + esc(l.text) + '</div>').join("") || '<div class="sub">Nothing has happened yet.</div>'; }
+
+}
+
+/* ---- the front page: the paper of the whole war ---- */
+function frontHtml() {
+
+    return '<div class="sub" style="margin-bottom:10px">' +
+        esc(T("The front page is the paper of the whole war: the host writes it, and the two faction leaders file dispatches that wait for the host to allow them.")) +
+        '</div><div id="gf-news-inline"></div>';
+
+}
+
+function wireFront() {
+
+    const box = $("gf-news-inline");
+
+    if (box && window.GFNews) { window.GFNews.render(box); }
 
 }
 
