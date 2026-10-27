@@ -1049,6 +1049,20 @@
             "Um link fica guardado neste navegador. Um ficheiro deste computador toca até a página ser fechada.",
         "Paste a link to an audio file first.": "Cole primeiro um link para um ficheiro de áudio.",
 
+        /* ---------- the shared wireless (2026-11-08) ---------- */
+        "MUTE": "SEM SOM",
+        "UNMUTE": "COM SOM",
+        "The host chooses the music. You can mute it for yourself.":
+            "O anfitrião escolhe a música. Pode silenciá-la para si.",
+        "A file from this computer plays only on your screen: put it online and add its link to share it.":
+            "Um ficheiro deste computador toca apenas no seu ecrã: coloque-o online e adicione o link para o partilhar.",
+        "The wireless lives in the database: run sql/2026-11-08_shared_music_playlist.sql, then reload.":
+            "A rádio vive na base de dados: execute sql/2026-11-08_shared_music_playlist.sql e recarregue.",
+        "ON YOUR SCREEN ONLY": "SÓ NO SEU ECRÃ",
+        "Adding...": "A adicionar...",
+        "The wireless is silent: nobody has put a track on yet.":
+            "A rádio está em silêncio: ainda ninguém pôs uma faixa.",
+
         /* ---------- page titles ---------- */
         "Galactic Front - Galaxy Map": "Galactic Front - Mapa da Galáxia",
         "Galactic Front - Planet": "Galactic Front - Planeta",
