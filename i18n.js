@@ -1119,6 +1119,17 @@
         "RESTLESS": "INQUIETA",
         "RIOTING": "EM MOTIM",
         "REVOLT": "REVOLTA",
+        /* ---------- how a world is administered (2026-11-13) ---------- */
+        "POLICY": "POLÍTICA",
+        "CIVIL RULE": "ADMINISTRAÇÃO CIVIL",
+        "REPRISALS": "REPRESÁLIAS",
+        "AMNESTY": "AMNISTIA",
+        "GARRISON": "GUARNIÇÃO",
+        "NO GARRISON": "SEM GUARNIÇÃO",
+        "How a world we hold whole is administered. Civil rule pays what the world always paid; reprisals pay half again its income and make its people angrier; amnesty pays half and lets them settle.":
+            "Como é administrado um mundo que dominamos por inteiro. A administração civil paga o que o mundo sempre pagou; as represálias pagam mais metade da sua receita e enfurecem o seu povo; a amnistia paga metade e deixa-o acalmar.",
+        "Unrest climbs two points a turn faster while no fleet of ours stands in this world's orbit.":
+            "A agitação cresce dois pontos por turno mais depressa enquanto nenhuma frota nossa estiver na órbita deste mundo.",
         "Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.":
             "A agitação cresce num mundo tomado à força. Ela consome a estabilidade do mundo e, aos cem, o mundo levanta-se e expulsa a ocupação.",
 
@@ -1475,6 +1486,9 @@
             function (all, planet, relation, note) {
                 return 'EMBASSY: ' + planet + ' received envoys: relations ' + relation + '/100. ' + (lookupServer(note) || note);
             }],
+        [/^ADMINISTRAÇÃO: (.+) passa a represálias\.$/, "ADMINISTRATION: $1 is placed under reprisals."],
+        [/^ADMINISTRAÇÃO: (.+) passa a amnistia\.$/, "ADMINISTRATION: $1 is placed under amnesty."],
+        [/^ADMINISTRAÇÃO: (.+) passa a administração civil\.$/, "ADMINISTRATION: $1 is placed under civil rule."],
         [/^O assalto a (.+) teve sucesso\.$/, "The assault on $1 succeeded."],
         [/^O assalto a (.+) foi repelido\.$/, "The assault on $1 was repelled."]
     ];

@@ -122,6 +122,7 @@
                the last one is nothing but a yellowed clipping. What actually went
                to print stays on the front page. */
             try { await supabaseClient.rpc("news_clear_trays"); } catch (e) { /* older database */ }
+            try { await supabaseClient.rpc("occupation_policy_reset"); } catch (e) { /* older database */ }
 
             if (data && data.warnings && data.warnings.length) {
                 alert("The reset finished, but some parts could not be done:\n\n- " + data.warnings.join("\n- "));

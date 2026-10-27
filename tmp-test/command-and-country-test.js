@@ -37,6 +37,8 @@ const FILES = [
     "sql/2026-11-07_charters_and_restless_worlds.sql",
     "sql/2026-11-09_capitals_are_always_their_own.sql",
     "sql/2026-11-10_pacified_worlds_and_the_opening_quota.sql",
+    "sql/2026-11-13_the_occupation_has_a_policy.sql",
+    "sql/2026-11-14_the_blockade_reaches_the_capital.sql",
     "sql/2026-11-12_the_speakers_chair.sql"
 ];
 
@@ -593,6 +595,12 @@ async function run() {
         "on conflict (planet) do nothing");
     await apply(db, "sql/2026-11-07_charters_and_restless_worlds.sql");
 
+    /* running an older patch again does not undo the newer ones in a real
+       install — the SQL editor runs them in order — so the patches that
+       replaced what 11-07 wrote are put back here, in that order */
+    await apply(db, "sql/2026-11-13_the_occupation_has_a_policy.sql");
+    await apply(db, "sql/2026-11-14_the_blockade_reaches_the_capital.sql");
+
     const home = await call(db, "select c.faction from public.cities as c " +
         "join public.planets as p on p.id = c.planet_id where p.name = 'Ultramars'");
     check("the capital is the Combine's again",
@@ -854,4 +862,156 @@ async function run() {
         Number((await call(db, "select count(*)::int as n from public.cg_speaker_votes"))[0].n) === 0);
     check("and the tax meter starts again",
         (await call(db, "select last_tax_at from public.cg_state where id = 1"))[0].last_tax_at !== null);
+
+    /* ---------------------------------------------------------
+       8. how the occupation is administered, and the blockade
+       --------------------------------------------------------- */
+
+    console.log("\nthe occupation is administered, not just occupied");
+    await as(db, AUTH);
+
+    /* two worlds the Authority holds whole, and nothing else in the sky */
+    await db.exec("update public.fleets set faction = 'Independents'");
+    await db.exec("update public.cities set faction = 'Independents' " +
+        "where planet_id in ('Kara','Elya','Volst','Asteron','Veyra','Ultramars')");
+    await db.exec("update public.cities set faction = 'Freedom Authority' where planet_id in ('Free Earth','Krieg')");
+    await db.exec("insert into public.cg_occupations (planet, stage, stability, progress) values ('Krieg', 1, 80, 0) " +
+        "on conflict (planet) do update set stage = 1, stability = 80, progress = 0");
+    await db.exec("delete from public.planet_unrest");
+    await db.exec("insert into public.planet_unrest (planet, faction, unrest, last_turn_at) " +
+        "values ('Krieg','Freedom Authority', 40, now() - interval '5 minutes')");
+
+    check("a world nobody has decided about is under civil rule",
+        (await call(db, "select public.planet_policy_of('Krieg') as p"))[0].p === "civil");
+    check("and it pays what it always paid",
+        Number((await call(db, "select public.planet_policy_income('Freedom Authority','Krieg') as n"))[0].n) === 100);
+
+    const reps = (await call(db, "select public.occupation_set_policy('Krieg','reprisals') as r"))[0].r;
+    check("any player of the holding faction may decide how a world is run",
+        reps && reps.policy === "reprisals", JSON.stringify(reps));
+    check("reprisals pay half again its income",
+        Number(reps.paid) === 150 && Number(reps.income) === 100, JSON.stringify(reps));
+    check("and its people are the angrier for it", Number(reps.delta) === 2, JSON.stringify(reps));
+    check("the world's own book is told",
+        Number((await call(db, "select count(*)::int as n from public.cg_log " +
+            "where text like 'ADMINISTRAÇÃO: Krieg%'"))[0].n) === 1);
+
+    const amnest = (await call(db, "select public.occupation_set_policy('Krieg','amnesty') as r"))[0].r;
+    check("amnesty pays half the income instead", Number(amnest.paid) === 50, JSON.stringify(amnest));
+    check("and lets the world settle", Number(amnest.delta) === -2, JSON.stringify(amnest));
+
+    let bad = await expectError(db, "select public.occupation_set_policy('Volst','reprisals')");
+    check("a world we hold no city of cannot be administered", /hold no city/.test(String(bad)), bad);
+
+    await db.exec("update public.cities set faction = 'Freedom Authority' where planet_id = 'Elya' and name = 'Elya Ramp'");
+    bad = await expectError(db, "select public.occupation_set_policy('Elya','reprisals')");
+    check("and a world somebody else still holds has to be taken first", /not held whole/.test(String(bad)), bad);
+
+    bad = await expectError(db, "select public.occupation_set_policy('Krieg','bribes')");
+    check("only the three policies exist", /civil rule, reprisals or amnesty/.test(String(bad)), bad);
+
+    console.log("\na world with no garrison slips");
+    let gar = (await call(db, "select public.planet_garrison('Freedom Authority','Krieg') as g"))[0].g;
+    check("no fleet in orbit is no garrison", Number(gar.fleets) === 0, JSON.stringify(gar));
+
+    await db.exec("insert into public.fleets (player_id, faction, name, status, origin, squads) values " +
+        "('" + AUTH + "', 'Freedom Authority', 'Home Watch', 'stationed', 'Krieg', " +
+        "'[{\"type\":\"Rifle\",\"amount\":1}]'::jsonb)");
+    gar = (await call(db, "select public.planet_garrison('Freedom Authority','Krieg') as g"))[0].g;
+    check("a fleet stationed there with troops aboard is one",
+        Number(gar.fleets) === 1 && Number(gar.soldiers) === 1000, JSON.stringify(gar));
+
+    /* stability 80 is three points off the climb; a garrison is none */
+    async function kriegTurn(policy) {
+        if (policy) { await call(db, "select public.occupation_set_policy('Krieg','" + policy + "')"); }
+        await db.exec("update public.planet_unrest set unrest = 40, last_turn_at = now() - interval '5 minutes' " +
+            "where planet = 'Krieg'");
+        const out = (await call(db, "select public.unrest_tick() as r"))[0].r;
+        return out.find(x => x.planet === "Krieg");
+    }
+
+    /* what is installed, not what was written */
+    const tickRow = (await call(db, "select count(*)::int as n, max(pg_get_functiondef(p.oid)) as s " +
+        "from pg_proc as p where p.proname = 'unrest_tick'"))[0];
+    check("the installed unrest_tick answers to the policy",
+        /planet_policy_delta/.test(String(tickRow.s)),
+        tickRow.n + " rows :: " + String(tickRow.s).slice(0, 700));
+
+    let tick = await kriegTurn("civil");
+    check("a garrisoned world under civil rule climbs one point a turn",
+        tick && Number(tick.delta) === 1 && Number(tick.unrest) === 41, JSON.stringify(tick));
+
+    tick = await kriegTurn("reprisals");
+    check("reprisals make it climb three", tick && Number(tick.delta) === 3, JSON.stringify(tick));
+
+    tick = await kriegTurn("amnesty");
+    check("amnesty lets the world settle",
+        tick && Number(tick.delta) === -1 && Number(tick.unrest) === 39, JSON.stringify(tick));
+
+    await db.exec("delete from public.fleets where name = 'Home Watch'");
+    tick = await kriegTurn("civil");
+    check("a garrison called away is two points a turn worse",
+        tick && Number(tick.delta) === 3, JSON.stringify(tick));
+    check("and the screen says the world is not held", tick && tick.garrison === false, JSON.stringify(tick));
+
+    console.log("\nthe blockade reaches the capital");
+
+    /* nothing left in the sky from the sections above: an "Independents"
+       fleet is still a stranger in the orbit it sits in, and it would
+       block the very hop this section is about */
+    await db.exec("delete from public.fleets");
+    await db.exec("delete from public.planet_policy");
+
+    let net = (await call(db, "select public.supply_network('Freedom Authority') as n"))[0].n;
+    check("the net carries both worlds the Authority holds whole",
+        Number(net.total) === 200 && Number(net.cut) === 0, JSON.stringify({ total: net.total, cut: net.cut }));
+    check("and its capital is not blockaded",
+        net.capital_blocked === false && net.capital === "Free Earth",
+        JSON.stringify({ capital: net.capital, blocked: net.capital_blocked }));
+
+    await db.exec("insert into public.fleets (player_id, faction, name, status, origin, squads) values " +
+        "('" + COMB + "', 'Combine', 'Blockaders', 'stationed', 'Free Earth', " +
+        "'[{\"type\":\"Rifle\",\"amount\":1}]'::jsonb)");
+    net = (await call(db, "select public.supply_network('Freedom Authority') as n"))[0].n;
+    check("an enemy fleet over the capital closes the capital",
+        net.capital_blocked === true, JSON.stringify(net.capital_blocked));
+    check("and the whole net behind it",
+        Number(net.total) === 0 && Number(net.cut) === 2, JSON.stringify({ total: net.total, cut: net.cut }));
+    check("while what the worlds could have carried is still reported",
+        Number(net.potential) === 200, net.potential);
+
+    const sup = (await call(db, "select public.supply_state() as s"))[0].s;
+    check("and the map's own reading says what the blockade costs",
+        Number(sup.lost) === 200 && sup.capital_blocked === true, JSON.stringify({ lost: sup.lost }));
+
+    await db.exec("delete from public.fleets where name = 'Blockaders'");
+    await call(db, "select public.occupation_set_policy('Krieg','reprisals')");
+    net = (await call(db, "select public.supply_network('Freedom Authority') as n"))[0].n;
+    const kriegWord = net.worlds.find(w => w.planet === "Krieg");
+    check("a world under reprisals carries half again into the net",
+        kriegWord && Number(kriegWord.income) === 150 && Number(kriegWord.potential) === 100,
+        JSON.stringify(kriegWord));
+    check("and the net's total follows the policy", Number(net.total) === 250, net.total);
+    check("the screens' own reading lists it",
+        (await call(db, "select public.occupation_policy_state() as s"))[0].s.worlds
+            .some(w => w.planet === "Krieg" && w.policy === "reprisals"));
+
+    /* a world that is no longer ours keeps no policy, and the reset clears
+       whatever is left */
+    await db.exec("update public.cities set faction = 'Independents' where planet_id = 'Krieg'");
+    await call(db, "select public.unrest_state()");
+    check("a world we no longer hold keeps no policy",
+        Number((await call(db, "select count(*)::int as n from public.planet_policy where planet = 'Krieg'"))[0].n) === 0);
+
+    await call(db, "select public.occupation_set_policy('Free Earth','reprisals')");
+    check("a policy is on the books",
+        Number((await call(db, "select count(*)::int as n from public.planet_policy"))[0].n) === 1);
+    const cleared = (await call(db, "select public.occupation_policy_reset() as n"))[0].n;
+    check("and the host's reset clears it", Number(cleared) === 1 &&
+        Number((await call(db, "select count(*)::int as n from public.planet_policy"))[0].n) === 0, cleared);
+
+    await as(db, COMB);
+    const notHost = await expectError(db, "select public.occupation_policy_reset()");
+    check("and only the host may clear it", /Only the host/.test(String(notHost)), notHost);
+    await as(db, AUTH);
 }

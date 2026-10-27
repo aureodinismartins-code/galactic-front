@@ -1208,7 +1208,35 @@ function unrestLine(planet) {
     return '<div class="sub" style="margin-top:6px">' + T("UNREST") + ' ' + value + ' / 100 &middot; <b style="color:' + colour + '">' +
         T(u.mood) + '</b>' + (Number(u.revolts) ? ' &middot; ' + T("revolts") + ' ' + u.revolts : '') + '</div>' +
         '<div class="bar"><i style="width:' + value + '%;background:' + colour + '"></i></div>' +
-        '<div class="sub">' + T("Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.") + '</div>';
+        '<div class="sub">' + T("Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.") + '</div>' +
+        policyLine(planet);
+
+}
+
+/* ---------------------------------------------------------
+   HOW THE WORLD IS ADMINISTERED (2026-11-13)
+--------------------------------------------------------- */
+
+/* civil rule pays what the world always paid, reprisals half again and
+   amnesty half; a world nobody has decided about is under civil rule */
+const POLICY_LABELS = { civil: "CIVIL RULE", reprisals: "REPRISALS", amnesty: "AMNESTY" };
+
+function policyLine(planet) {
+
+    const u = unrestFor(planet);
+    const policy = (u && u.policy) || "civil";
+    const g = (u && u.garrison) || { fleets: 0, soldiers: 0 };
+
+    return '<div class="sub" style="margin-top:8px"><b>' + T("POLICY") + ':</b> ' + T(POLICY_LABELS[policy] || "CIVIL RULE") +
+        ' &middot; ' + (Number(g.fleets) > 0
+            ? T("GARRISON") + ' ' + g.fleets + ' (' + Number(g.soldiers || 0).toLocaleString() + ')'
+            : T("NO GARRISON")) + '</div>' +
+        '<div style="margin-top:4px">' + Object.keys(POLICY_LABELS).map(function(k) {
+            return '<button class="btn small policy" data-p="' + esc(planet) + '" data-k="' + k + '"' +
+                (k === policy ? " disabled" : "") + '>' + T(POLICY_LABELS[k]) + '</button>';
+        }).join(" ") + '</div>' +
+        '<div class="sub">' + T("How a world we hold whole is administered. Civil rule pays what the world always paid; reprisals pay half again its income and make its people angrier; amnesty pays half and lets them settle.") +
+        ' ' + T("Unrest climbs two points a turn faster while no fleet of ours stands in this world's orbit.") + '</div>';
 
 }
 
@@ -1242,6 +1270,13 @@ function wireOccupied() {
     }));
     $("tabbody").querySelectorAll(".relief").forEach(el => el.addEventListener("click", function() {
         draft.type = "resource_allocation"; draft.planet = el.dataset.p; tab = "new"; renderTabs();
+    }));
+    $("tabbody").querySelectorAll(".policy").forEach(el => el.addEventListener("click", async function() {
+        el.disabled = true;
+        const { error } = await supabaseClient.rpc("occupation_set_policy", { p_planet: el.dataset.p, p_policy: el.dataset.k });
+        if (error) { toast(error.message, true); el.disabled = false; return; }
+        toast(el.dataset.p + ": " + T("POLICY") + " " + T(POLICY_LABELS[el.dataset.k]));
+        await load();
     }));
 }
 

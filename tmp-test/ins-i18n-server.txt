@@ -1,0 +1,3 @@
+        [/^ADMINISTRAÇÃO: (.+) passa a represálias\.$/, "ADMINISTRATION: $1 is placed under reprisals."],
+        [/^ADMINISTRAÇÃO: (.+) passa a amnistia\.$/, "ADMINISTRATION: $1 is placed under amnesty."],
+        [/^ADMINISTRAÇÃO: (.+) passa a administração civil\.$/, "ADMINISTRATION: $1 is placed under civil rule."],
