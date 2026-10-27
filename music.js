@@ -2,6 +2,11 @@
    GALACTIC FRONT — the ship's wireless
    A playlist that plays under the game on every screen.
 
+   The wireless belongs to the HOST's account: only the host (the
+   player in game_control.host_player, the one with the reset and the
+   maintenance keys) sees the ♪ button and can add music. Nobody else
+   gets the widget at all.
+
    Add a track by pasting a direct link to an audio file
    (mp3, ogg, wav, m4a — anything the browser can play),
    or pick a file from this computer for the session.
@@ -362,10 +367,51 @@
 
         wanted = state.on === true;
 
-        build();
-        paint();
+        watchHost();
 
-        if (wanted && tracks.length) { play(); }
+    }
+
+    /*
+       The host is not known until gamecontrol.js has heard its first
+       heartbeat (it writes window.gameStatus.is_host), so the wireless
+       waits for that answer and only then puts its button on the page.
+       Everybody else never sees it.
+    */
+    function watchHost() {
+
+        let timer = null;
+        let tries = 0;
+
+        function check() {
+
+            tries++;
+
+            const status = window.gameStatus;
+
+            if (status && typeof status.is_host === "boolean") {
+
+                if (timer) { clearInterval(timer); }
+
+                if (status.is_host) {
+                    build();
+                    paint();
+                    if (wanted && tracks.length) { play(); }
+                }
+                else {
+                    wanted = false;
+                    writeState();
+                }
+
+                return;
+            }
+
+            /* a minute with no heartbeat: this screen has no host in it */
+            if (tries > 120 && timer) { clearInterval(timer); }
+
+        }
+
+        check();
+        timer = setInterval(check, 500);
 
     }
 
@@ -376,12 +422,24 @@
         boot();
     }
 
-    /* the other screens can ask for the wireless too */
+    /* is this the host's account? (gamecontrol.js hears it from the server) */
+    function isHost() {
+        const status = window.gameStatus;
+        return !!(status && status.is_host === true);
+    }
+
+    /* the other screens can ask for the wireless too, but only the host may */
     window.GFMusic = {
-        add: function(url, title) { addTrack(url, title || titleOf(url), false); },
-        play: play,
+        add: function(url, title) {
+            if (!isHost()) { return; }
+            addTrack(url, title || titleOf(url), false);
+        },
+        play: function() { if (isHost()) { play(); } },
         pause: pause,
-        open: function() { if (panel) { panel.style.display = "block"; paint(); } }
+        open: function() {
+            if (panel && isHost()) { panel.style.display = "block"; paint(); }
+        },
+        host: isHost
     };
 
 })();
