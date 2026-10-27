@@ -343,6 +343,22 @@
         };
         setTimeout(congressTick, 6000);
         setInterval(congressTick, 60000);
+
+        /* the unrest of the occupied worlds climbs with the same clock, on
+           whichever screen the player happens to be looking at */
+        const unrestTick = function() {
+            try { supabaseClient.rpc("unrest_tick").then(function() {}, function() {}); } catch (e) {}
+        };
+        setTimeout(unrestTick, 7000);
+        setInterval(unrestTick, 60000);
+
+        /* two rival fleets in a neutral orbit fight even if nobody is looking
+           at the map (the map's own scan is the fast one) */
+        const orbitTick = function() {
+            try { supabaseClient.rpc("orbit_battle_scan").then(function() {}, function() {}); } catch (e) {}
+        };
+        setTimeout(orbitTick, 9000);
+        setInterval(orbitTick, 45000);
     });
 
 })();

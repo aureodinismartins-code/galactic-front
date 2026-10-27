@@ -804,8 +804,8 @@
         "elected by the players, for a two week term": "eleito pelos jogadores, para um mandato de duas semanas",
         "PARTY": "PARTIDO",
         "DIPLOMACY": "DIPLOMACIA",
-        "Every Freedom Authority player belongs to a party, and a party is joined here at any time - not only when an election is called. You need one to stand for Congress Leader or to vote.":
-            "Todo jogador da Freedom Authority pertence a um partido, e o partido é escolhido aqui a qualquer momento - não apenas quando uma eleição é convocada. Você precisa de um para se candidatar a Líder do Congresso ou votar.",
+        "Every Freedom Authority player belongs to a party, and a party is joined here at any time - not only when an election is called. You need one to stand for President of the Freedom Authority, or to vote in its election.":
+            "Todo jogador da Freedom Authority pertence a um partido, e o partido é escolhido aqui a qualquer momento - não apenas quando uma eleição é convocada. Você precisa de um para se candidatar a Presidente da Freedom Authority, ou para votar nessa eleição.",
         "You sit with": "Você senta com",
         "Click another party to cross the floor.": "Clique em outro partido para mudar de lado.",
         "You belong to no party yet: choose one above.": "Você ainda não tem partido: escolha um acima.",
@@ -985,6 +985,69 @@
             "- as diretivas do Soviete, seus partidos e seu Alto Comissário são apagados",
         "- every embassy, the truce and the list of who is playing are cleared":
             "- todas as embaixadas, a trégua e a lista de quem está jogando são apagadas",
+
+        /* ---------- the dock, the neutral orbits and unrest (2026-11-06) ---------- */
+        "BATTLE IN THE ORBIT OF": "BATALHA NA ÓRBITA DE",
+        "FLEET DAMAGED": "FROTA DANIFICADA",
+        "FLEETS DAMAGED": "FROTAS DANIFICADAS",
+        "Two rival fleets met over a world that belongs to nobody.":
+            "Duas frotas rivais encontraram-se sobre um mundo que não pertence a ninguém.",
+        "HULL:": "CASCO:",
+        "soldiers missing": "soldados em falta",
+        "at full strength": "em força total",
+        "REPAIR FLEET": "REPARAR FROTA",
+        "AT FULL STRENGTH": "EM FORÇA TOTAL",
+        "CREDITS": "CRÉDITOS",
+        "Dock:": "Estaleiro:",
+        "soldiers restored for": "soldados repostos por",
+        "credits": "créditos",
+        "Treasury": "Tesouro",
+        "UNREST": "AGITAÇÃO",
+        "revolts": "revoltas",
+        "CALM": "CALMA",
+        "RESTLESS": "INQUIETA",
+        "RIOTING": "EM MOTIM",
+        "REVOLT": "REVOLTA",
+        "Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.":
+            "A agitação cresce num mundo tomado à força. Ela consome a estabilidade do mundo e, aos cem, o mundo levanta-se e expulsa a ocupação.",
+
+        /* ---------- the two chairs (2026-11-06) ---------- */
+        "THE TWO PRESIDENTS": "OS DOIS PRESIDENTES",
+        "PRESIDENT OF THE FREEDOM AUTHORITY": "PRESIDENTE DA FREEDOM AUTHORITY",
+        "PRESIDENT OF THE CONGRESS": "PRESIDENTE DO CONGRESSO",
+        "The faction's leader": "O líder da facção",
+        "The chamber's own chair": "A cadeira da própria casa",
+        "The President leads the faction: 5 proposals before Congress (others 3), the ruling party's agenda heard more often, and the state's initiatives for new fleets and squads come in the President's name. The gavel and the veto belong to the President of the Congress, not to this chair.":
+            "O Presidente lidera a facção: 5 propostas no Congresso (os outros 3), a agenda do partido no poder é ouvida mais vezes, e as iniciativas do Estado para novas frotas e esquadrões chegam em nome do Presidente. O martelo e o veto pertencem ao Presidente do Congresso, não a esta cadeira.",
+        "Election of the President of the Freedom Authority": "Eleição do Presidente da Freedom Authority",
+        "Election of the President of the Congress": "Eleição do Presidente do Congresso",
+        "The President of the Congress leads the chamber and holds its veto, and has used it this term.":
+            "O Presidente do Congresso lidera a casa e detém o seu veto, e já o usou neste mandato.",
+        "The President of the Congress leads the chamber and holds its veto: one bill a term.":
+            "O Presidente do Congresso lidera a casa e detém o seu veto: uma proposta por mandato.",
+        "The next election starts when the term ends.": "A próxima eleição começa quando o mandato terminar.",
+        "no party": "sem partido",
+        "votes": "votos",
+        "RUN FOR PRESIDENT OF THE CONGRESS": "CANDIDATAR-SE A PRESIDENTE DO CONGRESSO",
+        "The chamber elects its own president with sql/2026-11-06_orbits_repairs_unrest_and_offices.sql. Run it, then reload this page.":
+            "A casa elege o seu próprio presidente com sql/2026-11-06_orbits_repairs_unrest_and_offices.sql. Execute-o e recarregue esta página.",
+        "You are a candidate for President of the Congress.": "Você é candidato a Presidente do Congresso.",
+        "Vetoed.": "Vetado.",
+
+        /* ---------- the ship's wireless (2026-11-06) ---------- */
+        "Music": "Música",
+        "SHIP'S WIRELESS": "RÁDIO DE BORDO",
+        "Playing:": "Tocando:",
+        "Paused.": "Pausada.",
+        "No music yet: add a track below.": "Ainda sem música: adicione uma faixa abaixo.",
+        "That track could not be played.": "Não foi possível tocar essa faixa.",
+        "(this session)": "(esta sessão)",
+        "paste a link to an audio file": "cole um link para um ficheiro de áudio",
+        "ADD BY LINK": "ADICIONAR POR LINK",
+        "PICK A FILE": "ESCOLHER FICHEIRO",
+        "A link is remembered in this browser. A file from this computer plays until the page is closed.":
+            "Um link fica guardado neste navegador. Um ficheiro deste computador toca até a página ser fechada.",
+        "Paste a link to an audio file first.": "Cole primeiro um link para um ficheiro de áudio.",
 
         /* ---------- page titles ---------- */
         "Galactic Front - Galaxy Map": "Galactic Front - Mapa da Galáxia",

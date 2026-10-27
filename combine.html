@@ -9,6 +9,7 @@
 <script src="i18n.js?v=26"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js?v=23"></script>
+    <script src="music.js?v=1"></script>
 <style>
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: #0b0708; color: #ecdfe0; font-family: Arial, sans-serif; }
@@ -135,6 +136,7 @@ const TYPES = {
 };
 
 let ov = null;
+let unrest = null;        /* how much every taken world resents it */
 let tab = "directives";
 let selMember = null;
 let selDirective = null;
@@ -185,6 +187,11 @@ async function load() {
 
     ov = data;
     skew = new Date(ov.now).getTime() - Date.now();
+
+    /* the unrest of the worlds the Union has taken */
+    await supabaseClient.rpc("unrest_tick");
+    const us = await supabaseClient.rpc("unrest_state");
+    unrest = us.error ? null : us.data;
 
     const dr = await supabaseClient.rpc("cs_debate_view");
     debate = dr.error ? null : dr.data;
@@ -995,6 +1002,24 @@ function wireAgitprop() {
 
 }
 
+/* ---- unrest: how much a taken world resents it ---- */
+function unrestLine(planet) {
+
+    const list = (typeof unrest !== "undefined" && unrest && unrest.worlds) ? unrest.worlds : [];
+    const u = list.find(x => x.planet === planet);
+
+    if (!u) { return ""; }
+
+    const value = Math.round(Number(u.unrest) || 0);
+    const colour = value >= 80 ? "#ff5a4a" : value >= 55 ? "#ff9a3c" : value >= 30 ? "#d6a84b" : "#4cc2ff";
+
+    return '<div class="sub" style="margin-top:6px">' + esc(T("UNREST")) + ' ' + value + ' / 100 &middot; <b style="color:' + colour + '">' +
+        esc(T(u.mood)) + '</b>' + (Number(u.revolts) ? ' &middot; ' + esc(T("revolts")) + ' ' + u.revolts : '') + '</div>' +
+        '<div class="bar"><i style="width:' + value + '%;background:' + colour + '"></i></div>' +
+        '<div class="sub">' + esc(T("Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.")) + '</div>';
+
+}
+
 /* ---- occupied worlds ---- */
 function worldsHtml() {
 
@@ -1077,6 +1102,7 @@ function worldsHtml() {
                   '<div class="sub">' + esc(T("STABILITY")) + ' ' + Math.round(w.stability) + ' / ' + esc(T("needed")) + ' ' + (stage < 3 ? need : "-") + '</div>' +
                   '<div class="bar"><i style="width:' + Math.min(100, Number(w.stability)) + '%;background:' +
                       (Number(w.stability) >= need ? "#2fbf6a" : "#d6a84b") + '"></i></div>' +
+                  unrestLine(w.planet) +
                   (stage < 3
                       ? '<div class="sub">' + esc(T("STAGE PROGRESS")) + ' ' + w.progress + ' / ' + STAGE_TURNS + ' ' +
                         esc(T("turns (5 minutes each, only counted while stability is high enough)")) + '</div>' +

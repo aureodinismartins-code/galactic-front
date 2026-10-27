@@ -25,6 +25,7 @@
     <script src="i18n.js?v=26"></script>
         <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js?v=23"></script>
+    <script src="music.js?v=1"></script>
     <script src="ships.js"></script>
 
 
@@ -277,6 +278,55 @@
             font-size: 12px;
 
             color: #ffcc66;
+        }
+
+
+        /* =========================================
+           THE DOCK
+        ========================================= */
+
+        #fleet-dock {
+
+            margin-top: 14px;
+
+            padding-top: 12px;
+
+            border-top: 1px solid rgba(255,255,255,0.18);
+        }
+
+
+        #repair-fleet-button {
+
+            margin-top: 8px;
+
+            width: 100%;
+
+            padding: 8px 10px;
+
+            background: #123a2a;
+
+            color: #c9ffe2;
+
+            border: 1px solid #37c98a;
+
+            font-size: 12px;
+
+            font-weight: bold;
+
+            letter-spacing: 1px;
+
+            cursor: pointer;
+        }
+
+
+        #repair-fleet-button:hover:not(:disabled) {
+            background: #1a5640;
+        }
+
+
+        #repair-fleet-button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
         }
 
 
@@ -951,6 +1001,24 @@
 
 
         <!-- =========================================
+             THE DOCK: what the battles took away
+        ========================================= -->
+
+        <div id="fleet-dock">
+
+            <div class="fleet-panel-row" id="fleet-panel-hull"></div>
+
+            <button
+                id="repair-fleet-button"
+                type="button"
+            >
+                REPAIR FLEET
+            </button>
+
+        </div>
+
+
+        <!-- =========================================
              RECRUITMENT
         ========================================= -->
 
@@ -1288,6 +1356,18 @@ const fleetCredits =
 const recruitButtons =
     document.querySelectorAll(
         ".recruit-button"
+    );
+
+
+const repairFleetButton =
+    document.getElementById(
+        "repair-fleet-button"
+    );
+
+
+const fleetHullRow =
+    document.getElementById(
+        "fleet-panel-hull"
     );
 
 
@@ -2379,6 +2459,11 @@ const orbitSlots = {};
     const enemiesInSight = fleets.filter(f => f.faction && f.faction !== playerFaction).length;
     const linksCut = (window.SUPPLY_STATUS && Number(window.SUPPLY_STATUS.cut)) || 0;
 
+    /* how many of my hulls are under strength: the dock is in the fleet panel */
+    const damaged = fleets.filter(f =>
+        f.player_id === playerID && !fleetIsDormant(f) &&
+        fleetStrength(f.squads).missing > 0).length;
+
     fleetStatusDisplay.textContent =
         activeCount + " " + tpText(activeCount === 1 ? "ACTIVE FLEET" : "ACTIVE FLEETS") +
         " · " + (enemiesInSight
@@ -2389,6 +2474,9 @@ const orbitSlots = {};
             : tpText("NO LOST CONTACTS")) +
         (linksCut
             ? " · " + linksCut + " " + tpText(linksCut === 1 ? "SUPPLY LINK CUT" : "SUPPLY LINKS CUT")
+            : "") +
+        (damaged
+            ? " · " + damaged + " " + tpText(damaged === 1 ? "FLEET DAMAGED" : "FLEETS DAMAGED")
             : "");
 
 }
@@ -2651,6 +2739,112 @@ async function updateRecruitmentPanel() {
 ========================================= */
 
 
+/* =========================================
+   THE HULL: what a battle leaves behind
+   The battle screen's own establishment per division, so that the panel,
+   the dock and the fighting all mean the same thing by "full strength".
+========================================= */
+
+const DIVISION_SIZE = {
+    Rifle: 1000, MG: 750, Assault: 1000, AT: 600,
+    Sniper: 400, Tank: 200, Artillery: 250, Knightmare: 3
+};
+
+function divisionSize(type) {
+    return DIVISION_SIZE[type] || 1000;
+}
+
+function fleetStrength(squads) {
+
+    let full = 0;
+    let left = 0;
+
+    for (const e of (squads || [])) {
+
+        const size = Number(e.soldiersPerDivision) || divisionSize(e.type);
+        const cap = Math.max(0, Number(e.amount) || 0) * size;
+        const men = (e.soldiers === undefined || e.soldiers === null)
+            ? cap
+            : Math.max(0, Number(e.soldiers) || 0);
+
+        full += cap;
+        left += Math.min(cap, men);
+
+    }
+
+    return {
+        full: full,
+        left: left,
+        missing: Math.max(0, full - left),
+        fraction: full > 0 ? left / full : 1
+    };
+
+}
+
+function repairPrice(missing) {
+    return missing <= 0 ? 0 : Math.max(10, Math.ceil(missing / 25));
+}
+
+function updateDock(canWork) {
+
+    if (!fleetHullRow) { return; }
+
+    const s = fleetStrength(selectedFleet && selectedFleet.squads);
+    const price = repairPrice(s.missing);
+    const pct = Math.round(s.fraction * 100);
+
+    fleetHullRow.innerHTML =
+        "<strong>HULL:</strong> " + pct + "%" +
+        (s.missing > 0
+            ? " &middot; " + Math.round(s.missing).toLocaleString() + " " + T("soldiers missing")
+            : " &middot; " + T("at full strength"));
+
+    const dock = document.getElementById("fleet-dock");
+    if (dock) { dock.style.display = s.missing > 0 ? "" : "none"; }
+
+    if (!repairFleetButton) { return; }
+
+    repairFleetButton.disabled = !canWork || s.missing <= 0;
+    repairFleetButton.textContent = s.missing > 0
+        ? T("REPAIR FLEET") + " — " + price.toLocaleString() + " " + T("CREDITS")
+        : T("AT FULL STRENGTH");
+
+}
+
+
+if (repairFleetButton) {
+
+    repairFleetButton.addEventListener("click", async function() {
+
+        if (!selectedFleet) { return; }
+
+        repairFleetButton.disabled = true;
+
+        const { data, error } = await supabaseClient.rpc("repair_fleet", {
+            p_fleet: selectedFleet.id
+        });
+
+        if (error) {
+            fleetMessage.textContent = error.message;
+            updateDock(true);
+            return;
+        }
+
+        fleetMessage.textContent =
+            T("Dock:") + " " + Number(data.repaired).toLocaleString() + " " + T("soldiers restored for") + " " +
+            Number(data.paid).toLocaleString() + " " + T("credits") + " — " +
+            T("Treasury") + " " + Number(data.credits).toLocaleString();
+
+        await loadFleets();
+
+        const again = fleets.find(f => f.id === selectedFleet.id);
+        if (again) { selectFleet(again); }
+
+    });
+
+}
+
+
 function selectFleet(fleet) {
 
     selectedFleet =
@@ -2800,6 +2994,13 @@ function selectFleet(fleet) {
         isOwner
         ? ""
         : "You do not command this fleet.";
+
+
+    updateDock(
+        isOwner &&
+        fleet.status ===
+        "stationed"
+    );
 
 
     fleetPanel.classList.add(
@@ -3181,6 +3382,32 @@ document
 ========================================= */
 let lastSpaceBattleId = null;
 
+/* a battle just opened in the orbit of an independent world */
+function announceOrbitBattle(o) {
+
+    let box = document.getElementById("space-battle-feed");
+
+    if (!box) {
+        box = document.createElement("div");
+        box.id = "space-battle-feed";
+        box.style.cssText =
+            "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:900;display:flex;flex-direction:column;gap:6px;align-items:center;";
+        document.body.appendChild(box);
+    }
+
+    const row = document.createElement("div");
+    row.style.cssText =
+        "padding:8px 16px;background:rgba(18,8,4,.93);border:1px solid #ff9a4a;color:#ffe2cc;font:bold 12px Arial;letter-spacing:1px;cursor:pointer;";
+    row.textContent = "⚔ " + T("BATTLE IN THE ORBIT OF") + " " + String(o.planet).toUpperCase();
+    row.title = T("Two rival fleets met over a world that belongs to nobody.");
+    row.addEventListener("click", function() {
+        window.location.href = "space.html?battle=" + encodeURIComponent(o.id);
+    });
+    box.appendChild(row);
+    setTimeout(function() { row.remove(); }, 20000);
+
+}
+
 function showSpaceBattle(b) {
 
     const map = document.getElementById("galaxy-map");
@@ -3222,9 +3449,21 @@ async function pollSpaceBattles() {
 
     if (window.gameStatus && !window.gameStatus.started) { return; }
 
+    /* deep space first, then the quiet orbits: two rival fleets parked
+       around an independent world fight there too now */
     const scan = await supabaseClient.rpc("space_battle_scan");
 
-    if (scan.data && scan.data.length) { await loadFleets(); }
+    let opened = 0;
+    try { opened = (scan.data && scan.data.length) || 0; } catch (e) { opened = 0; }
+
+    const orbits = await supabaseClient.rpc("orbit_battle_scan");
+
+    if (orbits && orbits.data && orbits.data.length) {
+        opened += orbits.data.length;
+        (orbits.data || []).forEach(function(o) { announceOrbitBattle(o); });
+    }
+
+    if (opened) { await loadFleets(); }
 
     const { data, error } = await supabaseClient
         .from("space_battle_log")
@@ -3788,6 +4027,11 @@ setInterval(async function() {
         if (current) {
             selectedFleet = current;
         }
+
+        updateDock(
+            selectedFleet.player_id === playerID &&
+            selectedFleet.status === "stationed"
+        );
 
         await updateRecruitmentPanel();
 

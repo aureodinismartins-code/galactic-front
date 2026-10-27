@@ -9,6 +9,7 @@
 <script src="i18n.js?v=26"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js?v=23"></script>
+    <script src="music.js?v=1"></script>
 <style>
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: #070b14; color: #e3ebf5; font-family: Arial, sans-serif; }
@@ -151,6 +152,9 @@ let propError = null;     /* set when the propaganda functions are not installed
 let debate = null;        /* the sides every live bill's delegates are on */
 let debateError = null;
 
+let unrest = null;        /* how much every occupied world resents it */
+let speaker = null;       /* the Congress's own president and its election */
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = n => Number(n || 0).toLocaleString();
@@ -258,6 +262,16 @@ async function load() {
 
     ov = data;
     skew = new Date(ov.now).getTime() - Date.now();
+
+    /* the unrest bars of the occupied worlds (its own book, so the Congress's
+       own overview is untouched) */
+    await supabaseClient.rpc("unrest_tick");
+    const us = await supabaseClient.rpc("unrest_state");
+    unrest = us.error ? null : us.data;
+
+    /* the chamber's president: its own book, its own election */
+    const spk = await supabaseClient.rpc("cg_speaker_state");
+    speaker = spk.error ? null : spk.data;
 
     /* the propaganda offices also carry the fleet count, which decides the
        odds of a fleet bill: both the PROPAGANDA tab and the fleet cards use it */
@@ -602,7 +616,7 @@ function renderMember() {
 --------------------------------------------------------- */
 function renderTabs() {
 
-    const tabs = [["proposals", "PROPOSALS"], ["leader", "CONGRESS LEADER"], ["party", "PARTY"], ["new", "NEW PROPOSAL"],
+    const tabs = [["proposals", "PROPOSALS"], ["leader", "THE TWO PRESIDENTS"], ["party", "PARTY"], ["new", "NEW PROPOSAL"],
         ["propaganda", "PROPAGANDA"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + t[1] + '</div>').join("");
@@ -702,7 +716,9 @@ function proposalsHtml() {
             }
 
             h += '<div style="margin-top:8px"><button class="btn small sel-btn" data-p="' + p.id + '">' + T(selProposal === p.id ? "SELECTED FOR BRIBES" : "SELECT TO BRIBE DELEGATES") + '</button>' +
-                (ov.president && ov.president.me && !ov.president.veto_used && !p.mine ? ' <button class="btn small red veto-btn" data-p="' + p.id + '">' + T("VETO") + '</button>' : "") + '</div>';
+                (typeof speaker !== "undefined" && speaker && speaker.speaker && speaker.speaker.me &&
+                    !speaker.speaker.veto_used && !p.mine
+                    ? ' <button class="btn small red veto-btn" data-p="' + p.id + '">' + T("VETO") + '</button>' : "") + '</div>';
 
         }
         else {
@@ -730,9 +746,9 @@ function wireProposals() {
     $("tabbody").querySelectorAll(".veto-btn").forEach(el => el.addEventListener("click", async function() {
         const ok = await gameConfirm("Use your veto on this proposal? You can only veto once per term.", "Notice");
         if (!ok) { return; }
-        const { error } = await supabaseClient.rpc("congress_veto", { p_proposal: Number(el.dataset.p) });
+        const { error } = await supabaseClient.rpc("congress_speaker_veto", { p_proposal: Number(el.dataset.p) });
         if (error) { toast(error.message, true); return; }
-        toast("Vetoed.");
+        toast(T("Vetoed."));
         await load();
     }));
     $("tabbody").querySelectorAll(".sel-btn").forEach(el => el.addEventListener("click", function() {
@@ -748,22 +764,20 @@ function leaderHtml() {
     const el = ov.election;
     const myParty = ov.my_party;
 
-    let h = '<div class="card"><h3>' + T("Congress Leader") + '</h3>' +
-        '<div class="sub">' + T("President of the Freedom Authority") + ' &middot; ' + T("elected by the players, for a two week term") + '</div>';
+    let h = '<div class="card"><h3>' + T("PRESIDENT OF THE FREEDOM AUTHORITY") + '</h3>' +
+        '<div class="sub">' + T("The faction's leader") + ' &middot; ' + T("elected by the players, for a two week term") + '</div>';
 
     if (pres && pres.name) {
         const f = factionById(pres.faction);
         h += '<div style="font-size:18px;font-weight:800;color:' + esc(f.color) + '">' + esc(pres.name) + (pres.me ? " " + T("(you)") : "") + '</div>' +
             '<div class="sub">' + esc(f.name) + ' &middot; ' + T("term") + ' ' + pres.term_no + ' &middot; ' + T("term ends in") + ' <b class="cdt" data-ts="' + esc(pres.term_end) + '">' + mmss(secondsLeft(pres.term_end)) + '</b></div>' +
-            '<div class="sub" style="margin-top:6px">' + T(pres.veto_used
-                ? "The President may keep 5 proposals before Congress (others 3), has used the veto of this term, and the ruling party's agenda is heard more often. State initiatives for new fleets and squads go to the President."
-                : "The President may keep 5 proposals before Congress (others 3), may veto one proposal per term, and the ruling party's agenda is heard more often. State initiatives for new fleets and squads go to the President.") + '</div>';
+            '<div class="sub" style="margin-top:6px">' + T("The President leads the faction: 5 proposals before Congress (others 3), the ruling party's agenda heard more often, and the state's initiatives for new fleets and squads come in the President's name. The gavel and the veto belong to the President of the Congress, not to this chair.") + '</div>';
     }
     else { h += '<div class="sub">The office is vacant.</div>'; }
 
     h += '</div>';
 
-    h += '<div class="card active"><h3>' + T("Election of the Congress Leader") + '</h3>';
+    h += '<div class="card active"><h3>' + T("Election of the President of the Freedom Authority") + '</h3>';
 
     if (!el) {
         h += '<div class="sub">' + (pres && pres.name ? 'The next election starts when the term ends (in <b class="cdt" data-ts="' + esc(pres.term_end) + '">' + mmss(secondsLeft(pres.term_end)) + '</b>).' : "An election will be called as soon as a Freedom Authority player is online.") + '</div>';
@@ -801,6 +815,69 @@ function leaderHtml() {
             (ov.last_election.result && ov.last_election.result.note ? ' &middot; ' + esc(ov.last_election.result.note) : "") + '</div></div>';
     }
 
+    /* ---- the second chair: the Congress's own president ---- */
+
+    if (typeof speaker !== "undefined" && speaker) {
+
+        const sp = speaker.speaker;
+        const se = speaker.election;
+
+        h += '<div class="card"><h3>' + T("PRESIDENT OF THE CONGRESS") + '</h3>' +
+            '<div class="sub">' + T("The chamber's own chair") + ' &middot; ' + T("elected by the players, for a two week term") + '</div>';
+
+        if (sp && sp.name) {
+            h += '<div style="font-size:18px;font-weight:800;color:#7fdcff">' + esc(sp.name) + (sp.me ? " " + T("(you)") : "") + '</div>' +
+                '<div class="sub">' + (sp.party ? esc(sp.party) + ' &middot; ' : "") + T("term") + ' ' + sp.term_no + ' &middot; ' + T("term ends in") +
+                ' <b class="cdt" data-ts="' + esc(sp.term_end) + '">' + mmss(secondsLeft(sp.term_end)) + '</b></div>' +
+                '<div class="sub" style="margin-top:6px">' + T(sp.veto_used
+                    ? "The President of the Congress leads the chamber and holds its veto, and has used it this term."
+                    : "The President of the Congress leads the chamber and holds its veto: one bill a term.") + '</div>';
+        }
+        else {
+            h += '<div class="sub">' + T("The office is vacant.") + '</div>';
+        }
+
+        h += '</div>';
+
+        h += '<div class="card active"><h3>' + T("Election of the President of the Congress") + '</h3>';
+
+        if (!se) {
+            h += '<div class="sub">' + (sp && sp.name
+                ? T("The next election starts when the term ends.")
+                : T("An election will be called as soon as a Freedom Authority player is online.")) + '</div>';
+        }
+        else {
+
+            const campaigning = se.phase === "campaign";
+            const standing = (se.candidates || []).some(c => c.mine);
+
+            h += '<div class="sub"><span class="badge live">' + T(campaigning ? "CAMPAIGN" : "VOTING") + '</span> ' +
+                '<b class="cdt" data-ts="' + esc(campaigning ? se.campaign_end : se.vote_end) + '" style="color:#ffd37a">' +
+                mmss(secondsLeft(campaigning ? se.campaign_end : se.vote_end)) + '</b> ' + T("left") + '</div>';
+
+            h += (se.candidates || []).map(function(c) {
+                const mine = se.my_vote === c.player_id;
+                return '<div class="fc" style="margin:8px 0"><b style="flex:1;font-size:14px">' + esc(c.name) + (c.mine ? " " + T("(you)") : "") +
+                    ' <span class="sub">' + esc(c.party || T("no party")) + ' &middot; ' + c.votes + ' ' + T("votes") + '</span></b>' +
+                    (!campaigning ? '<button class="btn small speaker-vote-btn" data-c="' + esc(c.player_id) + '"' + (se.my_vote ? " disabled" : "") + '>' +
+                        T(mine ? "YOUR VOTE" : "VOTE") + '</button>' : "") + '</div>';
+            }).join("") || '<div class="sub" style="margin:8px 0">' + T("No candidates yet.") + '</div>';
+
+            if (campaigning) {
+                h += '<button class="btn" id="speaker-run-btn"' + (standing ? " disabled" : "") + '>' +
+                    T(standing ? "YOU ARE A CANDIDATE" : "RUN FOR PRESIDENT OF THE CONGRESS") + '</button>';
+            }
+
+        }
+
+        h += '</div>';
+
+    }
+    else {
+        h += '<div class="card"><h3>' + T("PRESIDENT OF THE CONGRESS") + '</h3><div class="sub">' +
+            T("The chamber elects its own president with sql/2026-11-06_orbits_repairs_unrest_and_offices.sql. Run it, then reload this page.") + '</div></div>';
+    }
+
     return h;
 
 }
@@ -823,6 +900,22 @@ function wireLeader() {
         await load();
     }));
 
+    if ($("speaker-run-btn")) {
+        $("speaker-run-btn").addEventListener("click", async function() {
+            const { error } = await supabaseClient.rpc("cg_speaker_run");
+            if (error) { toast(error.message, true); return; }
+            toast(T("You are a candidate for President of the Congress."));
+            await load();
+        });
+    }
+
+    $("tabbody").querySelectorAll(".speaker-vote-btn").forEach(el => el.addEventListener("click", async function() {
+        const { error } = await supabaseClient.rpc("cg_speaker_vote", { p_candidate: el.dataset.c });
+        if (error) { toast(error.message, true); return; }
+        toast(T("Vote cast."));
+        await load();
+    }));
+
 }
 
 /* ---- the party: yours to join or change at any time, election or not ---- */
@@ -835,7 +928,7 @@ function partyHtml() {
     const mine = ov.factions.find(f => f.id === myParty);
 
     let h = '<div class="card"><h3>' + T("Your party") + '</h3>' +
-        '<div class="sub">' + T("Every Freedom Authority player belongs to a party, and a party is joined here at any time - not only when an election is called. You need one to stand for Congress Leader or to vote.") + '</div>' +
+        '<div class="sub">' + T("Every Freedom Authority player belongs to a party, and a party is joined here at any time - not only when an election is called. You need one to stand for President of the Freedom Authority, or to vote in its election.") + '</div>' +
         '<div class="spons" style="margin-top:8px">' +
         joinable.map(function(f) {
             const pl = (parties.find(x => x.faction === f.id) || { players: [] }).players;
@@ -1074,6 +1167,31 @@ function wirePropaganda() {
 }
 
 /* ---- occupied worlds ---- */
+
+/* how much a taken world resents it (its own book, so the Congress's own
+   overview is untouched) */
+function unrestFor(planet) {
+    const list = (typeof unrest !== "undefined" && unrest && unrest.worlds) ? unrest.worlds : [];
+    const found = list.find(w => w.planet === planet);
+    return found || null;
+}
+
+function unrestLine(planet) {
+
+    const u = unrestFor(planet);
+
+    if (!u) { return ""; }
+
+    const value = Math.round(Number(u.unrest) || 0);
+    const colour = value >= 80 ? "#ff5a4a" : value >= 55 ? "#ff9a3c" : value >= 30 ? "#d6a84b" : "#4cc2ff";
+
+    return '<div class="sub" style="margin-top:6px">' + T("UNREST") + ' ' + value + ' / 100 &middot; <b style="color:' + colour + '">' +
+        T(u.mood) + '</b>' + (Number(u.revolts) ? ' &middot; ' + T("revolts") + ' ' + u.revolts : '') + '</div>' +
+        '<div class="bar"><i style="width:' + value + '%;background:' + colour + '"></i></div>' +
+        '<div class="sub">' + T("Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.") + '</div>';
+
+}
+
 function occupiedHtml() {
 
     if (!ov.occupations.length) {
@@ -1086,6 +1204,7 @@ function occupiedHtml() {
 
         return '<div class="card"><h3>' + esc(o.planet) + '</h3><div class="sub">' + esc(o.stage_name) + ' &middot; ' + o.seats + ' ' + T("of") + ' ' + o.seats_target + ' ' + T("delegates seated") + '</div>' +
             '<div class="steps">' + names.map((n, i) => '<div class="' + (i < o.stage ? "done" : i === o.stage ? "cur" : "") + '">' + T(n) + '</div>').join("") + '</div>' +
+            unrestLine(o.planet) +
             '<div class="sub">' + T("STABILITY") + ' ' + o.stability + ' / ' + T("needed") + ' ' + (o.stage < 3 ? o.threshold : "-") + '</div>' +
             '<div class="bar"><i style="width:' + o.stability + '%;background:' + (o.stability >= o.threshold ? "#2fbf6a" : "#d6a84b") + '"></i></div>' +
             (o.stage < 3 ? '<div class="sub">' + T("STAGE PROGRESS") + ' ' + o.progress + ' / ' + o.duration + ' ' + T("turns (5 minutes each, only counted while stability is high enough)") + '</div>' +
