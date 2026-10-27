@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=27"></script>
+<script src="i18n.js?v=28"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js?v=24"></script>
     <script src="music.js?v=2"></script>
@@ -617,7 +617,7 @@ function renderMember() {
 --------------------------------------------------------- */
 function renderTabs() {
 
-    const tabs = [["proposals", "PROPOSALS"], ["leader", "THE TWO PRESIDENTS"], ["party", "PARTY"], ["new", "NEW PROPOSAL"],
+    const tabs = [["proposals", "PROPOSALS"], ["leader", "THE TWO CHAIRS"], ["party", "PARTY"], ["new", "NEW PROPOSAL"],
         ["propaganda", "PROPAGANDA"], ["occupied", "OCCUPIED WORLDS"], ["authority", "AUTHORITY"], ["news", "NEWS"],
         ["front", "THE FRONT PAGE"]];
 
@@ -791,7 +791,7 @@ function leaderHtml() {
         const f = factionById(pres.faction);
         h += '<div style="font-size:18px;font-weight:800;color:' + esc(f.color) + '">' + esc(pres.name) + (pres.me ? " " + T("(you)") : "") + '</div>' +
             '<div class="sub">' + esc(f.name) + ' &middot; ' + T("term") + ' ' + pres.term_no + ' &middot; ' + T("term ends in") + ' <b class="cdt" data-ts="' + esc(pres.term_end) + '">' + mmss(secondsLeft(pres.term_end)) + '</b></div>' +
-            '<div class="sub" style="margin-top:6px">' + T("The President leads the faction: 5 proposals before Congress (others 3), the ruling party's agenda heard more often, and the state's initiatives for new fleets and squads come in the President's name. The gavel and the veto belong to the President of the Congress, not to this chair.") + '</div>';
+            '<div class="sub" style="margin-top:6px">' + T("The President leads the faction: 5 proposals before Congress (others 3), the ruling party's agenda heard more often, and the state's initiatives for new fleets and squads come in the President's name. The gavel and the veto belong to the Speaker of the Congress, not to this chair.") + '</div>';
     }
     else { h += '<div class="sub">The office is vacant.</div>'; }
 
@@ -842,7 +842,7 @@ function leaderHtml() {
         const sp = speaker.speaker;
         const se = speaker.election;
 
-        h += '<div class="card"><h3>' + T("PRESIDENT OF THE CONGRESS") + '</h3>' +
+        h += '<div class="card"><h3>' + T("SPEAKER OF THE CONGRESS") + '</h3>' +
             '<div class="sub">' + T("The chamber's own chair") + ' &middot; ' + T("elected by the players, for a two week term") + '</div>';
 
         if (sp && sp.name) {
@@ -850,8 +850,8 @@ function leaderHtml() {
                 '<div class="sub">' + (sp.party ? esc(sp.party) + ' &middot; ' : "") + T("term") + ' ' + sp.term_no + ' &middot; ' + T("term ends in") +
                 ' <b class="cdt" data-ts="' + esc(sp.term_end) + '">' + mmss(secondsLeft(sp.term_end)) + '</b></div>' +
                 '<div class="sub" style="margin-top:6px">' + T(sp.veto_used
-                    ? "The President of the Congress leads the chamber and holds its veto, and has used it this term."
-                    : "The President of the Congress leads the chamber and holds its veto: one bill a term.") + '</div>';
+                    ? "The Speaker of the Congress leads the chamber and holds its veto, and has used it this term."
+                    : "The Speaker of the Congress leads the chamber and holds its veto: one bill a term.") + '</div>';
         }
         else {
             h += '<div class="sub">' + T("The office is vacant.") + '</div>';
@@ -859,7 +859,7 @@ function leaderHtml() {
 
         h += '</div>';
 
-        h += '<div class="card active"><h3>' + T("Election of the President of the Congress") + '</h3>';
+        h += '<div class="card active"><h3>' + T("Election of the Speaker of the Congress") + '</h3>';
 
         if (!se) {
             h += '<div class="sub">' + (sp && sp.name
@@ -885,7 +885,7 @@ function leaderHtml() {
 
             if (campaigning) {
                 h += '<button class="btn" id="speaker-run-btn"' + (standing ? " disabled" : "") + '>' +
-                    T(standing ? "YOU ARE A CANDIDATE" : "RUN FOR PRESIDENT OF THE CONGRESS") + '</button>';
+                    T(standing ? "YOU ARE A CANDIDATE" : "RUN FOR SPEAKER OF THE CONGRESS") + '</button>';
             }
 
         }
@@ -894,7 +894,7 @@ function leaderHtml() {
 
     }
     else {
-        h += '<div class="card"><h3>' + T("PRESIDENT OF THE CONGRESS") + '</h3><div class="sub">' +
+        h += '<div class="card"><h3>' + T("SPEAKER OF THE CONGRESS") + '</h3><div class="sub">' +
             T("The chamber elects its own president with sql/2026-11-06_orbits_repairs_unrest_and_offices.sql. Run it, then reload this page.") + '</div></div>';
     }
 
@@ -924,7 +924,7 @@ function wireLeader() {
         $("speaker-run-btn").addEventListener("click", async function() {
             const { error } = await supabaseClient.rpc("cg_speaker_run");
             if (error) { toast(error.message, true); return; }
-            toast(T("You are a candidate for President of the Congress."));
+            toast(T("You are a candidate for Speaker of the Congress."));
             await load();
         });
     }

@@ -1122,27 +1122,29 @@
         "Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.":
             "A agitação cresce num mundo tomado à força. Ela consome a estabilidade do mundo e, aos cem, o mundo levanta-se e expulsa a ocupação.",
 
-        /* ---------- the two chairs (2026-11-06) ---------- */
-        "THE TWO PRESIDENTS": "OS DOIS PRESIDENTES",
+        /* ---------- the two chairs (2026-11-06). The chamber's own chair became
+           the Speaker of the Congress on 2026-11-12, so one president is left. ---------- */
+        "THE TWO CHAIRS": "AS DUAS CADEIRAS",
         "PRESIDENT OF THE FREEDOM AUTHORITY": "PRESIDENTE DA FREEDOM AUTHORITY",
-        "PRESIDENT OF THE CONGRESS": "PRESIDENTE DO CONGRESSO",
+        "SPEAKER OF THE CONGRESS": "ORADOR DO CONGRESSO",
         "The faction's leader": "O líder da facção",
         "The chamber's own chair": "A cadeira da própria casa",
-        "The President leads the faction: 5 proposals before Congress (others 3), the ruling party's agenda heard more often, and the state's initiatives for new fleets and squads come in the President's name. The gavel and the veto belong to the President of the Congress, not to this chair.":
-            "O Presidente lidera a facção: 5 propostas no Congresso (os outros 3), a agenda do partido no poder é ouvida mais vezes, e as iniciativas do Estado para novas frotas e esquadrões chegam em nome do Presidente. O martelo e o veto pertencem ao Presidente do Congresso, não a esta cadeira.",
+        "The President leads the faction: 5 proposals before Congress (others 3), the ruling party's agenda heard more often, and the state's initiatives for new fleets and squads come in the President's name. The gavel and the veto belong to the Speaker of the Congress, not to this chair.":
+            "O Presidente lidera a facção: 5 propostas no Congresso (os outros 3), a agenda do partido no poder é ouvida mais vezes, e as iniciativas do Estado para novas frotas e esquadrões chegam em nome do Presidente. O martelo e o veto pertencem ao Orador do Congresso, não a esta cadeira.",
         "Election of the President of the Freedom Authority": "Eleição do Presidente da Freedom Authority",
-        "Election of the President of the Congress": "Eleição do Presidente do Congresso",
-        "The President of the Congress leads the chamber and holds its veto, and has used it this term.":
-            "O Presidente do Congresso lidera a casa e detém o seu veto, e já o usou neste mandato.",
-        "The President of the Congress leads the chamber and holds its veto: one bill a term.":
-            "O Presidente do Congresso lidera a casa e detém o seu veto: uma proposta por mandato.",
+        "Election of the Speaker of the Congress": "Eleição do Orador do Congresso",
+        "The Speaker of the Congress leads the chamber and holds its veto, and has used it this term.":
+            "O Orador do Congresso lidera a casa e detém o seu veto, e já o usou neste mandato.",
+        "The Speaker of the Congress leads the chamber and holds its veto: one bill a term.":
+            "O Orador do Congresso lidera a casa e detém o seu veto: uma proposta por mandato.",
         "The next election starts when the term ends.": "A próxima eleição começa quando o mandato terminar.",
         "no party": "sem partido",
         "votes": "votos",
-        "RUN FOR PRESIDENT OF THE CONGRESS": "CANDIDATAR-SE A PRESIDENTE DO CONGRESSO",
-        "The chamber elects its own president with sql/2026-11-06_orbits_repairs_unrest_and_offices.sql. Run it, then reload this page.":
-            "A casa elege o seu próprio presidente com sql/2026-11-06_orbits_repairs_unrest_and_offices.sql. Execute-o e recarregue esta página.",
-        "You are a candidate for President of the Congress.": "Você é candidato a Presidente do Congresso.",
+        "RUN FOR SPEAKER OF THE CONGRESS": "CANDIDATAR-SE A ORADOR DO CONGRESSO",
+        "The chamber elects its own speaker with sql/2026-11-06_orbits_repairs_unrest_and_offices.sql. Run it, then reload this page.":
+            "A casa elege o seu próprio orador com sql/2026-11-06_orbits_repairs_unrest_and_offices.sql. Execute-o e recarregue esta página.",
+        "You are a candidate for Speaker of the Congress.": "Você é candidato a Orador do Congresso.",
+        "Only the Speaker of the Congress may veto": "Só o Orador do Congresso pode vetar.",
         "Vetoed.": "Vetado.",
 
         /* ---------- the ship's wireless (2026-11-06) ---------- */
@@ -1381,7 +1383,7 @@
             "SCANDAL: delegate $1 exposed for corruption and removed. $2 takes the seat."],
         [/^ESCÂNDALO: uma rede de subornos foi exposta\. (.*) é removido, (.*) assume a cadeira\.$/,
             "SCANDAL: a bribery network is exposed. $1 is removed, $2 takes the seat."],
-        [/^VETO: o Presidente (.*) veta "(.*)"\.$/, function (all, who, title) {
+        [/^VETO: o Presidente (?!do Congresso)(.*) veta "(.*)"\.$/, function (all, who, title) {
             return 'VETO: President ' + who + ' vetoes "' + (lookupServer(title) || title) + '".';
         }],
         [/^IMPOSTOS: ([0-9]+) créditos arrecadados dos mundos membros\.$/,
@@ -1395,6 +1397,22 @@
             "CONGRESS: $1 sends a delegate ($2 of $3 seats)."],
         [/^O Congresso se reúne: ([0-9]+) delegados de ([0-9]+) áreas em ([0-9]+) regiões\.$/,
             "Congress convenes: $1 delegates from $2 areas in $3 regions."],
+
+        /* the chamber's chair, the Speaker (2026-11-12): the older wording is
+           still read, because the log keeps what was written before it */
+        [/^CONGRESSO: a eleição para (?:Presidente|Orador) do Congresso foi aberta\. Declare a candidatura \(8 minutos\), depois todos votam \(8 minutos\)\.$/,
+            "CONGRESS: the election of the Speaker of the Congress is open. Declare your candidacy (8 minutes), then everybody votes (8 minutes)."],
+        [/^CONGRESSO: ninguém se candidatou (?:à presidência do Congresso|a Orador do Congresso)\. A campanha foi prorrogada por 5 minutos\.$/,
+            "CONGRESS: nobody stood for Speaker of the Congress. The campaign was extended by 5 minutes."],
+        [/^CONGRESSO: a votação para (?:Presidente|Orador) do Congresso está aberta\.$/,
+            "CONGRESS: the vote for Speaker of the Congress is open."],
+        [/^CONGRESSO: (.*) é eleito (?:Presidente|Orador) do Congresso \(([0-9]+) voto\(s\)\)\. Toma a cadeira e o veto da casa\.$/,
+            "CONGRESS: $1 is elected Speaker of the Congress ($2 vote(s)). They take the chair and the chamber's veto."],
+        [/^CANDIDATURA: (.*) apresenta-se a (?:Presidente|Orador) do Congresso\.$/,
+            "CANDIDACY: $1 stands for Speaker of the Congress."],
+        [/^VETO: o (?:Presidente|Orador) do Congresso (.*) veta "(.*)"\.$/, function (all, who, title) {
+            return 'VETO: the Speaker of the Congress ' + who + ' vetoes "' + (lookupServer(title) || title) + '".';
+        }],
 
         [/^ELEIÇÃO: (.*) é eleito Presidente da Freedom Authority \((.*)\)\. ?(.*)$/,
             "ELECTION: $1 is elected President of the Freedom Authority ($2). $3"],

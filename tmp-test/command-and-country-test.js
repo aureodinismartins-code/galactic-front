@@ -18,7 +18,7 @@
      - the unrest clock stops once nobody has touched the game for two hours,
        so no world can rise in a game nobody is playing;
      - a chartered world the revolt threw to the Independents is handed back.
-     - the Congress elects its own president, who holds the chamber's veto;
+     - the Congress elects its own Speaker, who holds the chamber's veto;
      - the reset button clears all of it.
 
    Run: NODE_PATH=/tmp/pgtest/node_modules node tmp-test/command-and-country-test.js */
@@ -36,7 +36,8 @@ const FILES = [
     "sql/2026-11-06_orbits_repairs_unrest_and_offices.sql",
     "sql/2026-11-07_charters_and_restless_worlds.sql",
     "sql/2026-11-09_capitals_are_always_their_own.sql",
-    "sql/2026-11-10_pacified_worlds_and_the_opening_quota.sql"
+    "sql/2026-11-10_pacified_worlds_and_the_opening_quota.sql",
+    "sql/2026-11-12_the_speakers_chair.sql"
 ];
 
 const AUTH = "11111111-1111-1111-1111-111111111111";    /* Freedom Authority */
@@ -815,7 +816,23 @@ async function run() {
 
     await as(db, COMB);
     const notSpeaker = await expectError(db, "select public.congress_speaker_veto(1)");
-    check("and not by anybody else", /Only the President of the Congress/.test(String(notSpeaker)), notSpeaker);
+    check("and not by anybody else", /Only the Speaker of the Congress/.test(String(notSpeaker)), notSpeaker);
+
+
+    console.log("\nthe chamber's chair is the Speaker, and the log says so");
+    await as(db, AUTH);
+    const lines = (await call(db, "select text from public.cg_log order by id")).map(r => r.text);
+    check("the chair is written as the Speaker", lines.some(t => /Orador do Congresso/.test(t)), lines.slice(-2).join(" | "));
+    check("and never as the President of the Congress", !lines.some(t => /Presidente do Congresso/.test(t)),
+        lines.filter(t => /Presidente do Congresso/.test(t)).join(" | "));
+    check("the veto belongs to the Speaker", lines.some(t => /^VETO: o Orador do Congresso/.test(t)), lines.slice(-1).join(" | "));
+
+    const resultCol = Number((await call(db, "select count(*)::int as n from information_schema.columns " +
+        "where table_schema = 'public' and table_name = 'cg_proposals' and column_name = 'result'"))[0].n);
+    if (resultCol === 1) {
+        const raw = JSON.stringify((await call(db, "select result from public.cg_proposals where id = " + billId))[0].result);
+        check("and a bill it kills records the Speaker", /Orador do Congresso/.test(raw), raw);
+    }
 
     /* ---------------------------------------------------------
        7. the reset button
