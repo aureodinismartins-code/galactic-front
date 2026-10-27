@@ -1130,6 +1130,36 @@
             "Como é administrado um mundo que dominamos por inteiro. A administração civil paga o que o mundo sempre pagou; as represálias pagam mais metade da sua receita e enfurecem o seu povo; a amnistia paga metade e deixa-o acalmar.",
         "Unrest climbs two points a turn faster while no fleet of ours stands in this world's orbit.":
             "A agitação cresce dois pontos por turno mais depressa enquanto nenhuma frota nossa estiver na órbita deste mundo.",
+        /* ---------- committees and ministers (2026-11-15) ---------- */
+        "COMMITTEES": "COMISSÕES",
+        "COMMITTEES AND MINISTERS": "COMISSÕES E MINISTROS",
+        "THE COMMITTEES": "AS COMISSÕES",
+        "THE MINISTRIES": "OS MINISTÉRIOS",
+        "COMMITTEE OF FLEETS": "COMISSÃO DAS FROTAS",
+        "COMMITTEE OF THE TREASURY": "COMISSÃO DO TESOURO",
+        "COMMITTEE OF DIPLOMACY": "COMISSÃO DA DIPLOMACIA",
+        "WAR": "GUERRA",
+        "TREASURY": "TESOURO",
+        "INTERIOR": "INTERIOR",
+        "Chaired by": "Presidida por",
+        "REPORT TO THE VOTE": "RELATAR À VOTAÇÃO",
+        "reports in": "relata dentro de",
+        "No bill of this committee's kind is before the chamber.": "Não há nenhuma proposta do género desta comissão perante a câmara.",
+        "The chair may report one bill of the committee's own kind straight to the vote, once a term and ten minutes apart at the least. Nowhere else does a seat count for anything but a vote.":
+            "A presidência pode relatar uma proposta do género da sua comissão directamente à votação, uma vez por mandato e com dez minutos de intervalo no mínimo. Em nenhum outro lugar uma cadeira vale mais do que um voto.",
+        "No minister": "Sem ministro",
+        "APPOINT": "NOMEAR",
+        "DISMISS": "EXONERAR",
+        "The President of the Freedom Authority names the ministers; the High Commissar of the Combine does the same in the Soviet. Each ministry may act once a term: the war ministry authorises one campaign without a bill, the treasury takes one extraordinary levy (300-500 credits, and the people are told), and the interior sends one load of relief (+10 stability).":
+            "O Presidente da Freedom Authority nomeia os ministros; o Alto Comissário do Combine faz o mesmo no Soviete. Cada ministério pode agir uma vez por mandato: a guerra autoriza uma campanha sem proposta, o tesouro lança um imposto extraordinário (300-500 créditos, e o povo sabe quem o cobrou), e o interior envia um carregamento de alívio (+10 estabilidade).",
+        "AUTHORISE CAMPAIGN": "AUTORIZAR CAMPANHA",
+        "EXTRAORDINARY LEVY": "IMPOSTO EXTRAORDINÁRIO",
+        "SEND RELIEF": "ENVIAR ALÍVIO",
+        "Only the ministry's holder may act.": "Só o titular do ministério pode agir.",
+        "That ministry has already acted this term.": "Esse ministério já agiu neste mandato.",
+        "Run sql/2026-11-15_committees_and_ministers.sql, then reload this page.":
+            "Rode sql/2026-11-15_committees_and_ministers.sql e recarregue esta página.",
+        "A world": "Um mundo",
         "Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.":
             "A agitação cresce num mundo tomado à força. Ela consome a estabilidade do mundo e, aos cem, o mundo levanta-se e expulsa a ocupação.",
 
@@ -1489,6 +1519,13 @@
         [/^ADMINISTRAÇÃO: (.+) passa a represálias\.$/, "ADMINISTRATION: $1 is placed under reprisals."],
         [/^ADMINISTRAÇÃO: (.+) passa a amnistia\.$/, "ADMINISTRATION: $1 is placed under amnesty."],
         [/^ADMINISTRAÇÃO: (.+) passa a administração civil\.$/, "ADMINISTRATION: $1 is placed under civil rule."],
+        [/^COMISSÃO: (.+) relata (.+) diretamente à votação\.$/, "COMMITTEE: $1 reports $2 straight to the vote."],
+        [/^MINISTÉRIO: (.+) é nomeado para o (.+)\.$/, "MINISTRY: $1 is named to the $2."],
+        [/^MINISTÉRIO: (.+) deixa o (.+)\.$/, "MINISTRY: $1 leaves the $2."],
+        [/^MINISTÉRIO: (.+) fica vago\.$/, "MINISTRY: the $1 is left vacant."],
+        [/^MINISTÉRIO: (.+) autoriza uma campanha contra (.+)\.$/, "MINISTRY: $1 authorises a campaign against $2."],
+        [/^MINISTÉRIO: (.+) levanta ([0-9]+) créditos dos (mundos membros|oblasts)\.$/, "MINISTRY: $1 raises $2 credits from the member worlds."],
+        [/^MINISTÉRIO: (.+) envia alívio a (.+)\.$/, "MINISTRY: $1 sends relief to $2."],
         [/^O assalto a (.+) teve sucesso\.$/, "The assault on $1 succeeded."],
         [/^O assalto a (.+) foi repelido\.$/, "The assault on $1 was repelled."]
     ];

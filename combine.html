@@ -6,9 +6,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=29"></script>
+<script src="i18n.js?v=30"></script>
 <script>window.GC_NO_BANNER = false;</script>
-<script src="gamecontrol.js?v=25"></script>
+<script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
     <script src="news.js?v=1"></script>
 <style>
@@ -193,6 +193,10 @@ async function load() {
     await supabaseClient.rpc("unrest_tick");
     const us = await supabaseClient.rpc("unrest_state");
     unrest = us.error ? null : us.data;
+
+    /* the committees and the ministries (2026-11-15) */
+    const gv = await supabaseClient.rpc("cs_government");
+    gov = gv.error ? null : gv.data;
 
     const dr = await supabaseClient.rpc("cs_debate_view");
     debate = dr.error ? null : dr.data;
@@ -518,7 +522,8 @@ function renderMember() {
 function renderTabs() {
 
     const tabs = [["directives", "DIRECTIVES"], ["secretary", "HIGH COMMISSAR"], ["party", "PARTY"], ["new", "NEW DIRECTIVE"],
-        ["propaganda", "AGITPROP"], ["worlds", "OCCUPIED WORLDS"], ["authority", "SOVIET POWER"], ["news", "NEWS"],
+        ["propaganda", "AGITPROP"], ["worlds", "OCCUPIED WORLDS"], ["committees", "COMMITTEES"],
+        ["authority", "SOVIET POWER"], ["news", "NEWS"],
         ["front", "THE FRONT PAGE"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + esc(T(t[1])) + '</div>').join("");
@@ -533,6 +538,7 @@ function renderTabs() {
     else if (tab === "propaganda") { body.innerHTML = agitpropHtml(); wireAgitprop(); }
     else if (tab === "worlds") { body.innerHTML = worldsHtml(); wireWorlds(); }
     else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
+    else if (tab === "committees") { body.innerHTML = governmentHtml(); wireGovernment(); }
     else if (tab === "front") { body.innerHTML = frontHtml(); wireFront(); }
     else { body.innerHTML = newsHtml(); }
 
@@ -1038,6 +1044,119 @@ function unrestLine(planet) {
         '<div class="bar"><i style="width:' + value + '%;background:' + colour + '"></i></div>' +
         '<div class="sub">' + esc(T("Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.")) + '</div>' +
         policyLine(planet);
+
+}
+
+/* ---- committees and ministers (2026-11-15) ---- */
+
+let gov = null;
+
+const COMMITTEE_LABEL = { fleets: "COMMITTEE OF FLEETS", treasury: "COMMITTEE OF THE TREASURY", diplomacy: "COMMITTEE OF DIPLOMACY" };
+const POST_LABEL = { war: "WAR", treasury: "TREASURY", interior: "INTERIOR" };
+
+function governmentHtml() {
+
+    if (!gov) {
+        return '<div class="card"><h3>' + esc(T("COMMITTEES AND MINISTERS")) + '</h3><div class="sub">' +
+            esc(T("Run sql/2026-11-15_committees_and_ministers.sql, then reload this page.")) + '</div></div>';
+    }
+
+    let h = '<div class="card"><h3>' + esc(T("THE COMMITTEES")) + '</h3><div class="sub">' +
+        esc(T("The chair may report one bill of the committee's own kind straight to the vote, once a term and ten minutes apart at the least. Nowhere else does a seat count for anything but a vote.")) + '</div>';
+
+    (gov.committees || []).forEach(function(c) {
+
+        h += '<div style="border-left:4px solid ' + esc(c.chair_color || "#888") + ';background:rgba(255,255,255,.04);margin:8px 0;padding:8px 10px;">' +
+            '<div style="font-weight:bold;color:#fff;">' + esc(T(COMMITTEE_LABEL[c.kind] || c.name)) + '</div>' +
+            '<div class="sub">' + esc(T("Chaired by")) + ' <b>' + esc(c.chair_name || "?") + '</b> (' + Number(c.chair_seats || 0) + ' ' + esc(T("seats")) + ')</div>' +
+            ((c.bills || []).length
+                ? c.bills.map(function(b) {
+                      return '<div class="sub" style="margin-top:4px"><b>' + esc(b.title) + '</b> &middot; ' +
+                          (c.mine
+                              ? (Number(c.wait) > 0
+                                  ? esc(T("reports in")) + " " + mmss(Number(c.wait))
+                                  : '<button class="btn small report" data-p="' + b.id + '">' + esc(T("REPORT TO THE VOTE")) + '</button>')
+                              : esc(b.status)) + '</div>';
+                  }).join("")
+                : '<div class="sub">' + esc(T("No bill of this committee's kind is before the chamber.")) + '</div>') + '</div>';
+    });
+
+    h += '</div><div class="card"><h3>' + esc(T("THE MINISTRIES")) + '</h3><div class="sub">' +
+        esc(T("The President of the Freedom Authority names the ministers; the High Commissar of the Combine does the same in the Soviet. Each ministry may act once a term: the war ministry authorises one campaign without a bill, the treasury takes one extraordinary levy (300-500 credits, and the people are told), and the interior sends one load of relief (+10 stability).")) + '</div>';
+
+    (gov.ministers || []).forEach(function(m) {
+
+        h += '<div style="border-left:4px solid #7fdcff;background:rgba(255,255,255,.04);margin:8px 0;padding:8px 10px;">' +
+            '<div style="font-weight:bold;color:#fff;">' + esc(T(POST_LABEL[m.post] || m.post)) + '</div>' +
+            '<div class="sub">' + (m.holder ? esc(m.holder) : esc(T("No minister"))) +
+            (Number(m.wait) > 0 ? ' &middot; ' + esc(T("reports in")) + ' ' + mmss(Number(m.wait)) : "") + '</div>';
+
+        if (gov.is_secretary) {
+            h += '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' +
+                '<select class="appoint" data-post="' + esc(m.post) + '"><option value="">— ' + esc(T("APPOINT")) + ' —</option>' +
+                (gov.players || []).map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join("") + '</select>' +
+                (m.holder ? '<button class="btn small fire" data-post="' + esc(m.post) + '">' + esc(T("DISMISS")) + '</button>' : "") + '</div>';
+        }
+
+        if (m.mine) {
+
+            h += '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">';
+
+            if (m.post === "war" || m.post === "interior") {
+                const list = m.post === "war" ? (ov.targets || []) : (gov.worlds || []);
+                h += '<select class="target"><option value="">— ' + esc(T("A world")) + ' —</option>' +
+                    list.map(t => '<option value="' + esc(t.planet) + '">' + esc(t.planet) + '</option>').join("") + '</select>';
+            }
+
+            h += '<button class="btn small act" data-post="' + esc(m.post) + '"' + (Number(m.wait) > 0 ? " disabled" : "") + '>' +
+                esc(T(m.post === "war" ? "AUTHORISE CAMPAIGN" : m.post === "treasury" ? "EXTRAORDINARY LEVY" : "SEND RELIEF")) + '</button></div>';
+
+        }
+        else {
+            h += '<div class="sub">' + esc(T("Only the ministry's holder may act.")) + '</div>';
+        }
+
+        h += '</div>';
+    });
+
+    return h + '</div>';
+
+}
+
+function wireGovernment() {
+
+    $("tabbody").querySelectorAll(".report").forEach(el => el.addEventListener("click", async function() {
+        el.disabled = true;
+        const { error } = await supabaseClient.rpc("cs_committee_report", { p_directive: Number(el.dataset.p) });
+        if (error) { toast(error.message, true); el.disabled = false; return; }
+        toast(T("REPORT TO THE VOTE"));
+        await load();
+    }));
+
+    $("tabbody").querySelectorAll(".appoint").forEach(el => el.addEventListener("change", async function() {
+        if (!el.value) { return; }
+        const { error } = await supabaseClient.rpc("cs_appoint_minister", { p_post: el.dataset.post, p_player: el.value });
+        if (error) { toast(error.message, true); return; }
+        toast(T("APPOINT"));
+        await load();
+    }));
+
+    $("tabbody").querySelectorAll(".fire").forEach(el => el.addEventListener("click", async function() {
+        const { error } = await supabaseClient.rpc("cs_dismiss_minister", { p_post: el.dataset.post });
+        if (error) { toast(error.message, true); return; }
+        toast(T("DISMISS"));
+        await load();
+    }));
+
+    $("tabbody").querySelectorAll(".act").forEach(el => el.addEventListener("click", async function() {
+        const post = el.dataset.post;
+        const sel = $("tabbody").querySelector(".target");
+        el.disabled = true;
+        const { error } = await supabaseClient.rpc("cs_minister_action", { p_post: post, p_planet: sel && sel.value ? sel.value : null });
+        if (error) { toast(error.message, true); el.disabled = false; return; }
+        toast(T(post === "war" ? "AUTHORISE CAMPAIGN" : post === "treasury" ? "EXTRAORDINARY LEVY" : "SEND RELIEF"));
+        await load();
+    }));
 
 }
 

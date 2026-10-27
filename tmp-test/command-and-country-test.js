@@ -39,6 +39,7 @@ const FILES = [
     "sql/2026-11-10_pacified_worlds_and_the_opening_quota.sql",
     "sql/2026-11-13_the_occupation_has_a_policy.sql",
     "sql/2026-11-14_the_blockade_reaches_the_capital.sql",
+    "sql/2026-11-15_committees_and_ministers.sql",
     "sql/2026-11-12_the_speakers_chair.sql"
 ];
 
@@ -131,8 +132,11 @@ create table public.cg_state (id int primary key, relations jsonb default '{}'::
     fa_online_at timestamptz default now(), last_tax_at timestamptz);
 insert into public.cg_state (id) values (1);
 
+/* sponsor_faction_id is the real game's column: the NPC proposers write it
+   and the vote scores every delegate against it */
 create table public.cg_proposals (id serial primary key, title text, ptype text, status text default 'debate',
-    planet text, result jsonb, resolved_at timestamptz, introduction_at timestamptz default now(),
+    sponsor_faction_id int, planet text, result jsonb, resolved_at timestamptz,
+    introduction_at timestamptz default now(),
     debate_at timestamptz default now(), vote_at timestamptz default now() + interval '10 minutes');
 
 create table public.cg_occupations (id serial primary key, planet text unique, stage int default 0,
@@ -167,7 +171,7 @@ create table public.cs_occupations (id serial primary key, planet text unique, s
 
 create table public.cs_authorizations (id serial primary key, kind text, planet text, player_id uuid, used boolean default false);
 
-create table public.cs_currents (id int primary key, name text, loyalty int);
+create table public.cs_currents (id int primary key, name text, loyalty int, seats int default 0, color text);
 insert into public.cs_currents values
     (1, 'Vanguarda Proletária', 60),
     (2, 'Aparato do Partido', 55),
@@ -182,8 +186,12 @@ create table public.space_battles (id uuid primary key default gen_random_uuid()
 create table public.space_battle_fleets (id serial primary key, battle_id uuid, fleet_id uuid, side text,
     player_id uuid, faction text, fleet_name text, prev_status text, squads jsonb);
 
-/* the rest of the Soviet's books, for the reset */
-create table public.cs_directives (id serial primary key);
+/* the rest of the Soviet's books, for the reset. The directives carry the
+   columns the plenum's own screen reads, as the real book does. */
+create table public.cs_directives (id serial primary key, dtype text, title text, status text default 'debate',
+    sponsor_current int, proposer_player uuid, planet text, fleet_id text,
+    debate_at timestamptz default now(), vote_at timestamptz default now() + interval '10 minutes',
+    required_votes int, result jsonb);
 create table public.cs_votes (id serial primary key);
 create table public.cs_debate_sides (id serial primary key);
 create table public.cs_debate_standing (id serial primary key);
@@ -1014,4 +1022,141 @@ async function run() {
     const notHost = await expectError(db, "select public.occupation_policy_reset()");
     check("and only the host may clear it", /Only the host/.test(String(notHost)), notHost);
     await as(db, AUTH);
+
+    /* ---------------------------------------------------------
+       9. the committees, and the ministers
+       --------------------------------------------------------- */
+
+    console.log("\nthe committees are chaired by the biggest party");
+    await db.exec("delete from public.cg_committees");
+    await db.exec("delete from public.cg_ministers");
+    await db.exec("update public.cg_factions set seats = 40 where id = 1");
+    await db.exec("update public.cg_factions set seats = 30 where id = 2");
+    await db.exec("update public.cg_factions set seats = 20 where id = 3");
+    await db.exec("update public.cg_factions set seats = 10 where id = 4");
+
+    /* the seat the player holds, and the party the base game names for them */
+    await db.exec("alter table public.cg_members add column if not exists player_id uuid");
+    await db.exec("alter table public.cg_members add column if not exists party text");
+    await db.exec("update public.cg_members set active = false");
+    await db.exec("insert into public.cg_members (name, faction_id, region, area, seat, loyalty, active, planet, party, player_id) " +
+        "values ('President Hale', 1, 'West', 1, 1, 70, true, 'Free Earth', 'militarists', '" + AUTH + "')");
+
+    let gov = (await call(db, "select public.cg_government() as g"))[0].g;
+    check("three committees are seated", gov.committees.length === 3,
+        JSON.stringify(gov.committees.map(c => c.kind)));
+    check("each chaired by the party with the most seats",
+        gov.committees.every(c => Number(c.chair) === 1), JSON.stringify(gov.committees.map(c => c.chair)));
+    check("and a player can see they sit in it", gov.committees.every(c => c.mine === true),
+        JSON.stringify(gov.committees.map(c => c.mine)));
+
+    await db.exec("insert into public.cg_proposals (title, ptype, status, sponsor_faction_id, vote_at) " +
+        "values ('Authorize New Fleet Construction', 'fleet_construction', 'debate', 1, now() + interval '10 minutes')");
+    const bill = Number((await call(db, "select id from public.cg_proposals order by id desc limit 1"))[0].id);
+
+    gov = (await call(db, "select public.cg_government() as g"))[0].g;
+    check("the committee lists the bill it schedules",
+        gov.committees.find(c => c.kind === "fleets").bills.some(b => Number(b.id) === bill));
+
+    const rep = (await call(db, "select public.cg_committee_report(" + bill + ") as r"))[0].r;
+    check("the chair reports it straight to the vote", rep && rep.reported === true, JSON.stringify(rep));
+    const moved = (await call(db, "select status, vote_at <= now() as due from public.cg_proposals where id = " + bill))[0];
+    check("and the vote is due at once", moved.status === "debate" && moved.due === true, JSON.stringify(moved));
+    check("the chamber's record hears of it",
+        Number((await call(db, "select count(*)::int as n from public.cg_log where text like 'COMISSÃO:%'"))[0].n) === 1);
+
+    const twiceRep = await expectError(db, "select public.cg_committee_report(" + bill + ")");
+    check("a committee reports once a term", /already reported this term/.test(String(twiceRep)), twiceRep);
+
+    /* a party that does not chair the committee cannot use it */
+    await db.exec("update public.cg_members set faction_id = 2, party = 'environmentalists' where player_id = '" + AUTH + "'");
+    const notChair = await expectError(db, "select public.cg_committee_report(" + bill + ")");
+    check("and a party that does not chair it cannot", /Only the party that chairs/.test(String(notChair)), notChair);
+    await db.exec("update public.cg_members set faction_id = 1, party = 'militarists' where player_id = '" + AUTH + "'");
+
+    console.log("\nthe President names the ministers, and each ministry can act");
+    await db.exec("update public.cg_state set president_player = '" + AUTH + "', term_no = 3, popularity = 60 where id = 1");
+
+    const app = (await call(db, "select public.cg_appoint_minister('treasury', '" + AUTH + "') as r"))[0].r;
+    check("the President names a minister", app && app.name === "President Hale", JSON.stringify(app));
+
+    await as(db, COMB);
+    const notPresident = await expectError(db, "select public.cg_appoint_minister('war', '" + AUTH + "')");
+    check("and only the President may", /Only the President/.test(String(notPresident)), notPresident);
+    await as(db, AUTH);
+
+    const wrongSide = await expectError(db, "select public.cg_appoint_minister('war', '" + COMB + "')");
+    check("nor may a minister be taken from the other side", /does not serve/.test(String(wrongSide)), wrongSide);
+
+    const levyBefore = Number((await call(db, "select credits from public.faction_treasury where faction = 'Freedom Authority'"))[0].credits);
+    const levy = (await call(db, "select public.cg_minister_action('treasury') as r"))[0].r;
+    const levyAfter = Number((await call(db, "select credits from public.faction_treasury where faction = 'Freedom Authority'"))[0].credits);
+    check("the treasury takes an extraordinary levy",
+        Number(levy.credits) >= 300 && levyAfter === levyBefore + Number(levy.credits), JSON.stringify(levy));
+    check("and the people are told who took it",
+        Number((await call(db, "select popularity from public.cg_state where id = 1"))[0].popularity) === 57);
+
+    await db.exec("delete from public.cg_authorizations where kind = 'war'");
+    await call(db, "select public.cg_appoint_minister('war', '" + AUTH + "')");
+    await call(db, "select public.cg_appoint_minister('interior', '" + AUTH + "')");
+
+    const far = await expectError(db, "select public.cg_minister_action('interior', 'Volst')");
+    check("a world we do not administer gets no relief", /not under the Congress/.test(String(far)), far);
+
+    const war = (await call(db, "select public.cg_minister_action('war', 'Veyra') as r"))[0].r;
+    check("the war ministry authorises a campaign with no bill", war && war.authorised === true, JSON.stringify(war));
+    check("on the book the fleets already read",
+        Number((await call(db, "select count(*)::int as n from public.cg_authorizations " +
+            "where kind = 'war' and planet = 'Veyra' and not used"))[0].n) === 1);
+
+    const oncePerTerm = await expectError(db, "select public.cg_minister_action('war', 'Asteron')");
+    check("a ministry acts once a term", /already acted this term/.test(String(oncePerTerm)), oncePerTerm);
+
+    await db.exec("insert into public.cg_occupations (planet, stage, stability, progress) values ('Krieg', 1, 40, 0) " +
+        "on conflict (planet) do update set stage = 1, stability = 40, progress = 0");
+    await call(db, "select public.cg_appoint_minister('interior', '" + AUTH + "')");
+    const relief = (await call(db, "select public.cg_minister_action('interior', 'Krieg') as r"))[0].r;
+    check("the interior sends relief without a proposal",
+        relief && Number(relief.stability) === 50, JSON.stringify(relief));
+
+    const fired = (await call(db, "select public.cg_dismiss_minister('interior') as r"))[0].r;
+    check("the President may dismiss one", fired && fired.dismissed === "President Hale", JSON.stringify(fired));
+
+    console.log("\nand the Soviet has the same two");
+    await as(db, COMB);
+    await db.exec("update public.cs_currents set seats = 42 where id = 1");
+    await db.exec("delete from public.cs_membership");
+    await db.exec("insert into public.cs_membership (player_id, current_id) values ('" + COMB + "', 1)");
+    await db.exec("update public.cs_state set secretary_player = '" + COMB + "', term_no = 2, confidence = 60 where id = 1");
+
+    const cgov = (await call(db, "select public.cs_government() as g"))[0].g;
+    check("three committees in the plenum too", cgov.committees.length === 3, cgov.committees.length);
+    check("chaired by the biggest current",
+        cgov.committees.every(c => Number(c.chair) === 1 && c.mine === true),
+        JSON.stringify(cgov.committees.map(c => [c.chair, c.mine])));
+
+    await db.exec("insert into public.cs_directives (dtype, title, status, sponsor_current, vote_at) " +
+        "values ('production_quota', 'Plano Quinquenal', 'debate', 1, now() + interval '10 minutes')");
+    const directive = Number((await call(db, "select id from public.cs_directives order by id desc limit 1"))[0].id);
+    const crep = (await call(db, "select public.cs_committee_report(" + directive + ") as r"))[0].r;
+    check("the current in the chair reports a directive to the vote",
+        crep && crep.reported === true, JSON.stringify(crep));
+
+    const capp = (await call(db, "select public.cs_appoint_minister('war', '" + COMB + "') as r"))[0].r;
+    check("the High Commissar names a commissar of a ministry",
+        capp && capp.name === "Comrade Volkov", JSON.stringify(capp));
+
+    await db.exec("delete from public.cs_authorizations where kind = 'war'");
+    const cwar = (await call(db, "select public.cs_minister_action('war', 'Asteron') as r"))[0].r;
+    check("and its war ministry authorises a campaign",
+        cwar && cwar.authorised === true &&
+        Number((await call(db, "select count(*)::int as n from public.cs_authorizations " +
+            "where kind = 'war' and planet = 'Asteron'"))[0].n) === 1, JSON.stringify(cwar));
+
+    await as(db, AUTH);
+    const wiped = (await call(db, "select public.committees_and_ministers_reset() as n"))[0].n;
+    check("the host's reset clears both chambers' committees and ministries",
+        Number((await call(db, "select count(*)::int as n from public.cg_ministers"))[0].n) === 0 &&
+        Number((await call(db, "select count(*)::int as n from public.cs_ministers"))[0].n) === 0 &&
+        Number((await call(db, "select count(*)::int as n from public.cg_committees"))[0].n) === 0, wiped);
 }
