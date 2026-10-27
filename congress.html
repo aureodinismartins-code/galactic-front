@@ -1208,7 +1208,7 @@ function occupiedHtml() {
             '<div class="sub">' + T("STABILITY") + ' ' + o.stability + ' / ' + T("needed") + ' ' + (o.stage < 3 ? o.threshold : "-") + '</div>' +
             '<div class="bar"><i style="width:' + o.stability + '%;background:' + (o.stability >= o.threshold ? "#2fbf6a" : "#d6a84b") + '"></i></div>' +
             (o.stage < 3 ? '<div class="sub">' + T("STAGE PROGRESS") + ' ' + o.progress + ' / ' + o.duration + ' ' + T("turns (5 minutes each, only counted while stability is high enough)") + '</div>' +
-                '<div class="bar"><i style="width:' + (o.duration ? o.progress / o.duration * 100 : 0) + '%;background:#4cc2ff"></i></div>' : '<div class="sub" style="color:#7dff9d">Fully integrated into the Authority.</div>') +
+                '<div class="bar"><i style="width:' + (o.duration ? o.progress / o.duration * 100 : 0) + '%;background:#4cc2ff"></i></div>' : '<div class="sub" style="color:#7dff9d">Fully integrated into the Authority: the world has sent two more delegates to Congress.</div>') +
             '<div style="margin-top:8px"><button class="btn small relief" data-p="' + esc(o.planet) + '">' + T("PROPOSE RELIEF (+10 stability)") + '</button></div></div>';
 
     }).join("");

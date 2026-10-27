@@ -35,7 +35,8 @@ const FILES = [
     "sql/2026-11-06_planet_keys_and_hostile_worlds.sql",
     "sql/2026-11-06_orbits_repairs_unrest_and_offices.sql",
     "sql/2026-11-07_charters_and_restless_worlds.sql",
-    "sql/2026-11-09_capitals_are_always_their_own.sql"
+    "sql/2026-11-09_capitals_are_always_their_own.sql",
+    "sql/2026-11-10_pacified_worlds_and_the_opening_quota.sql"
 ];
 
 const AUTH = "11111111-1111-1111-1111-111111111111";    /* Freedom Authority */
@@ -137,6 +138,20 @@ create table public.cg_occupations (id serial primary key, planet text unique, s
 
 create table public.cg_authorizations (id serial primary key, kind text, planet text, player_id uuid, used boolean default false);
 
+create table public.cg_factions (id int primary key, key text, name text, color text, seats int default 0,
+    loyalty numeric default 50, alignment_x numeric default 0, alignment_y numeric default 0,
+    description text, credits numeric default 5000);
+insert into public.cg_factions (id, key, name, color) values
+    (1, 'militarists', 'The Militarists', '#c0272d'),
+    (2, 'environmentalists', 'The Environmentalists', '#2fbf6a'),
+    (3, 'technocrats', 'The Technocrats', '#4cc2ff'),
+    (4, 'reformers', 'The Reformers', '#c08a2e');
+
+create table public.cg_members (id serial primary key, name text, faction_id int references public.cg_factions (id),
+    region text, area int, seat int, loyalty numeric default 60, active boolean default true,
+    corruption_level int default 0, bribes_received int default 0, is_corrupted boolean default false,
+    alignment_x numeric default 0, alignment_y numeric default 0, planet text, bribe_exposure numeric default 0.05);
+
 create table public.cs_state (id int primary key, confidence numeric default 55, quota int default 1,
     relations jsonb default '{}'::jsonb, secretary_player uuid, secretary_name text, secretary_current int,
     term_no int default 0, term_end timestamptz, veto_used boolean default false,
@@ -150,7 +165,10 @@ create table public.cs_occupations (id serial primary key, planet text unique, s
 create table public.cs_authorizations (id serial primary key, kind text, planet text, player_id uuid, used boolean default false);
 
 create table public.cs_currents (id int primary key, name text, loyalty int);
-insert into public.cs_currents values (1, 'Vanguarda Proletária', 60);
+insert into public.cs_currents values
+    (1, 'Vanguarda Proletária', 60),
+    (2, 'Aparato do Partido', 55),
+    (3, 'Comando Vermelho', 74);
 create table public.cs_membership (id serial primary key, player_id uuid, current_id int);
 
 create table public.cg_log (id serial primary key, text text);
@@ -170,7 +188,8 @@ create table public.cs_privileges (id serial primary key);
 create table public.cs_candidates (id serial primary key);
 create table public.cs_election_votes (id serial primary key);
 create table public.cs_election (id serial primary key);
-create table public.cs_commissars (id serial primary key, current_id int, loyalty int default 55,
+create table public.cs_commissars (id serial primary key, name text, current_id int, oblast text,
+    seat int, loyalty int default 55, alignment_x numeric default 0, alignment_y numeric default 0,
     is_disgraced boolean default false, active boolean default true);
 create table public.cs_agitprop (id serial primary key);
 create table public.ceasefires (id serial primary key);
@@ -668,6 +687,90 @@ async function run() {
         Number((await call(db, "select count(*)::int as n from public.planet_unrest where planet = 'Ultramars'"))[0].n) === 0);
     check("and the game reads both capitals as cored",
         (await call(db, "select public.charters_are_cored() as ok"))[0].ok === true);
+
+    /* ---------------------------------------------------------
+       5e. a pacified world sends its people (2026-11-10)
+       --------------------------------------------------------- */
+
+    console.log("\nand a pacified world sends its people");
+
+    /* the Combine opens a war with three fleet quotas of its own */
+    await db.exec("delete from public.cs_authorizations");
+    await db.exec("update public.fleets set faction = 'Independents' where faction = 'Combine'");
+    await as(db, COMB);
+
+    let seed = (await call(db, "select public.game_opening_quotas() as r"))[0].r;
+    check("the Combine opens the war with three fleet quotas",
+        Number(seed.granted) === 3 && Number(seed.floor) === 3, JSON.stringify(seed));
+
+    seed = (await call(db, "select public.game_opening_quotas() as r"))[0].r;
+    check("and calling it again changes nothing", Number(seed.granted) === 0 &&
+        Number((await call(db, "select count(*)::int as n from public.cs_authorizations " +
+            "where kind = 'fleet' and not used"))[0].n) === 3, JSON.stringify(seed));
+
+    /* three fleets of its own meet the floor, so nothing is handed out */
+    await db.exec("insert into public.fleets (faction, name, status) values " +
+        "('Combine','One','stationed'), ('Combine','Two','stationed'), ('Combine','Three','stationed')");
+    await db.exec("delete from public.cs_authorizations");
+    seed = (await call(db, "select public.game_opening_quotas() as r"))[0].r;
+    check("three fleets in service meet it on their own", Number(seed.granted) === 0, JSON.stringify(seed));
+
+    /* two fleets and the floor hands over exactly the third */
+    await db.exec("update public.fleets set faction = 'Independents' where name = 'Three'");
+    seed = (await call(db, "select public.game_opening_quotas() as r"))[0].r;
+    check("two fleets leave room for one more", Number(seed.granted) === 1, JSON.stringify(seed));
+
+    /* a world held whole, one turn short of incorporation */
+    await db.exec("update public.fleets set faction = 'Independents' where name in ('One','Two')");
+    await db.exec("delete from public.cs_occupations");
+    await db.exec("delete from public.cs_commissars");
+    await db.exec("update public.cities set faction = 'Combine' where planet_id = 'Krieg'");
+    await db.exec("insert into public.cs_occupations (planet, stage, stability, progress, last_turn_at) " +
+        "values ('Krieg', 2, 50, 4, now() - interval '10 minutes')");
+    /* it is the stage change that seats the commissar, whichever tick made it;
+       the Soviet's own suite drives the real advance (cs_process_occupations) */
+    await db.exec("update public.cs_occupations set stage = 3 where planet = 'Krieg'");
+
+    const seated = await call(db, "select m.name, m.oblast, m.seat, m.current_id, m.active " +
+        "from public.cs_commissars as m");
+    check("an incorporated world seats one more commissar",
+        seated.length === 1 && seated[0].active === true, JSON.stringify(seated));
+    check("and the commissar is from that world", seated[0] && seated[0].oblast === "Krieg",
+        JSON.stringify(seated[0]));
+    check("in a current of the three",
+        seated[0] && [1, 2, 3].indexOf(Number(seated[0].current_id)) !== -1, JSON.stringify(seated[0]));
+    check("and the plenum hears of it",
+        Number((await call(db, "select count(*)::int as n from public.cs_log " +
+            "where text like 'COMISSÁRIO: Krieg%'"))[0].n) === 1);
+
+    /* the same world changing again is not a second pacification */
+    await db.exec("update public.cs_occupations set stability = 20 where planet = 'Krieg'");
+    check("and a later change to that world seats nobody else",
+        Number((await call(db, "select count(*)::int as n from public.cs_commissars"))[0].n) === 1);
+
+    /* and a world integrated into the Authority seats two delegates */
+    const before = Number((await call(db, "select count(*)::int as n from public.cg_members"))[0].n);
+    await db.exec("insert into public.cg_occupations (planet, stage, stability, progress) " +
+        "values ('Kara', 2, 60, 0) on conflict (planet) do update set stage = 2, stability = 60, progress = 0");
+    await db.exec("update public.cg_occupations set stage = 3 where planet = 'Kara'");
+
+    const delegates = await call(db, "select m.faction_id, m.active, m.planet, m.seat " +
+        "from public.cg_members as m order by m.id");
+    check("an integrated world seats two more delegates",
+        delegates.length === before + 2, delegates.length + " of " + before);
+    check("each of them in a party of the four",
+        delegates.every(m => [1, 2, 3, 4].indexOf(Number(m.faction_id)) !== -1), JSON.stringify(delegates));
+    check("and they count in the chamber",
+        delegates.filter(m => m.active === true).length === before + 2, JSON.stringify(delegates));
+    check("with the world they came from on their seat",
+        delegates.every(m => m.planet === "Kara"), JSON.stringify(delegates));
+    check("and the Congress is told",
+        Number((await call(db, "select count(*)::int as n from public.cg_log " +
+            "where text like 'CONGRESSO: Kara%'"))[0].n) === 1);
+
+    await db.exec("update public.cg_occupations set stability = 40 where planet = 'Kara'");
+    check("and a later change to that world seats nobody else",
+        Number((await call(db, "select count(*)::int as n from public.cg_members"))[0].n) === before + 2);
 
     /* ---------------------------------------------------------
        6. the Congress's own president

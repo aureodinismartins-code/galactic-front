@@ -55,6 +55,10 @@
                database without that patch the call simply does not exist */
             try { await supabaseClient.rpc("charters_core_capitals"); } catch (e) { /* older database */ }
 
+            /* and with the Combine's opening fleet quotas in hand: the first
+               three fleets of a war wait on no directive */
+            try { await supabaseClient.rpc("game_opening_quotas"); } catch (e) { /* older database */ }
+
             location.reload();
 
         });
@@ -110,6 +114,9 @@
                a new game starts with Ultramars the Combine's and Free Earth the
                Authority's */
             try { await supabaseClient.rpc("charters_core_capitals"); } catch (e) { /* older database */ }
+
+            /* and the Combine opens the war with its three fleet quotas again */
+            try { await supabaseClient.rpc("game_opening_quotas"); } catch (e) { /* older database */ }
 
             if (data && data.warnings && data.warnings.length) {
                 alert("The reset finished, but some parts could not be done:\n\n- " + data.warnings.join("\n- "));

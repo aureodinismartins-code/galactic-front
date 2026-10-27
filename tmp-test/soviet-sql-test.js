@@ -19,7 +19,8 @@ const ROOT = path.join(__dirname, "..");
 const FILES = [
     "sql/2026-10-28_combine_soviet.sql",
     "sql/2026-10-29_soviet_worlds_and_quotas.sql",
-    "sql/2026-10-30_soviet_agitprop.sql"
+    "sql/2026-10-30_soviet_agitprop.sql",
+    "sql/2026-11-10_pacified_worlds_and_the_opening_quota.sql"
 ];
 
 const ME = "11111111-1111-1111-1111-111111111111";
@@ -569,6 +570,44 @@ async function run() {
     occNow = await turn("Krieg");
     check("nothing moves past incorporation", Number(occNow.stage) === 3 && Number(occNow.progress) === 0,
         JSON.stringify(occNow));
+
+    /* and the world it just incorporated sends the Soviet its own commissar */
+    const kreigSeat = (await db.query("select name, oblast, current_id, seat, active from public.cs_commissars " +
+        "where oblast = 'Krieg'")).rows;
+    check("an incorporated world sends one more commissar to the plenum",
+        kreigSeat.length === 1 && kreigSeat[0].active === true, JSON.stringify(kreigSeat));
+    check("and the commissar is from that world, in a current of the three",
+        kreigSeat.length === 1 && [1, 2, 3].indexOf(Number(kreigSeat[0].current_id)) !== -1 &&
+        Number(kreigSeat[0].seat) > 100, JSON.stringify(kreigSeat));
+    check("and the plenum is told of the new seat",
+        Number((await db.query("select count(*)::int as n from public.cs_log where text like 'COMISSÁRIO: Krieg%'")).rows[0].n) === 1);
+    check("while a later turn of the same world seats nobody else",
+        Number((await db.query("select count(*)::int as n from public.cs_commissars")).rows[0].n) === 101,
+        (await db.query("select count(*)::int as n from public.cs_commissars")).rows[0].n);
+
+    console.log("\nand a war opens with the Combine's three fleet quotas");
+
+    await db.query("delete from public.fleets");
+    await db.query("delete from public.cs_authorizations");
+    let opening = (await db.query("select public.game_opening_quotas() as r")).rows[0].r;
+    check("with no fleet built, three quotas and a floor of three",
+        Number(opening.granted) === 3 && Number(opening.floor) === 3, JSON.stringify(opening));
+    opening = (await db.query("select public.game_opening_quotas() as r")).rows[0].r;
+    check("asking twice in the same war changes nothing",
+        Number(opening.granted) === 0 && Number(opening.quotas) === 3, JSON.stringify(opening));
+
+    await db.query(`insert into public.fleets (player_id, name, faction, status) values
+        ('${ME}', 'Um', 'Combine', 'stationed'), ('${ME}', 'Dois', 'Combine', 'stationed'),
+        ('${ME}', 'Três', 'Combine', 'stationed')`);
+    await db.query("delete from public.cs_authorizations");
+    opening = (await db.query("select public.game_opening_quotas() as r")).rows[0].r;
+    check("three fleets of its own already meet the floor",
+        Number(opening.granted) === 0, JSON.stringify(opening));
+
+    await db.query("update public.fleets set faction = 'Freedom Authority' where name = 'Três'");
+    opening = (await db.query("select public.game_opening_quotas() as r")).rows[0].r;
+    check("and two leave room for exactly one more",
+        Number(opening.granted) === 1 && Number(opening.fleets) === 2, JSON.stringify(opening));
 
     ov = (await db.query("select public.cs_overview() as o")).rows[0].o;
     const kriegOv = ov.worlds.find(w => w.planet === "Krieg");

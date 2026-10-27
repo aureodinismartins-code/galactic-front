@@ -1024,6 +1024,13 @@ function unrestLine(planet) {
 function worldsHtml() {
 
     const worlds = ov.worlds || [];
+
+    /* nothing taken yet: the ministry carries the same note the Authority's
+       occupied worlds tab carries, and no blank grid behind it */
+    if (!worlds.length) {
+        return '<div class="sub">' + esc(T("The Combine holds no occupied world. When Combine fleets take every city of a planet, it comes under Soviet administration and moves through four stages — occupied, military administration, collectivised and finally incorporated into the Union. Each stage takes time and enough stability (relief is sent straight to the world), and every world incorporated sends the Soviet one more commissar from that planet.")) + '</div>';
+    }
+
     const whole = worlds.filter(w => w.whole).length;
     const cities = worlds.reduce((n, w) => n + Number(w.held), 0);
     const incorporated = worlds.filter(w => Number(w.stage) === 3).length;
@@ -1039,12 +1046,7 @@ function worldsHtml() {
         '<div class="sub" style="margin-bottom:10px">' +
         esc(T("Relief is sent straight to a world under Combine administration — no directive, no vote — for +10 stability, one world every five minutes. The Freedom Authority has to put the same relief before Congress first.")) + '</div>';
 
-    /* nothing held yet: the map would be a blank grid, so it is left out */
-    const map = worlds.length ? '<div class="card">' + miniMapHtml("held") + '</div>' : "";
-
-    if (!worlds.length) {
-        return tokens + note + '<div class="sub">' + esc(T("The Combine holds no world yet. Take one with a military campaign (NEW DIRECTIVE), and it is listed here.")) + '</div>';
-    }
+    const map = '<div class="card">' + miniMapHtml("held") + '</div>';
 
     return tokens + map + note + worlds.map(function(w) {
 
@@ -1057,7 +1059,7 @@ function worldsHtml() {
         if (w.whole) {
 
             if (stage >= 3) {
-                actions = '<div class="sub" style="color:#7dff9d">' + esc(T("Fully integrated into the Union: the plan collects this world and the Party has its confidence.")) + '</div>';
+                actions = '<div class="sub" style="color:#7dff9d">' + esc(T("Fully integrated into the Union: the plan collects this world, the Party has its confidence and the world has sent the Soviet one more commissar.")) + '</div>';
             }
             else {
                 /* the Authority puts relief before Congress; here it is sent

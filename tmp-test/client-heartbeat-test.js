@@ -120,6 +120,8 @@ const lastHeartbeat = () => heartbeats()[heartbeats().length - 1];
         order.indexOf("game_reset_extras") > order.indexOf("game_reset"), order.join(","));
     check("and the capitals are cored in the same breath",
         order.indexOf("charters_core_capitals") > order.indexOf("game_reset_extras"), order.join(","));
+    check("and the Combine's opening fleet quotas come back with it",
+        order.indexOf("game_opening_quotas") > order.indexOf("charters_core_capitals"), order.join(","));
 
     console.log("and a database without the newer patch still resets");
 
@@ -168,6 +170,9 @@ const lastHeartbeat = () => heartbeats()[heartbeats().length - 1];
     check("and starting the war cores the capitals after it",
         startCalls.indexOf("game_start") !== -1 &&
         startCalls.indexOf("charters_core_capitals") > startCalls.indexOf("game_start"),
+        startCalls.join(","));
+    check("and hands the Combine its three opening fleet quotas",
+        startCalls.indexOf("game_opening_quotas") > startCalls.indexOf("charters_core_capitals"),
         startCalls.join(","));
 
     console.log("");

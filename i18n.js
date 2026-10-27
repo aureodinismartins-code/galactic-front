@@ -455,7 +455,8 @@
         "VOTES NEEDED:": "VOTOS NECESSÁRIOS:",
         "PROPOSE WAR": "PROPOR GUERRA",
         "the floor is still moving": "o plenário ainda se mexe",
-        "Fully integrated into the Authority.": "Totalmente integrado à Autoridade.",
+        "Fully integrated into the Authority: the world has sent two more delegates to Congress.":
+            "Totalmente integrado à Autoridade: o mundo enviou mais dois delegados ao Congresso.",
         "BRIBE FOR:": "SUBORNO PARA:",
         "buy a YES": "comprar um SIM",
         "buy a NO": "comprar um NÃO",
@@ -658,16 +659,16 @@
             "A estabilidade basta: a administração avança um turno a cada cinco minutos.",
         "Stability is below the threshold: the administration does not advance until relief is sent.":
             "A estabilidade está abaixo do limite: a administração não avança enquanto não for enviada ajuda.",
-        "Fully integrated into the Union: the plan collects this world and the Party has its confidence.":
-            "Totalmente integrado à União: o plano recolhe deste mundo e o Partido ganha confiança.",
+        "Fully integrated into the Union: the plan collects this world, the Party has its confidence and the world has sent the Soviet one more commissar.":
+            "Totalmente integrado à União: o plano recolhe deste mundo, o Partido ganha confiança e o mundo enviou mais um comissário ao Soviete.",
         "GRANT RELIEF (+10 stability)": "CONCEDER AJUDA (+10 estabilidade)",
         "sent again in": "enviada de novo em",
         "Relief sent to": "Ajuda enviada a",
         "stability": "estabilidade",
         "Relief is sent straight to a world under Combine administration — no directive, no vote — for +10 stability, one world every five minutes. The Freedom Authority has to put the same relief before Congress first.":
             "A ajuda é enviada diretamente a um mundo sob administração do Combine — sem diretiva, sem votação — para +10 de estabilidade, um mundo a cada cinco minutos. A Autoridade da Liberdade tem de levar a mesma ajuda primeiro ao Congresso.",
-        "The Combine holds no world yet. Take one with a military campaign (NEW DIRECTIVE), and it is listed here.":
-            "O Combine ainda não tomou nenhum mundo. Tome um com uma campanha militar (NOVA DIRETIVA) e ele aparece aqui.",
+        "The Combine holds no occupied world. When Combine fleets take every city of a planet, it comes under Soviet administration and moves through four stages — occupied, military administration, collectivised and finally incorporated into the Union. Each stage takes time and enough stability (relief is sent straight to the world), and every world incorporated sends the Soviet one more commissar from that planet.":
+            "O Combine não tem nenhum mundo ocupado. Quando as frotas do Combine tomam todas as cidades de um planeta, ele entra na administração soviética e passa por quatro estágios — ocupado, administração militar, coletivizado e por fim incorporado à União. Cada estágio leva tempo e exige estabilidade suficiente (a ajuda é enviada diretamente ao mundo), e cada mundo incorporado envia ao Soviete mais um comissário daquele planeta.",
         "WHOLE": "INTEIRO",
         "CONTESTED": "DISPUTADO",
         "cities held": "cidades em mãos",
