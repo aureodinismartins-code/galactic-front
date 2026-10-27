@@ -582,6 +582,63 @@ async function run() {
         Number((await call(db, "select count(*)::int as n from public.cg_log where text like 'RESTAURO%'"))[0].n) === 1);
 
     /* ---------------------------------------------------------
+       5c. the braces: the game cannot reset itself again
+       --------------------------------------------------------- */
+
+    console.log("\nand the galaxy can never be emptied again");
+
+    /* a capital is protected even with the charters table wiped: the two
+       home worlds are written into the code as well */
+    await db.exec("delete from public.planet_charters");
+    await db.exec("update public.cities set faction = 'Combine' where planet_id = 'Ultramars'");
+    await db.exec("insert into public.planet_unrest (planet, faction, unrest, last_turn_at) " +
+        "values ('Ultramars', 'Combine', 99, now() - interval '30 minutes') " +
+        "on conflict (planet) do update set unrest = 99, last_turn_at = now() - interval '30 minutes'");
+    await as(db, AUTH);
+    const heldTick = (await call(db, "select public.unrest_tick() as r"))[0].r;
+    const capitalAfter = await call(db, "select c.faction from public.cities as c " +
+        "join public.planets as p on p.id = c.planet_id where p.name = 'Ultramars'");
+    check("a capital stays its faction's even with the charters table empty",
+        capitalAfter.length > 0 && capitalAfter.every(f => f.faction === "Combine"),
+        JSON.stringify({ flags: capitalAfter, tick: heldTick }));
+
+    /* two worlds of the same faction at the very edge: one rises, not both */
+    await db.exec("delete from public.planet_unrest");
+    await db.exec("update public.cities set faction = 'Combine' where planet_id in ('Kara', 'Krieg')");
+    await db.exec("insert into public.planet_unrest (planet, faction, unrest, last_turn_at) values " +
+        "('Kara', 'Combine', 99, now() - interval '30 minutes'), " +
+        "('Krieg', 'Combine', 99, now() - interval '30 minutes')");
+    await call(db, "select public.unrest_tick()");
+
+    const flagOf = async (planet) => (await call(db, "select c.faction from public.cities as c " +
+        "join public.planets as p on p.id = c.planet_id where p.name = '" + planet + "'"))[0].faction;
+    const kara1 = await flagOf("Kara");
+    const krieg1 = await flagOf("Krieg");
+    check("only one world rises in a tick", [kara1, krieg1].filter(f => f === "Independents").length === 1,
+        kara1 + "/" + krieg1);
+
+    const left = await call(db, "select u.planet, u.unrest from public.planet_unrest as u order by u.planet");
+    check("the other holds one short of rising rather than following it",
+        left.length === 1 && Number(left[0].unrest) === 99, JSON.stringify(left));
+
+    /* strip the Combine down to that one world — Elya has a Combine city of
+       its own, so every other world is handed back first */
+    const survivor = left[0].planet;
+    await db.exec("update public.cities set faction = 'Independents' " +
+        "where faction = 'Combine' and planet_id is distinct from '" + survivor + "'");
+    await db.exec("update public.planet_unrest set last_turn_at = now() - interval '30 minutes'");
+    await call(db, "select public.unrest_tick()");
+    const lastFlag = await flagOf(left[0].planet);
+    check("a faction's last world never rises", lastFlag === "Combine", lastFlag);
+
+    /* give the faction another world and the guard lets go */
+    await db.exec("update public.cities set faction = 'Combine' where planet_id = 'Ultramars'");
+    await db.exec("update public.planet_unrest set last_turn_at = now() - interval '30 minutes'");
+    await call(db, "select public.unrest_tick()");
+    const freeFlag = await flagOf(left[0].planet);
+    check("with another world to its name, it may rise after all", freeFlag === "Independents", freeFlag);
+
+    /* ---------------------------------------------------------
        6. the Congress's own president
        --------------------------------------------------------- */
 

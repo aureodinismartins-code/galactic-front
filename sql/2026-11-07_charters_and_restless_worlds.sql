@@ -3,7 +3,8 @@
 --
 -- Run this in the Supabase SQL editor AFTER
 -- 2026-11-06_orbits_repairs_unrest_and_offices.sql.
--- Safe to run more than once.
+-- Safe to run more than once. It changes no world of yours except to put
+-- right what the old rule got wrong (see 6).
 --
 -- WHAT WENT WRONG
 --
@@ -15,27 +16,42 @@
 -- therefore earned a bar it was never meant to have and, an hour or two
 -- later, the Combine's own capital threw itself to the Independents.
 --
--- Two rules were missing, and this patch adds them:
+-- WHAT THIS PATCH CHANGES
 --
 --   1. A WORLD A FACTION LIVES ON IS NOT AN OCCUPATION. Whatever book lists
 --      it, a faction's own world cannot be restless. Those worlds are
 --      written down in planet_charters — Ultramars for the Combine, Free
 --      Earth for the Freedom Authority — and a bar is only ever given to a
 --      world held by somebody other than its charter holder. Add a row to
---      planet_charters if the map ever gains another home world;
+--      planet_charters if the map ever gains another home world. The two
+--      capitals are also written into the code itself, so emptying that
+--      table by accident cannot turn a capital into occupied ground.
 --
 --   2. A WORLD THAT SIGNED A PACT IS NOT UNDER OCCUPATION EITHER. The old
 --      comment promised that, but the code could not tell: a world annexed
---      by treaty (planet_diplomacy.annexed_at) now earns no bar either;
+--      by treaty (planet_diplomacy.annexed_at) now earns no bar either.
 --
--- and the unrest clock now stops with the rest of the world. Once nobody has
--- touched the game for two hours the economy is already at zero
--- (income_mode() = 'closed'), and no world can rise in a game nobody is
--- playing.
+--   3. THE CLOCK STOPS WHEN NOBODY IS PLAYING. Once nobody has touched the
+--      game for two hours the economy is already at zero (income_mode() is
+--      'closed'), and no world can rise in a game nobody is there for.
 --
--- It also puts right what the bug already did: bars a faction's own world
--- should never have carried are dropped, and a chartered world that the
--- revolt threw to the Independents comes home.
+--   4. ONE RISING PER TICK, AT MOST. A tick can cost a faction one world.
+--      Even a bug can no longer take the whole galaxy in a single call.
+--
+--   5. NEVER A FACTION'S LAST WORLD. Unrest may cost a faction a world; it
+--      can never end a faction. While a world is everything its holder has
+--      left, that world holds at one short of rising, however long the bar
+--      has been at the top.
+--
+-- Together with 1 those are the braces: the game cannot reset itself through
+-- unrest again — not by a capital being seeded, not by a cascade, and not by
+-- the galaxy being emptied in one go.
+--
+--   6. AND WHAT THE BUG DID IS PUT RIGHT. Bars that a faction's own world
+--      should never have carried are dropped, and a chartered world the
+--      revolt threw to the Independents comes home (only a world that is
+--      entirely independent is touched: if somebody really holds it, that is
+--      a conquest, not this bug).
 -- =========================================================
 
 
@@ -75,7 +91,22 @@ begin
     from public.planet_charters as k
     where k.planet = p_planet;
 
+    /* the capitals are also written here, in the code: a missing or emptied
+       table must never turn a home world into ground under occupation */
+    if v_faction is null then
+        v_faction := case p_planet
+                          when 'Ultramars' then 'Combine'
+                          when 'Free Earth' then 'Freedom Authority'
+                          else null end;
+    end if;
+
     return coalesce(v_faction, 'Independents');
+
+exception when undefined_table then
+    return case p_planet
+               when 'Ultramars' then 'Combine'
+               when 'Free Earth' then 'Freedom Authority'
+               else 'Independents' end;
 
 end;
 $function$;
@@ -182,8 +213,8 @@ $function$;
 
 
 -- ---------------------------------------------------------
--- 4. the clock: it stops when nobody is playing, and a faction's own
---    world can never rise
+-- 4. the clock: it stops when nobody is playing, one world may rise a
+--    tick, and never the last world of a faction
 -- ---------------------------------------------------------
 
 /*
@@ -208,6 +239,8 @@ declare
     v_new numeric;
     v_out jsonb := '[]'::jsonb;
     v_text text;
+    v_revolted boolean := false;
+    v_held integer;
 begin
 
     if auth.uid() is null then raise exception 'Not authenticated'; end if;
@@ -220,11 +253,8 @@ begin
         return v_out;
     end if;
 
-    /*
-       Nobody has touched the game for two hours: the economy is at zero
-       already, so the unrest clock stops with it. A game nobody is playing
-       must not lose a world to a revolt nobody was there for.
-    */
+    /* nobody has touched the game for two hours: the economy is at zero
+       already, so the unrest clock stops with it */
     begin
         if public.income_mode() = 'closed' then return v_out; end if;
     exception when undefined_function or undefined_table or undefined_column then null;
@@ -259,6 +289,29 @@ begin
         perform public.occupation_lower_stability(o.planet, floor(v_new / 25));
 
         if v_new >= public.unrest_revolt_at() then
+
+            /* what its faction still holds: unrest may cost a world, never
+               the last one, and never two in the same tick */
+            select count(distinct p.name) into v_held
+            from public.cities as c
+            join public.planets as p on p.id = c.planet_id
+            where c.faction = o.faction;
+
+            if v_revolted or coalesce(v_held, 0) <= 1 then
+
+                /* the world holds one short of rising and tries again on a
+                   later turn, when the situation is different */
+                update public.planet_unrest as u
+                set unrest = public.unrest_revolt_at() - 1, last_turn_at = now()
+                where u.planet = o.planet;
+
+                v_out := v_out || jsonb_build_object('planet', o.planet, 'revolted', false, 'held', true,
+                                                     'unrest', public.unrest_revolt_at() - 1);
+                continue;
+
+            end if;
+
+            v_revolted := true;
 
             update public.cities as c
             set faction = 'Independents'
@@ -310,7 +363,53 @@ $function$;
 
 
 -- ---------------------------------------------------------
--- 5. what the bug did, put right
+-- 5. every look at the bar keeps the rules honest
+-- ---------------------------------------------------------
+
+create or replace function public.unrest_state()
+returns jsonb
+language plpgsql
+security definer
+set search_path to ''
+as $function$
+declare
+    me uuid := auth.uid();
+    v_faction text;
+begin
+
+    if me is null then raise exception 'Not authenticated'; end if;
+
+    /* a world that has just been occupied gets its bar the moment somebody
+       looks at the screen, not five minutes later */
+    perform public.unrest_seed();
+
+    select p.faction into v_faction from public.players as p where p.id = me;
+
+    return jsonb_build_object(
+        'turn', public.unrest_turn_seconds(),
+        'revolt_at', public.unrest_revolt_at(),
+        'worlds', coalesce((
+            select jsonb_agg(jsonb_build_object(
+                       'planet', u.planet,
+                       'faction', u.faction,
+                       'unrest', round(u.unrest),
+                       'mood', case when u.unrest >= 80 then 'REVOLT'
+                                    when u.unrest >= 55 then 'RIOTING'
+                                    when u.unrest >= 30 then 'RESTLESS'
+                                    else 'CALM' end,
+                       'revolts', u.revolts,
+                       'mine', u.faction = v_faction
+                   ) order by u.unrest desc, u.planet)
+            from public.planet_unrest as u
+        ), '[]'::jsonb)
+    );
+
+end;
+$function$;
+
+
+-- ---------------------------------------------------------
+-- 6. what the bug did, put right
 -- ---------------------------------------------------------
 
 do $repair$
@@ -370,7 +469,7 @@ $repair$;
 
 
 -- ---------------------------------------------------------
--- 6. the closing readout
+-- 7. the closing readout
 -- ---------------------------------------------------------
 
 select
@@ -378,7 +477,7 @@ select
     (select count(*) from information_schema.routines
       where routine_schema = 'public'
         and routine_name in ('planet_home_faction', 'planet_unrest_holder',
-                             'unrest_seed', 'unrest_tick')) as unrest_functions,
+                             'unrest_seed', 'unrest_tick', 'unrest_state')) as unrest_functions,
     (select count(*) from public.planet_unrest) as bars,
     (select count(*) from public.planet_unrest as u
       where u.faction = public.planet_home_faction(u.planet)) as bars_that_should_not_exist;
