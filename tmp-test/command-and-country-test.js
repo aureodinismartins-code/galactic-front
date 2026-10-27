@@ -34,7 +34,8 @@ const FILES = [
     "sql/2026-11-05_fog_of_war_vision.sql",
     "sql/2026-11-06_planet_keys_and_hostile_worlds.sql",
     "sql/2026-11-06_orbits_repairs_unrest_and_offices.sql",
-    "sql/2026-11-07_charters_and_restless_worlds.sql"
+    "sql/2026-11-07_charters_and_restless_worlds.sql",
+    "sql/2026-11-09_capitals_are_always_their_own.sql"
 ];
 
 const AUTH = "11111111-1111-1111-1111-111111111111";    /* Freedom Authority */
@@ -637,6 +638,36 @@ async function run() {
     await call(db, "select public.unrest_tick()");
     const freeFlag = await flagOf(left[0].planet);
     check("with another world to its name, it may rise after all", freeFlag === "Independents", freeFlag);
+
+    /* ---------------------------------------------------------
+       5d. a capital is always cored by its faction (2026-11-09)
+       --------------------------------------------------------- */
+
+    console.log("\nand a capital always belongs to its own faction");
+
+    /* make a mess of the Combine's capital: independent cities, an occupation,
+       a pact and a bar of the other side's */
+    await db.exec("update public.cities set faction = 'Independents' where planet_id = 'Ultramars'");
+    await db.exec("insert into public.cs_occupations (planet, stage, stability) values ('Ultramars', 0, 30) " +
+        "on conflict (planet) do nothing");
+    await db.exec("insert into public.planet_diplomacy (planet, faction, relation, annexed_at) " +
+        "values ('Ultramars', 'Freedom Authority', 60, now()) on conflict (planet, faction) do nothing");
+    await db.exec("insert into public.planet_unrest (planet, faction, unrest) values ('Ultramars', 'Freedom Authority', 40) " +
+        "on conflict (planet) do update set faction = 'Freedom Authority', unrest = 40");
+
+    const cored = (await call(db, "select public.charters_core_capitals() as n"))[0].n;
+    check("both capitals are cored", Number(cored) === 2, cored);
+
+    const coredFlags = await call(db, "select c.faction from public.cities as c " +
+        "join public.planets as p on p.id = c.planet_id where p.name = 'Ultramars'");
+    check("the capital's cities are its faction's again",
+        coredFlags.length > 0 && coredFlags.every(f => f.faction === "Combine"), JSON.stringify(coredFlags));
+    check("and nothing else is left on it: no occupation, no pact, no bar",
+        Number((await call(db, "select count(*)::int as n from public.cs_occupations where planet = 'Ultramars'"))[0].n) === 0 &&
+        Number((await call(db, "select count(*)::int as n from public.planet_diplomacy where planet = 'Ultramars'"))[0].n) === 0 &&
+        Number((await call(db, "select count(*)::int as n from public.planet_unrest where planet = 'Ultramars'"))[0].n) === 0);
+    check("and the game reads both capitals as cored",
+        (await call(db, "select public.charters_are_cored() as ok"))[0].ok === true);
 
     /* ---------------------------------------------------------
        6. the Congress's own president

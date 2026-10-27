@@ -51,6 +51,10 @@
 
             if (error) { msg.textContent = error.message; return; }
 
+            /* a new war starts with each capital cored by its faction; on a
+               database without that patch the call simply does not exist */
+            try { await supabaseClient.rpc("charters_core_capitals"); } catch (e) { /* older database */ }
+
             location.reload();
 
         });
@@ -101,6 +105,11 @@
                 alert("The reset finished, but the newer systems could not be cleared:\n\n" + extras.error.message);
                 return;
             }
+
+            /* the capitals are cored again, whatever the last game did to them:
+               a new game starts with Ultramars the Combine's and Free Earth the
+               Authority's */
+            try { await supabaseClient.rpc("charters_core_capitals"); } catch (e) { /* older database */ }
 
             if (data && data.warnings && data.warnings.length) {
                 alert("The reset finished, but some parts could not be done:\n\n- " + data.warnings.join("\n- "));
