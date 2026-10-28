@@ -461,6 +461,14 @@ create table if not exists public.cs_ministers (
 
 alter table public.cs_ministers enable row level security;
 
+/* the posts exist before anybody holds them: the tab lists a vacant chair
+   rather than hiding the ministry until the President names somebody */
+insert into public.cg_ministers (post) values ('war'), ('treasury'), ('interior')
+on conflict (post) do nothing;
+
+insert into public.cs_ministers (post) values ('war'), ('treasury'), ('interior')
+on conflict (post) do nothing;
+
 
 create or replace function public.minister_posts()
 returns text[]
@@ -1051,7 +1059,7 @@ begin
                        'name', public.minister_name(m.post),
                        'player', m.player_id,
                        'holder', m.name,
-                       'mine', m.player_id = me,
+                       'mine', coalesce(m.player_id = me, false),
                        'wait', greatest(0, ceil(public.minister_wait_seconds() -
                            coalesce(extract(epoch from (now() - m.last_power_at)), 999999)::numeric))::integer
                    ) order by m.post)
@@ -1131,7 +1139,7 @@ begin
                        'name', public.minister_name(m.post),
                        'player', m.player_id,
                        'holder', m.name,
-                       'mine', m.player_id = me,
+                       'mine', coalesce(m.player_id = me, false),
                        'wait', greatest(0, ceil(public.minister_wait_seconds() -
                            coalesce(extract(epoch from (now() - m.last_power_at)), 999999)::numeric))::integer
                    ) order by m.post)
