@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=33"></script>
+<script src="i18n.js?v=34"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
@@ -1164,9 +1164,18 @@ const POST_LABEL = { war: "WAR", treasury: "TREASURY", interior: "INTERIOR" };
 function governmentHtml() {
 
     if (!gov) {
+
+        /* the one failure that means the patch is only half applied: the book
+           still has the earlier committee functions, and running the file
+           again replaces them */
+        const stale = !!govError && /seats|does not exist/i.test(govError);
+
         return '<div class="card"><h3>' + esc(T("COMMITTEES AND MINISTERS")) + '</h3><div class="sub">' +
-            esc(T("Run sql/2026-11-15_committees_and_ministers.sql, then reload this page.")) +
+            esc(stale
+                ? T("This database still has an earlier version of the committee functions. Run sql/2026-11-15_committees_and_ministers.sql again: it replaces them.")
+                : T("Run sql/2026-11-15_committees_and_ministers.sql, then reload this page.")) +
             (govError ? '<br><br><b style="color:#ff8a8a">' + esc(govError) + '</b>' : '') + '</div></div>';
+
     }
 
     let h = '<div class="card"><h3>' + esc(T("THE COMMITTEES")) + '</h3><div class="sub">' +
