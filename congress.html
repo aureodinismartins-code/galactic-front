@@ -1332,6 +1332,36 @@ function unrestLine(planet) {
 let gov = null;
 let govError = null;
 
+/* what a ministry's holder did this term, in the player's language. The rule
+   is the holder's own loyalty and his party's standing: nobody presses this,
+   the chamber's man acts on his own once a term. */
+function ministryEffectLine(m) {
+
+    const e = m.effect;
+
+    if (!e || !e.kind) { return T("Has not acted this term."); }
+
+    if (e.kind === "fleet") { return T("Authorised a fleet with no bill: build it from the galaxy map."); }
+
+    if (e.kind === "levy") {
+        return T("Took an extraordinary levy:") + " " + Number(e.credits || 0).toLocaleString() + " " +
+            T("credits") + ", " + T("and the people were told.");
+    }
+
+    if (e.kind === "relief") {
+        return T("Sent relief to") + " " + esc(e.planet) + ": " + T("stability") + " " +
+            Number(e.stability || 0) + ".";
+    }
+
+    if (e.kind === "idle") {
+        if (e.reason === "party") { return T("Nothing: the holder's party is in disgrace and will not serve this term."); }
+        if (e.reason === "holder") { return T("Nothing: the holder is too sullen to act this term."); }
+        return T("Nothing to do: every world we administer is already settled.");
+    }
+
+    return "";
+}
+
 const COMMITTEE_LABEL = { fleets: "COMMITTEE OF FLEETS", treasury: "COMMITTEE OF THE TREASURY", diplomacy: "COMMITTEE OF DIPLOMACY" };
 const POST_LABEL = { war: "WAR", treasury: "TREASURY", interior: "INTERIOR" };
 
@@ -1373,41 +1403,18 @@ function governmentHtml() {
     });
 
     h += '</div><div class="card"><h3>' + T("THE MINISTRIES") + '</h3><div class="sub">' +
-        T("The President of the Freedom Authority names the ministers; the High Commissar of the Combine does the same in the Soviet. Each ministry may act once a term: the war ministry authorises one campaign without a bill, the treasury takes one extraordinary levy (300-500 credits, and the people are told), and the interior sends one load of relief (+10 stability).") + '</div>';
+        T("The ministries are held by the chamber, not named by hand: the party with the most seats gives each post to its most loyal delegate, and the holder acts on his own once a term, more boldly when he is loyal and his party is in favour and less when it is not. A party below 25 loyalty is not served at all.") + '</div>';
 
     (gov.ministers || []).forEach(function(m) {
 
-        h += '<div style="border-left:4px solid #7fdcff;background:rgba(255,255,255,.04);margin:8px 0;padding:8px 10px;">' +
+        h += '<div style="border-left:4px solid ' + esc(m.party_color || "#7fdcff") + ';background:rgba(255,255,255,.04);margin:8px 0;padding:8px 10px;">' +
             '<div style="font-weight:bold;color:#fff;">' + T(POST_LABEL[m.post] || m.post) + '</div>' +
-            '<div class="sub">' + (m.holder ? esc(m.holder) : T("No minister")) +
-            (Number(m.wait) > 0 ? ' &middot; ' + T("reports in") + ' ' + mmss(Number(m.wait)) : "") + '</div>';
-
-        if (gov.is_president) {
-            h += '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' +
-                '<select class="appoint" data-post="' + esc(m.post) + '"><option value="">— ' + T("APPOINT") + ' —</option>' +
-                (gov.players || []).map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join("") + '</select>' +
-                (m.holder ? '<button class="btn small fire" data-post="' + esc(m.post) + '">' + T("DISMISS") + '</button>' : "") + '</div>';
-        }
-
-        if (m.mine) {
-
-            h += '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">';
-
-            if (m.post === "war" || m.post === "interior") {
-                const list = m.post === "war" ? (ov.targets || []) : (gov.worlds || []);
-                h += '<select class="target"><option value="">— ' + T("A world") + ' —</option>' +
-                    list.map(t => '<option value="' + esc(t.planet) + '">' + esc(t.planet) + '</option>').join("") + '</select>';
-            }
-
-            h += '<button class="btn small act" data-post="' + esc(m.post) + '"' + (Number(m.wait) > 0 ? " disabled" : "") + '>' +
-                T(m.post === "war" ? "AUTHORISE CAMPAIGN" : m.post === "treasury" ? "EXTRAORDINARY LEVY" : "SEND RELIEF") + '</button></div>';
-
-        }
-        else {
-            h += '<div class="sub">' + T("Only the ministry's holder may act.") + '</div>';
-        }
-
-        h += '</div>';
+            '<div class="sub">' + (m.holder
+                ? esc(m.holder) + ' &middot; ' + esc(m.party_name || "?") +
+                  (m.loyalty == null ? "" : ' &middot; ' + T("loyalty") + ' ' + Math.round(Number(m.loyalty)))
+                : T("No minister")) + '</div>' +
+            '<div class="sub" style="margin-top:4px">' + ministryEffectLine(m) + '</div>' +
+            '</div>';
     });
 
     return h + '</div>';
@@ -1424,30 +1431,8 @@ function wireGovernment() {
         await load();
     }));
 
-    $("tabbody").querySelectorAll(".appoint").forEach(el => el.addEventListener("change", async function() {
-        if (!el.value) { return; }
-        const { error } = await supabaseClient.rpc("cg_appoint_minister", { p_post: el.dataset.post, p_player: el.value });
-        if (error) { toast(error.message, true); return; }
-        toast(T("APPOINT"));
-        await load();
-    }));
-
-    $("tabbody").querySelectorAll(".fire").forEach(el => el.addEventListener("click", async function() {
-        const { error } = await supabaseClient.rpc("cg_dismiss_minister", { p_post: el.dataset.post });
-        if (error) { toast(error.message, true); return; }
-        toast(T("DISMISS"));
-        await load();
-    }));
-
-    $("tabbody").querySelectorAll(".act").forEach(el => el.addEventListener("click", async function() {
-        const post = el.dataset.post;
-        const sel = $("tabbody").querySelector(".target");
-        el.disabled = true;
-        const { error } = await supabaseClient.rpc("cg_minister_action", { p_post: post, p_planet: sel && sel.value ? sel.value : null });
-        if (error) { toast(error.message, true); el.disabled = false; return; }
-        toast(T(post === "war" ? "AUTHORISE CAMPAIGN" : post === "treasury" ? "EXTRAORDINARY LEVY" : "SEND RELIEF"));
-        await load();
-    }));
+    /* the ministries have no controls: the chamber seats them and its holders
+       act on their own terms, so there is nothing here to press */
 
 }
 

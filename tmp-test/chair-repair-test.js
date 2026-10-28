@@ -178,8 +178,11 @@ function slice(src, from, to) {
     check("each ministry is named, not just keyed",
         (gov.ministers || []).every(m => /Minist/.test(String(m.name))),
         JSON.stringify((gov.ministers || []).map(m => m.name)));
-    check("a vacant ministry is a seat, not a missing row",
-        (gov.ministers || []).every(m => m.holder === null && m.mine === false && m.wait === 0),
+    /* this rescue file restores the 2026-11-15 reading, which predates the
+       chamber-staffed ministries: what matters here is that nothing comes back
+       as a null flag, whatever 2026-11-20 later makes of the posts */
+    check("no ministry comes back with a null in it",
+        (gov.ministers || []).every(m => typeof m.mine === "boolean" && m.wait === 0),
         JSON.stringify(gov.ministers));
 
     console.log("\nand it stays fixed");

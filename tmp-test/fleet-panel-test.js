@@ -25,7 +25,7 @@ const mobile = fs.readFileSync(path.join(ROOT, "mobile.js"), "utf8");
    the body of selectFleet(), up to the next top-level function
 --------------------------------------------------------- */
 
-const start = galaxy.indexOf("function selectFleet(fleet) {");
+const start = galaxy.indexOf("function selectFleet(fleet, pickedByHand) {");
 
 check("selectFleet exists", start !== -1);
 
@@ -44,8 +44,20 @@ check("and it is shown before the dock is updated",
     shownAt !== -1 && (dockedAt === -1 || shownAt < dockedAt),
     "visible at " + shownAt + ", updateDock at " + dockedAt);
 
-check("a minimised panel is opened again on selection",
-    body.indexOf('contains("collapsed")') !== -1 && body.indexOf("min-fleet-panel") !== -1);
+check("a minimised panel is opened again when the player clicks a fleet",
+    /pickedByHand === true && fleetPanel\.classList\.contains\("collapsed"\)/.test(body) &&
+    body.indexOf("min-fleet-panel") !== -1);
+
+/* the refresh loops call selectFleet() again with whatever was selected. They
+   used to press the panel's own button each time, so a minimised panel opened
+   by itself every few seconds: only the click on a fleet may ask for it. */
+const handPicks = (galaxy.match(/selectFleet\(\s*[A-Za-z_.]+\s*,\s*true\s*\)/g) || []).length;
+
+check("and only the player's click asks for that, never a refresh loop",
+    handPicks === 1, handPicks);
+
+check("an empty warning strip takes no room on the panel",
+    /\.dock-warning:empty\s*\{[^}]*display:\s*none/.test(galaxy), galaxy.indexOf(".dock-warning:empty"));
 
 /* ---------------------------------------------------------
    the army summary must not be able to take the dock with it

@@ -186,6 +186,15 @@
         }
 
 
+        /* a warning with no words in it is not a warning: without this the
+           strip kept its padding, its bar and its tint on the panel all the
+           time, warning about nothing */
+        .dock-warning:empty {
+
+            display: none;
+        }
+
+
         #fleet-command-panel h2 {
 
             margin:
@@ -2449,7 +2458,8 @@ const orbitSlots = {};
             function(event) {
                 event.stopPropagation();
                 selectFleet(
-                    fleet
+                    fleet,
+                    true
                 );
             }
         );
@@ -3130,7 +3140,7 @@ async function updateArmy() {
 }
 
 
-function selectFleet(fleet) {
+function selectFleet(fleet, pickedByHand) {
 
     /* the panel opens first, before anything fills it in: every step below
        only writes into it, and a panel that is filled but never shown reads
@@ -3140,10 +3150,11 @@ function selectFleet(fleet) {
         "visible"
     );
 
-    /* selecting a fleet is a request to see it. A panel the player minimised
-       earlier leaves only a name bar, which is easy to read as "no screen",
-       so the selection opens it again through the panel's own button. */
-    if (fleetPanel.classList.contains("collapsed")) {
+    /* Only a click on the fleet itself reopens a minimised panel. The refresh
+       loops call this same function every few seconds with whatever was
+       selected, and they used to press the panel's own button each time: a
+       panel the player had minimised kept opening by itself, every poll. */
+    if (pickedByHand === true && fleetPanel.classList.contains("collapsed")) {
         const minButton = document.getElementById("min-fleet-panel");
         if (minButton) { minButton.click(); }
     }
