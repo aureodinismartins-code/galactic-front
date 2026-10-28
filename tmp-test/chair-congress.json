@@ -1,0 +1,10 @@
+[
+["the veto belong to the President of the Congress, not to this chair.", "the veto belong to the Speaker of the Congress, not to this chair."],
+["T(\"PRESIDENT OF THE CONGRESS\") + '</h3>' +", "T(\"SPEAKER OF THE CONGRESS\") + '</h3>' +"],
+["\"The President of the Congress leads the chamber and holds its veto, and has used it this term.\"", "\"The Speaker of the Congress leads the chamber and holds its veto, and has used it this term.\""],
+["\"The President of the Congress leads the chamber and holds its veto: one bill a term.\"", "\"The Speaker of the Congress leads the chamber and holds its veto: one bill a term.\""],
+["T(\"Election of the President of the Congress\")", "T(\"Election of the Speaker of the Congress\")"],
+["\"RUN FOR PRESIDENT OF THE CONGRESS\"", "\"RUN FOR SPEAKER OF THE CONGRESS\""],
+["T(\"PRESIDENT OF THE CONGRESS\") + '</h3><div class=\"sub\">' +", "T(\"SPEAKER OF THE CONGRESS\") + '</h3><div class=\"sub\">' +"],
+["T(\"You are a candidate for President of the Congress.\")", "T(\"You are a candidate for Speaker of the Congress.\")"]
+]

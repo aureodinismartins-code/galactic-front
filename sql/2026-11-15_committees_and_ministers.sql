@@ -124,21 +124,67 @@ begin
 
     if v_party is null or v_party = '' then return null; end if;
 
-    select f.id into v_id
-    from public.cg_factions as f
-    where lower(f.key) = lower(v_party) or lower(f.name) = lower(v_party)
-    order by f.id
-    limit 1;
+    /* the party may be stored under a short key or under its full name; an
+       older party book has no key column at all, so the name alone is the
+       fallback rather than a failed claim to a chair */
+    begin
+        select f.id into v_id
+        from public.cg_factions as f
+        where lower(f.key) = lower(v_party) or lower(f.name) = lower(v_party)
+        order by f.id
+        limit 1;
+    exception when undefined_column then
+        select f.id into v_id
+        from public.cg_factions as f
+        where lower(f.name) = lower(v_party)
+        order by f.id
+        limit 1;
+    end;
 
     return v_id;
+
+end;
+$function$;/*
+   How many votes a party holds. The base game does not keep that count on
+   the party itself: a party holds exactly the delegates seated in it, so
+   that is what is counted here (the chamber's own tally counts the same
+   way). Returns 0 instead of raising when the delegate book is missing, so
+   a committee can still be seated on a half-built database.
+*/
+create or replace function public.cg_party_seats(p_faction integer)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path to ''
+as $function$
+declare
+    n integer;
+begin
+
+    if p_faction is null or to_regclass('public.cg_members') is null then
+        return 0;
+    end if;
+
+    begin
+        select count(*)::integer into n
+        from public.cg_members as m
+        where m.faction_id = p_faction and coalesce(m.active, true);
+    exception when undefined_column then
+        select count(*)::integer into n
+        from public.cg_members as m
+        where m.faction_id = p_faction;
+    end;
+
+    return coalesce(n, 0);
 
 end;
 $function$;
 
 
 /*
-   The chair of every committee is the party with the most seats, and the
-   book is rewritten whenever anybody looks: a defection or a propaganda
+   The chair of every committee is the party with the most seats, and
+   the book is rewritten whenever anybody looks: a defection or a propaganda
    campaign that moves the seats moves the gavel with them.
 */
 create or replace function public.cg_commit()
@@ -160,8 +206,8 @@ begin
 
         select f.id into v_chair
         from public.cg_factions as f
-        where coalesce(f.seats, 0) > 0
-        order by f.seats desc, f.id
+        where public.cg_party_seats(f.id) > 0
+        order by public.cg_party_seats(f.id) desc, f.id
         limit 1;
 
         insert into public.cg_committees (kind, chair_id)
@@ -983,7 +1029,7 @@ begin
                        'chair', f.id,
                        'chair_name', f.name,
                        'chair_color', f.color,
-                       'chair_seats', f.seats,
+                       'chair_seats', public.cg_party_seats(f.id),
                        'mine', f.id = v_party,
                        'bills', coalesce((
                            select jsonb_agg(jsonb_build_object('id', p.id, 'title', p.title,

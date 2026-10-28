@@ -1163,6 +1163,13 @@
         "Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.":
             "A agitação cresce num mundo tomado à força. Ela consome a estabilidade do mundo e, aos cem, o mundo levanta-se e expulsa a ocupação.",
 
+        /* ---------- the army (2026-11-16) ---------- */
+        "THE ARMY": "O EXÉRCITO",
+        "REPAIR THE WHOLE ARMY": "REPARAR O EXÉRCITO INTEIRO",
+        "under strength": "abaixo do efectivo",
+        "Every fleet of yours that is in orbit goes to the dock at once: the treasury pays for all of it, or nothing is repaired.":
+            "Cada frota tua que esteja em órbita vai de uma vez para a doca: o tesouro paga por todas, ou não se repara nenhuma.",
+
         /* ---------- the two chairs (2026-11-06). The chamber's own chair became
            the Speaker of the Congress on 2026-11-12, so one president is left. ---------- */
         "THE TWO CHAIRS": "AS DUAS CADEIRAS",

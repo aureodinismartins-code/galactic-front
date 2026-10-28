@@ -1,0 +1,2 @@
+[["        [/^VETO: o Presidente (.*) veta \"(.*)\"\\.$/, function (all, who, title) {",
+  "        [/^VETO: o Presidente (?!do Congresso)(.*) veta \"(.*)\"\\.$/, function (all, who, title) {"]]

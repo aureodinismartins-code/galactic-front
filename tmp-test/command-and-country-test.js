@@ -145,7 +145,10 @@ create table public.cg_occupations (id serial primary key, planet text unique, s
 
 create table public.cg_authorizations (id serial primary key, kind text, planet text, player_id uuid, used boolean default false);
 
-create table public.cg_factions (id int primary key, key text, name text, color text, seats int default 0,
+/* no seat count: the real party book keeps none, the chamber counts the
+   delegates seated in each party instead. A friendlier stand-in here is how
+   a "column f.seats does not exist" reached the running game once already. */
+create table public.cg_factions (id int primary key, key text, name text, color text,
     loyalty numeric default 50, alignment_x numeric default 0, alignment_y numeric default 0,
     description text, credits numeric default 5000);
 insert into public.cg_factions (id, key, name, color) values
@@ -1030,15 +1033,21 @@ async function run() {
     console.log("\nthe committees are chaired by the biggest party");
     await db.exec("delete from public.cg_committees");
     await db.exec("delete from public.cg_ministers");
-    await db.exec("update public.cg_factions set seats = 40 where id = 1");
-    await db.exec("update public.cg_factions set seats = 30 where id = 2");
-    await db.exec("update public.cg_factions set seats = 20 where id = 3");
-    await db.exec("update public.cg_factions set seats = 10 where id = 4");
-
     /* the seat the player holds, and the party the base game names for them */
     await db.exec("alter table public.cg_members add column if not exists player_id uuid");
     await db.exec("alter table public.cg_members add column if not exists party text");
     await db.exec("update public.cg_members set active = false");
+
+    /* four delegates for the Militarists, three for the Environmentalists, two
+       for the Technocrats and one for the Reformers: the chair is the party
+       that holds the most seats, and seats are delegates */
+    for (const [faction, count] of [[1, 4], [2, 3], [3, 2], [4, 1]]) {
+        for (let i = 0; i < count; i++) {
+            await db.exec("insert into public.cg_members (name, faction_id, region, area, seat, loyalty, active) " +
+                "values ('Delegate " + faction + "-" + i + "', " + faction + ", 'West', 1, " + (10 + faction * 10 + i) + ", 60, true)");
+        }
+    }
+
     await db.exec("insert into public.cg_members (name, faction_id, region, area, seat, loyalty, active, planet, party, player_id) " +
         "values ('President Hale', 1, 'West', 1, 1, 70, true, 'Free Earth', 'militarists', '" + AUTH + "')");
 

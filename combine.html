@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=30"></script>
+<script src="i18n.js?v=31"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
@@ -194,9 +194,12 @@ async function load() {
     const us = await supabaseClient.rpc("unrest_state");
     unrest = us.error ? null : us.data;
 
-    /* the committees and the ministries (2026-11-15) */
+    /* the committees and the ministries (2026-11-15). The error is kept, not
+       swallowed, so the tab can say why it failed instead of only asking for
+       the patch again */
     const gv = await supabaseClient.rpc("cs_government");
     gov = gv.error ? null : gv.data;
+    govError = gv.error ? gv.error.message : null;
 
     const dr = await supabaseClient.rpc("cs_debate_view");
     debate = dr.error ? null : dr.data;
@@ -1050,6 +1053,7 @@ function unrestLine(planet) {
 /* ---- committees and ministers (2026-11-15) ---- */
 
 let gov = null;
+let govError = null;
 
 const COMMITTEE_LABEL = { fleets: "COMMITTEE OF FLEETS", treasury: "COMMITTEE OF THE TREASURY", diplomacy: "COMMITTEE OF DIPLOMACY" };
 const POST_LABEL = { war: "WAR", treasury: "TREASURY", interior: "INTERIOR" };
@@ -1058,7 +1062,8 @@ function governmentHtml() {
 
     if (!gov) {
         return '<div class="card"><h3>' + esc(T("COMMITTEES AND MINISTERS")) + '</h3><div class="sub">' +
-            esc(T("Run sql/2026-11-15_committees_and_ministers.sql, then reload this page.")) + '</div></div>';
+            esc(T("Run sql/2026-11-15_committees_and_ministers.sql, then reload this page.")) +
+            (govError ? '<br><br><b style="color:#ff8a8a">' + esc(govError) + '</b>' : '') + '</div></div>';
     }
 
     let h = '<div class="card"><h3>' + esc(T("THE COMMITTEES")) + '</h3><div class="sub">' +

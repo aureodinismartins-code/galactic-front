@@ -1,0 +1,7 @@
+        [/^COMISSÃO: (.+) relata (.+) diretamente à votação\.$/, "COMMITTEE: $1 reports $2 straight to the vote."],
+        [/^MINISTÉRIO: (.+) é nomeado para o (.+)\.$/, "MINISTRY: $1 is named to the $2."],
+        [/^MINISTÉRIO: (.+) deixa o (.+)\.$/, "MINISTRY: $1 leaves the $2."],
+        [/^MINISTÉRIO: (.+) fica vago\.$/, "MINISTRY: the $1 is left vacant."],
+        [/^MINISTÉRIO: (.+) autoriza uma campanha contra (.+)\.$/, "MINISTRY: $1 authorises a campaign against $2."],
+        [/^MINISTÉRIO: (.+) levanta ([0-9]+) créditos dos (mundos membros|oblasts)\.$/, "MINISTRY: $1 raises $2 credits from the member worlds."],
+        [/^MINISTÉRIO: (.+) envia alívio a (.+)\.$/, "MINISTRY: $1 sends relief to $2."],
