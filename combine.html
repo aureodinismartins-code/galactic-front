@@ -78,6 +78,7 @@ hr.rule { border: 0; border-top: 1px solid #5a1d20; margin: 10px 0; }
 .steps > div.cur { background: #5c1a1d; color: #fff; border-color: #b32424; }
 @media (max-width: 1150px) { #main { grid-template-columns: 1fr; } }
 </style>
+<script src="mobile.js?v=1"></script>
 </head>
 <body>
 
@@ -527,7 +528,7 @@ function renderTabs() {
     const tabs = [["directives", "DIRECTIVES"], ["secretary", "HIGH COMMISSAR"], ["party", "PARTY"], ["new", "NEW DIRECTIVE"],
         ["propaganda", "AGITPROP"], ["worlds", "OCCUPIED WORLDS"], ["committees", "COMMITTEES"],
         ["authority", "SOVIET POWER"], ["news", "NEWS"],
-        ["front", "THE FRONT PAGE"]];
+        ["front", "THE FRONT PAGE"], ["guide", "GUIDE"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + esc(T(t[1])) + '</div>').join("");
     $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
@@ -543,9 +544,111 @@ function renderTabs() {
     else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
     else if (tab === "committees") { body.innerHTML = governmentHtml(); wireGovernment(); }
     else if (tab === "front") { body.innerHTML = frontHtml(); wireFront(); }
+    else if (tab === "guide") { body.innerHTML = guideHtml(); wireGuide(); }
     else { body.innerHTML = newsHtml(); }
 
 }
+
+/* ---------------------------------------------------------
+   THE GUIDE (2026-11-17)
+
+   Eight steps, each opening the tab it is about, remembered per
+   browser so a player comes back to where they stopped.
+--------------------------------------------------------- */
+
+const GUIDE_STEPS = [
+    { t: "THE PLENUM", go: "directives",
+      b: "Every commissar in this hall is one vote, and a directive needs a qualified majority of the plenum. Putting one forward never costs credits; carrying it out may." },
+    { t: "A CURRENT, NOT A LONE VOICE", go: "party",
+      b: "Join a current in PARTY: the Proletarian Vanguard, the Party Apparatus, Red Command. The greatest current chairs the committees." },
+    { t: "DIRECTIVES", go: "new",
+      b: "In NEW DIRECTIVE you bring one yourself. The currents bring their own as well, and the plenum sits only while a Combine player is online." },
+    { t: "THE SHOW OF HANDS", go: "directives",
+      b: "While a directive is live the hall moves: the Soviet's confidence and its relations with the other side decide how the commissars lean, and the debate pulls them further." },
+    { t: "THE VOTE", go: "directives",
+      b: "A carried directive is executed at once: a campaign authorised, a quota raised, a fleet ordered or struck from the rolls." },
+    { t: "TWO CHAIRS", go: "secretary",
+      b: "The High Commissar leads the Combine and is elected by its players. The Secretary presides over the plenum and holds the veto. Two offices, two elections." },
+    { t: "COMMITTEES AND MINISTERS", go: "committees",
+      b: "Three committees schedule the directives, and the current in a chair may report one straight to the vote once a term. The High Commissar names the ministers." },
+    { t: "WORLDS TAKEN", go: "worlds",
+      b: "A world the Combine pacifies is administered on OCCUPIED WORLDS, and every world fully pacified sends one more commissar to this hall." }
+];
+
+let guideStep = 0;
+
+function guideRead() {
+    try { return JSON.parse(localStorage.getItem("gf_guide_combine") || "{}"); } catch (e) { return {}; }
+}
+
+function guideWrite(v) {
+    try { localStorage.setItem("gf_guide_combine", JSON.stringify(v)); } catch (e) { /* private mode */ }
+}
+
+function guideHtml() {
+
+    const saved = guideRead();
+
+    if (typeof saved.step === "number") {
+        guideStep = Math.max(0, Math.min(GUIDE_STEPS.length - 1, saved.step));
+    }
+
+    const step = GUIDE_STEPS[guideStep];
+
+    let h = '<div class="card"><h3>' + esc(T("GUIDE")) + ' &middot; ' + (guideStep + 1) + ' / ' + GUIDE_STEPS.length + '</h3>' +
+        '<div class="sub">' + esc(T("Eight steps through the Supreme Soviet. Each one opens the tab it is about; come back here for the next.")) + '</div>' +
+        '<div style="margin:9px 0;display:flex;gap:5px;flex-wrap:wrap">' +
+        GUIDE_STEPS.map((s, i) => '<span class="rchip' + (i === guideStep ? " on" : "") + '">' + (i + 1) + '</span>').join("") +
+        '</div>' +
+        '<h3 style="margin:12px 0 5px">' + esc(T(step.t)) + '</h3>' +
+        '<div class="sub">' + esc(T(step.b)) + '</div>' +
+        '<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">' +
+        (guideStep > 0 ? '<button class="btn small" id="guide-back">' + esc(T("GUIDE BACK")) + '</button>' : "") +
+        '<button class="btn small" id="guide-go">' + esc(T("GUIDE GO THERE")) + '</button>' +
+        '<button class="btn small" id="guide-next">' + esc(T(guideStep < GUIDE_STEPS.length - 1 ? "GUIDE NEXT" : "GUIDE FINISH")) + '</button>' +
+        '</div></div>';
+
+    if (guideStep === GUIDE_STEPS.length - 1) {
+        h += '<div class="card"><h3>' + esc(T("THAT IS THE SOVIET")) + '</h3><div class="sub">' +
+            esc(T("Everything the Combine does is on these tabs, and taking part costs nothing: no credits to propose, no credits to vote. The record of it all is on AGITPROP and NEWS.")) +
+            '</div></div>';
+    }
+
+    return h;
+
+}
+
+function wireGuide() {
+
+    const go = $("guide-go");
+    const next = $("guide-next");
+    const back = $("guide-back");
+
+    if (go) {
+        go.addEventListener("click", function() {
+            tab = GUIDE_STEPS[guideStep].go;
+            renderTabs();
+        });
+    }
+
+    if (next) {
+        next.addEventListener("click", function() {
+            guideStep = Math.min(GUIDE_STEPS.length - 1, guideStep + 1);
+            guideWrite({ step: guideStep, done: guideStep === GUIDE_STEPS.length - 1 });
+            renderTabs();
+        });
+    }
+
+    if (back) {
+        back.addEventListener("click", function() {
+            guideStep = Math.max(0, guideStep - 1);
+            guideWrite({ step: guideStep });
+            renderTabs();
+        });
+    }
+
+}
+
 
 /* ---- the front page: the paper of the whole war ---- */
 function frontHtml() {
@@ -900,7 +1003,7 @@ function miniMapHtml(kind) {
               ' &middot; <span style="color:#ffd37a">&#9711;</span> ' + esc(T("before the Soviet")) +
               ' &middot; <span style="color:#e8c46a">&#9711;</span> ' + esc(T("your target")) + ' &middot; ' +
               esc(T("click a planet to put a campaign against it before the Soviet")) +
-              ' &middot; <span style="color:#ff4a4a">red</span> = ' + esc(T("Combine")) + ', <span style="color:#4a8cff">blue</span> = ' + esc(T("Freedom Authority"))
+              ' &middot; <span style="color:#ff4a4a">red</span> = ' + esc("Combine") + ', <span style="color:#4a8cff">blue</span> = ' + esc("Freedom Authority")
             : '<span style="color:#d6a84b">&#9711;</span> ' + esc(T("occupied")) +
               ' &middot; <span style="color:#4cc2ff">&#9711;</span> ' + esc(T("military administration")) +
               ' &middot; <span style="color:#7a8cff">&#9711;</span> ' + esc(T("collectivised")) +

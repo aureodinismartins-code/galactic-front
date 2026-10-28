@@ -114,6 +114,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; background: #2
 #victory-continue:hover { background: #242424; }
 
 </style>
+<script src="mobile.js?v=1"></script>
 </head>
 
 <body>
@@ -867,6 +868,12 @@ function createUnit(x, y, faction, id, type, soldiers) {
         unit.soldiers = alive;
         unit.members = [0, 1, 2].map(i => i < alive ? KN_MEMBER_HP : 0);
         unit.health = unit.members.reduce((a, b) => a + b, 0);
+
+        /* the bar is this squad's own establishment, not the full three: a
+           squadron that came in with one mech is at full strength when that
+           mech is whole, and its soldiers are not scaled against mechs it
+           never had */
+        unit.maxHealth = Math.max(1, unit.health);
         unit.cannonReady = 0;
         unit.fxKind = "idle";
         unit.fxUntil = 0;
@@ -884,11 +891,22 @@ function damageUnit(target, damage) {
 
     if (target.members) {
 
-        const living = target.members.map((hp, i) => hp > 0 ? i : -1).filter(i => i >= 0);
+        let remaining = dealt;
 
-        if (living.length) {
-            const i = living[Math.floor(Math.random() * living.length)];
-            target.members[i] = Math.max(0, target.members[i] - dealt);
+        /* the hit falls on the mechs in order and whatever it has left after
+           one carries into the next: a shell does not evaporate because the
+           mech it landed on happened to be nearly dead */
+        for (let i = 0; i < target.members.length && remaining > 0.0001; i++) {
+
+            if (target.members[i] <= 0) { continue; }
+
+            const taken = Math.min(target.members[i], remaining);
+
+            target.members[i] -= taken;
+            remaining -= taken;
+
+            if (target.members[i] < 0.0001) { target.members[i] = 0; }
+
         }
 
         target.health = target.members.reduce((a, b) => a + b, 0);
@@ -1474,6 +1492,11 @@ function formatSoldiers(amount) {
 function getCurrentUnitSoldiers(unit) {
     if (unit.members) { return unit.members.filter(hp => hp > 0).length; }
     const ratio = Math.max(0, Math.min(1, unit.health / unit.maxHealth));
+    /* a Knightmare squadron's soldiers are its living mechs. Scaling them by
+       health / maxHealth used to round a lone survivor down to nothing, and a
+       fleet that survived the battle then lost the squadron off its rolls. */
+    if (unit.members) { return unit.members.filter(hp => hp > 0).length; }
+
     return Math.round(unit.soldiers * ratio);
 }
 

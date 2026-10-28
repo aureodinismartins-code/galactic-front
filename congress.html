@@ -79,6 +79,7 @@ label.row { display: block; margin: 10px 0 4px; font-size: 11px; letter-spacing:
 .token b { font-size: 20px; display: block; }
 @media (max-width: 1150px) { #main { grid-template-columns: 1fr; } }
 </style>
+<script src="mobile.js?v=1"></script>
 </head>
 <body>
 
@@ -627,7 +628,7 @@ function renderTabs() {
     const tabs = [["proposals", "PROPOSALS"], ["leader", "THE TWO CHAIRS"], ["party", "PARTY"], ["new", "NEW PROPOSAL"],
         ["propaganda", "PROPAGANDA"], ["occupied", "OCCUPIED WORLDS"], ["committees", "COMMITTEES"],
         ["authority", "AUTHORITY"], ["news", "NEWS"],
-        ["front", "THE FRONT PAGE"]];
+        ["front", "THE FRONT PAGE"], ["guide", "GUIDE"]];
 
     $("tabs").innerHTML = tabs.map(t => '<div class="tab' + (tab === t[0] ? " on" : "") + '" data-t="' + t[0] + '">' + t[1] + '</div>').join("");
     $("tabs").querySelectorAll(".tab").forEach(el => el.addEventListener("click", function() { tab = el.dataset.t; renderTabs(); }));
@@ -643,9 +644,111 @@ function renderTabs() {
     else if (tab === "authority") { body.innerHTML = authorityHtml(); wireAuthority(); }
     else if (tab === "committees") { body.innerHTML = governmentHtml(); wireGovernment(); }
     else if (tab === "front") { body.innerHTML = frontHtml(); wireFront(); }
+    else if (tab === "guide") { body.innerHTML = guideHtml(); wireGuide(); }
     else { body.innerHTML = ov.log.map(l => '<div class="log"><time>' + new Date(l.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + '</time>' + esc(l.text) + '</div>').join("") || '<div class="sub">Nothing has happened yet.</div>'; }
 
 }
+
+/* ---------------------------------------------------------
+   THE GUIDE (2026-11-17)
+
+   Eight steps, each opening the tab it is about, remembered per
+   browser so a player comes back to where they stopped.
+--------------------------------------------------------- */
+
+const GUIDE_STEPS = [
+    { t: "THE CHAMBER", go: "proposals",
+      b: "Every delegate seated in this dome is one vote. A bill needs a majority, and a few kinds need a supermajority. Bringing a bill never costs credits; what the bill does may." },
+    { t: "A PARTY, NOT A LONE VOICE", go: "party",
+      b: "Join a party in PARTY. Delegates lean with their party, the party with the most seats chairs the committees, and only a party's members may report its committee's bills." },
+    { t: "PROPOSING", go: "new",
+      b: "In NEW PROPOSAL you bring a bill yourself, of any kind the chamber allows. If you hold no seat the factions still bring their own every few minutes." },
+    { t: "THE DOME", go: "proposals",
+      b: "While a bill is live the dome moves: delegates are swayed by the debate, the standing of the parties and the Authority's popularity. Green seats are yes, red are no." },
+    { t: "THE VOTE", go: "proposals",
+      b: "At the vote a bill passes or fails, and a bill that passes is carried out at once: a war declared, a fleet authorised, credits moved." },
+    { t: "TWO CHAIRS, NOT ONE", go: "leader",
+      b: "The President leads the Freedom Authority and is elected by its players. The Speaker leads this chamber and holds the veto. Two people, two elections." },
+    { t: "COMMITTEES AND MINISTERS", go: "committees",
+      b: "Three committees schedule the bills. The party in a chair may send one of its own bills straight to the vote, once a term. The President names three ministers, each of whom may act once a term." },
+    { t: "WORLDS YOU HOLD", go: "occupied",
+      b: "A conquered world is administered on OCCUPIED WORLDS: relief raises its stability, unrest rises while no fleet of ours is in its orbit, and at a hundred it throws the occupation off." }
+];
+
+let guideStep = 0;
+
+function guideRead() {
+    try { return JSON.parse(localStorage.getItem("gf_guide_congress") || "{}"); } catch (e) { return {}; }
+}
+
+function guideWrite(v) {
+    try { localStorage.setItem("gf_guide_congress", JSON.stringify(v)); } catch (e) { /* private mode */ }
+}
+
+function guideHtml() {
+
+    const saved = guideRead();
+
+    if (typeof saved.step === "number") {
+        guideStep = Math.max(0, Math.min(GUIDE_STEPS.length - 1, saved.step));
+    }
+
+    const step = GUIDE_STEPS[guideStep];
+
+    let h = '<div class="card"><h3>' + T("GUIDE") + ' &middot; ' + (guideStep + 1) + ' / ' + GUIDE_STEPS.length + '</h3>' +
+        '<div class="sub">' + T("Eight steps through the Congress. Each one opens the tab it is about; come back here for the next.") + '</div>' +
+        '<div style="margin:9px 0;display:flex;gap:5px;flex-wrap:wrap">' +
+        GUIDE_STEPS.map((s, i) => '<span class="rchip' + (i === guideStep ? " on" : "") + '">' + (i + 1) + '</span>').join("") +
+        '</div>' +
+        '<h3 style="margin:12px 0 5px">' + T(step.t) + '</h3>' +
+        '<div class="sub">' + esc(T(step.b)) + '</div>' +
+        '<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">' +
+        (guideStep > 0 ? '<button class="btn small" id="guide-back">' + T("GUIDE BACK") + '</button>' : "") +
+        '<button class="btn small" id="guide-go">' + T("GUIDE GO THERE") + '</button>' +
+        '<button class="btn small" id="guide-next">' + T(guideStep < GUIDE_STEPS.length - 1 ? "GUIDE NEXT" : "GUIDE FINISH") + '</button>' +
+        '</div></div>';
+
+    if (guideStep === GUIDE_STEPS.length - 1) {
+        h += '<div class="card"><h3>' + T("THAT IS THE CONGRESS") + '</h3><div class="sub">' +
+            T("Everything the chamber does is on these tabs, and taking part costs nothing: no credits to propose, no credits to vote. The record of it all is on NEWS.") +
+            '</div></div>';
+    }
+
+    return h;
+
+}
+
+function wireGuide() {
+
+    const go = $("guide-go");
+    const next = $("guide-next");
+    const back = $("guide-back");
+
+    if (go) {
+        go.addEventListener("click", function() {
+            tab = GUIDE_STEPS[guideStep].go;
+            renderTabs();
+        });
+    }
+
+    if (next) {
+        next.addEventListener("click", function() {
+            guideStep = Math.min(GUIDE_STEPS.length - 1, guideStep + 1);
+            guideWrite({ step: guideStep, done: guideStep === GUIDE_STEPS.length - 1 });
+            renderTabs();
+        });
+    }
+
+    if (back) {
+        back.addEventListener("click", function() {
+            guideStep = Math.max(0, guideStep - 1);
+            guideWrite({ step: guideStep });
+            renderTabs();
+        });
+    }
+
+}
+
 
 /* ---- the front page: the paper of the whole war ---- */
 function frontHtml() {
