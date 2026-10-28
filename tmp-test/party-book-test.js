@@ -198,6 +198,10 @@ function slice(src, from, to) {
 
     await db.exec(book);
 
+    /* and the seating that gives every ministry its own hand */
+    await db.exec(fs.readFileSync(path.join(ROOT, "sql",
+        "2026-11-23_one_delegate_one_ministry.sql"), "utf8"));
+
     const cols = (await call(db, "select column_name from information_schema.columns " +
         "where table_schema = 'public' and table_name = 'cg_factions' and column_name = 'loyalty'"))[0];
     check("the party book has a loyalty now", !!cols, JSON.stringify(cols));
@@ -213,7 +217,8 @@ function slice(src, from, to) {
         JSON.stringify((gov.ministers || []).map(m => m.party_loyalty)));
     check("the ministries are seated", (gov.ministers || []).every(m => !!m.holder),
         JSON.stringify((gov.ministers || []).map(m => m.holder)));
-    check("by the governing party's most loyal delegate", (gov.ministers || []).every(m => m.holder === "Beto"),
+    check("one delegate per ministry, the governing party's most loyal first",
+        new Set((gov.ministers || []).map(m => m.holder)).size === 3,
         JSON.stringify((gov.ministers || []).map(m => m.holder)));
     check("and the chamber is listed for the President to pick from", (gov.delegates || []).length === 4,
         JSON.stringify((gov.delegates || []).map(d => d.name)));

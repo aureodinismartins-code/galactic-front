@@ -196,6 +196,8 @@ function slice(src, from, to) {
 
     await db.exec(fs.readFileSync(path.join(ROOT, "sql", "2026-11-21_capitals_are_never_occupied_and_the_commander_picks.sql"), "utf8"));
 
+    await db.exec(fs.readFileSync(path.join(ROOT, "sql", "2026-11-23_one_delegate_one_ministry.sql"), "utf8"));
+
     console.log("\nthe chamber seats its own ministries");
 
     /* the Militarists hold four seats, the Reformers two: the governing party
@@ -225,9 +227,13 @@ function slice(src, from, to) {
     check("the governing party hands them out", (gov.ministers || []).every(m => Number(m.party) === 1),
         JSON.stringify((gov.ministers || []).map(m => m.party)));
 
-    check("and the most loyal delegate of it holds each one",
-        (gov.ministers || []).every(m => m.holder === "Beto"),
-        JSON.stringify((gov.ministers || []).map(m => [m.holder, m.loyalty])));
+    check("and no delegate holds two: one hand per ministry",
+        new Set((gov.ministers || []).map(m => m.holder)).size === 3,
+        JSON.stringify((gov.ministers || []).map(m => [m.post, m.holder, m.loyalty])));
+
+    check("filled by the party's most loyal first, then the next",
+        (gov.ministers || []).map(m => m.holder).sort().join(",") === "Ana,Beto,Célia",
+        JSON.stringify((gov.ministers || []).map(m => m.holder)));
 
     check("the party is named and coloured on the card",
         (gov.ministers || []).every(m => m.party_name === "The Militarists" && !!m.party_color));
@@ -248,12 +254,10 @@ function slice(src, from, to) {
     const levy = (gov.ministers || []).find(m => m.post === "treasury").effect;
     const credits1 = Number((await call(db, "select credits from public.faction_treasury where faction = 'Freedom Authority'"))[0].credits);
 
-    /* Beto's loyalty is 90 and his party governs, so the factor is
-       (0.5 + 0.90) * 1.10 = 1.54 and the levy is 462 to 770 */
-    check("a loyal holder of the governing party levies half as much again",
-        Number(levy.credits) >= 462 && Number(levy.credits) <= 770, JSON.stringify(levy));
-    check("and never the full base range, because the factor scales it",
-        Number(levy.credits) > 500, JSON.stringify(levy));
+    /* the treasury is Ana's now: loyalty 72, governing party, so the factor is
+       (0.5 + 0.72) * 1.10 = 1.342 and the levy is 403 to 671 */
+    check("the levy is scaled by its holder's loyalty and his party's standing",
+        Number(levy.credits) >= 403 && Number(levy.credits) <= 671, JSON.stringify(levy));
     check("and the treasury actually received it", credits1 === credits0 + Number(levy.credits),
         credits0 + " -> " + credits1);
 
@@ -374,13 +378,18 @@ function slice(src, from, to) {
     catch (e) { refused = String(e.message); }
     check("and only the commander of that chamber may", /Only the High Commissar/.test(refused), refused);
 
+    let twoPosts = "";
+    try { await db.query("select public.cg_assign_ministry('interior', " + eva + ")"); }
+    catch (e) { twoPosts = String(e.message); }
+    check("and no delegate may be given two ministries", /no delegate holds two/.test(twoPosts), twoPosts);
+
     const auto = (await call(db, "select public.cg_assign_ministry('treasury', null) as r"))[0].r;
     check("clearing the name gives the post back to the chamber",
         auto.auto === true && auto.holder === null, JSON.stringify(auto));
 
     const reseated = (await call(db, "select public.cg_government() as g"))[0].g;
-    check("and the chamber seats its most loyal again",
-        reseated.ministers.find(m => m.post === "treasury").holder === "Beto",
+    check("and the chamber gives it to the next most loyal who holds nothing",
+        reseated.ministers.find(m => m.post === "treasury").holder === "Ana",
         reseated.ministers.find(m => m.post === "treasury").holder);
 
     console.log("\nthe Combine's three, which are not the Congress's three");
@@ -410,10 +419,16 @@ function slice(src, from, to) {
         JSON.stringify((cgov.ministers || []).map(m => m.post)));
     check("held by commissars, not by players",
         (cgov.ministers || []).every(m => !!m.holder && m.mine === false));
-    check("the biggest current hands them out", (cgov.ministers || []).every(m => Number(m.party) === 1),
-        JSON.stringify((cgov.ministers || []).map(m => m.party)));
-    check("its most loyal commissar holds each one", (cgov.ministers || []).every(m => m.holder === "Orlov"),
-        JSON.stringify((cgov.ministers || []).map(m => [m.holder, m.loyalty])));
+    check("the biggest current still takes the first posts it can fill",
+        Number((cgov.ministers || []).find(m => m.post === "security").party) === 1 &&
+        Number((cgov.ministers || []).find(m => m.post === "grain").party) === 1,
+        JSON.stringify((cgov.ministers || []).map(m => [m.post, m.party])));
+    check("and no commissar holds two, so the third post reaches the wider plenum",
+        new Set((cgov.ministers || []).map(m => m.holder)).size === 3,
+        JSON.stringify((cgov.ministers || []).map(m => [m.post, m.holder, m.loyalty])));
+    check("the current with the most seats still takes the first two posts",
+        (cgov.ministers || []).filter(m => Number(m.party) === 1).length === 2,
+        JSON.stringify((cgov.ministers || []).map(m => [m.post, m.party])));
     check("the old Congress posts are gone from the Soviet's book",
         !(cgov.ministers || []).some(m => ["war", "treasury", "interior"].includes(m.post)));
 
