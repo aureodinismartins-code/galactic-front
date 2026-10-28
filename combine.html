@@ -1263,6 +1263,10 @@ function governmentHtml() {
     h += '</div><div class="card"><h3>' + esc(T("THE MINISTRIES")) + '</h3><div class="sub">' +
         esc(T("The commissariats are the plenum's, and no commissar holds two: the current with the most seats fills them with its most loyal commissars, and the High Commissar may name each holder himself. Each holder acts on his own once a term, harder when he is loyal and his current is in favour and less when it is not. A current below 25 loyalty is not served at all.")) + '</div>';
 
+    /* the High Commissar names them; with the office empty the Combine's own
+       players do, which is what makes the picker live rather than a dead row */
+    const mayPick = gov.is_secretary === true || !gov.secretary;
+
     (gov.ministers || []).forEach(function(m) {
 
         h += '<div style="border-left:4px solid ' + esc(m.party_color || "#7fdcff") + ';background:rgba(255,255,255,.04);margin:8px 0;padding:8px 10px;">' +
@@ -1273,19 +1277,20 @@ function governmentHtml() {
                 : esc(T("No minister"))) + '</div>' +
             '<div class="sub" style="margin-top:4px">' + esc(ministryEffectLine(m)) + '</div>';
 
-        /* the High Commissar picks which commissar holds it; the plenum's own
-           choice is the first entry, so a post left alone stays automatic */
-        if (gov.is_secretary) {
-            h += '<div style="margin-top:6px">' +
-                '<select class="pick" data-post="' + esc(m.post) + '">' +
-                '<option value="">' + esc(T("— THE CHAMBER'S CHOICE —")) + '</option>' +
-                (gov.delegates || []).map(function(d) {
-                    return '<option value="' + esc(d.id) + '"' +
-                        (Number(m.member) === Number(d.id) ? " selected" : "") + '>' +
-                        esc(d.name) + ' &middot; ' + esc(d.party_name || "?") + ' &middot; ' +
-                        Math.round(Number(d.loyalty || 0)) + '</option>';
-                }).join("") + '</select></div>';
-        }
+        /* who holds it. The plenum's own choice is the first entry, so a post
+           left alone stays automatic; the High Commissar may overrule it. */
+        h += '<div style="margin-top:6px">' +
+            '<select class="pick" data-post="' + esc(m.post) + '"' + (mayPick ? "" : " disabled") + '>' +
+            '<option value="">' + esc(T("— THE CHAMBER'S CHOICE —")) + '</option>' +
+            (gov.delegates || []).map(function(d) {
+                return '<option value="' + esc(d.id) + '"' +
+                    (Number(m.member) === Number(d.id) ? " selected" : "") + '>' +
+                    esc(d.name) + ' &middot; ' + esc(d.party_name || "?") + ' &middot; ' +
+                    Math.round(Number(d.loyalty || 0)) + '</option>';
+            }).join("") + '</select>' +
+            (mayPick ? "" : '<div class="sub" style="margin-top:4px">' +
+                esc(T("The High Commissar of the Combine names the commissars. While the office is empty, any Combine player may.")) + '</div>') +
+            '</div>';
 
         h += '</div>';
     });

@@ -1435,6 +1435,10 @@ function governmentHtml() {
     h += '</div><div class="card"><h3>' + T("THE MINISTRIES") + '</h3><div class="sub">' +
         T("The ministries are the chamber's, and no delegate holds two: the party with the most seats fills them with its most loyal delegates, and the President may name each holder himself. Each holder acts on his own once a term, more boldly when he is loyal and his party is in favour and less when it is not. A party below 25 loyalty is not served at all.") + '</div>';
 
+    /* the President names them; with the office empty the Authority's own
+       players do, which is what makes the picker live rather than a dead row */
+    const mayPick = gov.is_president === true || !gov.president;
+
     (gov.ministers || []).forEach(function(m) {
 
         h += '<div style="border-left:4px solid ' + esc(m.party_color || "#7fdcff") + ';background:rgba(255,255,255,.04);margin:8px 0;padding:8px 10px;">' +
@@ -1445,19 +1449,20 @@ function governmentHtml() {
                 : T("No minister")) + '</div>' +
             '<div class="sub" style="margin-top:4px">' + ministryEffectLine(m) + '</div>';
 
-        /* the President picks which delegate holds it; the chamber's own
-           choice is the first entry, so a post left alone stays automatic */
-        if (gov.is_president) {
-            h += '<div style="margin-top:6px">' +
-                '<select class="pick" data-post="' + esc(m.post) + '">' +
-                '<option value="">' + T("— THE CHAMBER'S CHOICE —") + '</option>' +
-                (gov.delegates || []).map(function(d) {
-                    return '<option value="' + esc(d.id) + '"' +
-                        (Number(m.member) === Number(d.id) ? " selected" : "") + '>' +
-                        esc(d.name) + ' &middot; ' + esc(d.party_name || "?") + ' &middot; ' +
-                        Math.round(Number(d.loyalty || 0)) + '</option>';
-                }).join("") + '</select></div>';
-        }
+        /* who holds it. The chamber's own choice is the first entry, so a post
+           left alone stays automatic; the leader may overrule it. */
+        h += '<div style="margin-top:6px">' +
+            '<select class="pick" data-post="' + esc(m.post) + '"' + (mayPick ? "" : " disabled") + '>' +
+            '<option value="">' + T("— THE CHAMBER'S CHOICE —") + '</option>' +
+            (gov.delegates || []).map(function(d) {
+                return '<option value="' + esc(d.id) + '"' +
+                    (Number(m.member) === Number(d.id) ? " selected" : "") + '>' +
+                    esc(d.name) + ' &middot; ' + esc(d.party_name || "?") + ' &middot; ' +
+                    Math.round(Number(d.loyalty || 0)) + '</option>';
+            }).join("") + '</select>' +
+            (mayPick ? "" : '<div class="sub" style="margin-top:4px">' +
+                T("The President of the Freedom Authority names the ministers. While the office is empty, any Freedom Authority player may.") + '</div>') +
+            '</div>';
 
         h += '</div>';
     });

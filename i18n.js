@@ -1159,6 +1159,10 @@
         "SEND RELIEF": "ENVIAR ALÍVIO",
         "Only the ministry's holder may act.": "Só o titular do ministério pode agir.",
         "STATE SECURITY": "SEGURANÇA DO ESTADO",
+        "The President of the Freedom Authority names the ministers. While the office is empty, any Freedom Authority player may.":
+            "O Presidente da Freedom Authority nomeia os ministros. Enquanto o cargo estiver vago, qualquer jogador da Freedom Authority pode fazê-lo.",
+        "The High Commissar of the Combine names the commissars. While the office is empty, any Combine player may.":
+            "O Alto Comissário do Combine nomeia os comissários. Enquanto o cargo estiver vago, qualquer jogador do Combine pode fazê-lo.",
         "The ministries are the chamber's, and no delegate holds two: the party with the most seats fills them with its most loyal delegates, and the President may name each holder himself. Each holder acts on his own once a term, more boldly when he is loyal and his party is in favour and less when it is not. A party below 25 loyalty is not served at all.":
             "Os ministérios são da câmara, e nenhum delegado fica com dois: o partido com mais cadeiras preenche-os com os seus delegados mais leais, e o Presidente pode nomear cada titular. Cada titular age por sua conta uma vez por mandato — com mais força quando é leal e o seu partido está em favor, com menos quando não está. Um partido abaixo de 25 de lealdade não é servido de todo.",
         "The commissariats are the plenum's, and no commissar holds two: the current with the most seats fills them with its most loyal commissars, and the High Commissar may name each holder himself. Each holder acts on his own once a term, harder when he is loyal and his current is in favour and less when it is not. A current below 25 loyalty is not served at all.":

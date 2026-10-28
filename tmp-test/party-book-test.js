@@ -202,6 +202,9 @@ function slice(src, from, to) {
     await db.exec(fs.readFileSync(path.join(ROOT, "sql",
         "2026-11-23_one_delegate_one_ministry.sql"), "utf8"));
 
+    await db.exec(fs.readFileSync(path.join(ROOT, "sql",
+        "2026-11-24_the_leader_names_the_ministers.sql"), "utf8"));
+
     const cols = (await call(db, "select column_name from information_schema.columns " +
         "where table_schema = 'public' and table_name = 'cg_factions' and column_name = 'loyalty'"))[0];
     check("the party book has a loyalty now", !!cols, JSON.stringify(cols));

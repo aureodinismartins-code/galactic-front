@@ -198,6 +198,9 @@ function slice(src, from, to) {
 
     await db.exec(fs.readFileSync(path.join(ROOT, "sql", "2026-11-23_one_delegate_one_ministry.sql"), "utf8"));
 
+    /* and the leader's choice, which also survives an empty office */
+    await db.exec(fs.readFileSync(path.join(ROOT, "sql", "2026-11-24_the_leader_names_the_ministers.sql"), "utf8"));
+
     console.log("\nthe chamber seats its own ministries");
 
     /* the Militarists hold four seats, the Reformers two: the governing party
@@ -376,7 +379,8 @@ function slice(src, from, to) {
     let refused = "";
     try { await db.query("select public.cs_assign_ministry('grain', 1)"); }
     catch (e) { refused = String(e.message); }
-    check("and only the commander of that chamber may", /Only the High Commissar/.test(refused), refused);
+    check("and only a Combine player may, the chancellery being empty",
+        /Only the High Commissar|Only the Combine's own players/.test(refused), refused);
 
     let twoPosts = "";
     try { await db.query("select public.cg_assign_ministry('interior', " + eva + ")"); }
@@ -443,6 +447,23 @@ function slice(src, from, to) {
 
     const labour = (cgov.ministers || []).find(m => m.post === "labour").effect;
     check("labour sent relief where it was needed", labour.planet === "Vraks", JSON.stringify(labour));
+
+    console.log("\nan empty office is not a dead end");
+
+    /* the Combine's own chancellery stands empty: only its own may fill it */
+    await db.exec("update public.cs_state set secretary_player = null where id = 1");
+    let foreign = "";
+    try { await db.query("select public.cs_assign_ministry('security', 1)"); }
+    catch (e) { foreign = String(e.message); }
+    check("a Freedom Authority player cannot fill the Combine's posts",
+        /Only the Combine's own players/.test(foreign), foreign);
+
+    /* and the other way round: no President, so the Authority's players choose */
+    await db.exec("update public.cg_state set president_player = null where id = 1");
+    const eva2 = Number((await call(db, "select id from public.cg_members where name = 'Eva'"))[0].id);
+    const unblocked = (await call(db, "select public.cg_assign_ministry('treasury', " + eva2 + ") as r"))[0].r;
+    check("with the presidency empty a Freedom Authority player may choose",
+        unblocked && unblocked.holder === "Eva", JSON.stringify(unblocked));
 
     console.log("\nand the Combine envies too");
 
