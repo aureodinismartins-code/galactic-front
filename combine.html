@@ -1206,6 +1206,27 @@ const COMMITTEE_LABEL = { fleets: "COMMITTEE OF FLEETS", treasury: "COMMITTEE OF
    the interior */
 const POST_LABEL = { security: "STATE SECURITY", grain: "GRAIN", labour: "LABOUR" };
 
+/* which file puts right what the screen just failed on, the same rule the
+   Congress uses: name the column, name the file that adds it */
+function missingPatchAdvice(message) {
+
+    const m = String(message || "");
+
+    if (/loyalty does not exist/i.test(m)) {
+        return T("The party book is missing a column. Run sql/2026-11-22_the_party_book_has_a_loyalty.sql, then reload this page.");
+    }
+
+    if (/seats does not exist/i.test(m)) {
+        return T("This database still has an earlier version of the committee functions. Run sql/2026-11-15_committees_and_ministers.sql again: it replaces them.");
+    }
+
+    if (/does not exist/i.test(m)) {
+        return T("A table or column this screen needs is missing. Run sql/2026-11-15_committees_and_ministers.sql, then sql/2026-11-20_the_ministries_belong_to_the_chamber.sql, then sql/2026-11-22_the_party_book_has_a_loyalty.sql.");
+    }
+
+    return T("Run sql/2026-11-15_committees_and_ministers.sql, then reload this page.");
+}
+
 function governmentHtml() {
 
     if (!gov) {
@@ -1213,12 +1234,8 @@ function governmentHtml() {
         /* the one failure that means the patch is only half applied: the book
            still has the earlier committee functions, and running the file
            again replaces them */
-        const stale = !!govError && /seats|does not exist/i.test(govError);
-
         return '<div class="card"><h3>' + esc(T("COMMITTEES AND MINISTERS")) + '</h3><div class="sub">' +
-            esc(stale
-                ? T("This database still has an earlier version of the committee functions. Run sql/2026-11-15_committees_and_ministers.sql again: it replaces them.")
-                : T("Run sql/2026-11-15_committees_and_ministers.sql, then reload this page.")) +
+            esc(missingPatchAdvice(govError)) +
             (govError ? '<br><br><b style="color:#ff8a8a">' + esc(govError) + '</b>' : '') + '</div></div>';
 
     }

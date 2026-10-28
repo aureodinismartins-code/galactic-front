@@ -1159,6 +1159,10 @@
         "SEND RELIEF": "ENVIAR ALÍVIO",
         "Only the ministry's holder may act.": "Só o titular do ministério pode agir.",
         "STATE SECURITY": "SEGURANÇA DO ESTADO",
+        "The party book is missing a column. Run sql/2026-11-22_the_party_book_has_a_loyalty.sql, then reload this page.":
+            "O livro dos partidos não tem uma coluna. Rode sql/2026-11-22_the_party_book_has_a_loyalty.sql e recarregue esta página.",
+        "A table or column this screen needs is missing. Run sql/2026-11-15_committees_and_ministers.sql, then sql/2026-11-20_the_ministries_belong_to_the_chamber.sql, then sql/2026-11-22_the_party_book_has_a_loyalty.sql.":
+            "Falta uma tabela ou coluna que este ecrã precisa. Rode sql/2026-11-15_committees_and_ministers.sql, depois sql/2026-11-20_the_ministries_belong_to_the_chamber.sql e depois sql/2026-11-22_the_party_book_has_a_loyalty.sql.",
         "GRAIN": "GRÃO",
         "LABOUR": "TRABALHO",
         "loyalty": "lealdade",
