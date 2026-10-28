@@ -313,8 +313,14 @@ const deadline = setTimeout(function() { console.log("TIMEOUT: the page test did
     check("and a majority, not three fifths", war.indexOf("51 de 100 (maioria simples)") !== -1, war.slice(-400));
 
     const worlds = await open("worlds");
-    check("the occupied worlds tab", worlds.indexOf("MUNDOS TOMADOS") !== -1 && worlds.indexOf("MUNDOS INTEIROS") !== -1 &&
-        worlds.indexOf("CIDADES EM MÃOS") !== -1, worlds.slice(0, 260));
+    /* the tab is laid out like the Authority's occupied tab: the map, then one
+       card per world. No stat tiles and no wall of explanation above them. */
+    check("the occupied worlds tab opens on the map, as the Authority's does",
+        !!doc.querySelector("#tabbody svg.minimap") &&
+        doc.querySelectorAll("#tabbody .tokens").length === 0 &&
+        !!doc.querySelector("#tabbody").firstElementChild &&
+        doc.querySelector("#tabbody").firstElementChild.classList.contains("card"),
+        worlds.slice(0, 260));
     check("a world held whole shows its administration", worlds.indexOf("Krieg ADMINISTRAÇÃO MILITAR") !== -1 &&
         worlds.indexOf("2 de 2 cidades em mãos") !== -1, worlds.slice(0, 420));
     check("the four stages are drawn with the current one marked",
@@ -326,8 +332,8 @@ const deadline = setTimeout(function() { console.log("TIMEOUT: the page test did
     check("and relief sent straight to it, with no directive",
         worlds.indexOf("CONCEDER AJUDA (+10 estabilidade)") !== -1 &&
         doc.querySelector('#tabbody .relief-btn[data-p="Krieg"]') !== null, worlds.slice(-300));
-    check("the page explains that relief needs no vote here",
-        worlds.indexOf("sem diretiva, sem votação") !== -1, worlds.slice(0, 900));
+    check("and nothing is explained above the cards",
+        doc.querySelectorAll("#tabbody > .sub").length === 0, worlds.slice(0, 900));
     check("a contested world names the other holder and offers a campaign",
         worlds.indexOf("Liberty City DISPUTADO") !== -1 && worlds.indexOf("também em mãos de Freedom Authority") !== -1 &&
         worlds.indexOf("LEVAR UMA CAMPANHA AO SOVIETE") !== -1, worlds.slice(0, 700));
@@ -451,7 +457,7 @@ const deadline = setTimeout(function() { console.log("TIMEOUT: the page test did
     await new Promise(r => setTimeout(r, 80));
     const worldsEn = strip(e.document.getElementById("tabbody").textContent);
     check("the worlds are English too",
-        worldsEn.indexOf("WORLDS HELD") !== -1 && worldsEn.indexOf("MILITARY ADMIN") !== -1 &&
+        worldsEn.indexOf("MILITARY ADMIN") !== -1 &&
         worldsEn.indexOf("STABILITY 40 / needed 40") !== -1 && worldsEn.indexOf("PUT A CAMPAIGN BEFORE THE SOVIET") !== -1 &&
         worldsEn.indexOf("GRANT RELIEF (+10 stability)") !== -1, worldsEn.slice(0, 500));
 

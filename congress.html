@@ -1090,11 +1090,23 @@ function wireParty() {
 /* ---- mini map of the galaxy (planet positions are % of the galaxy map) ---- */
 const OWNER_COLORS = { "Freedom Authority": "#4a8cff", "Combine": "#ff4a4a", "Independents": "#e6e6e6" };
 
+/* a capital is cored by its faction and never enters an occupation book; the
+   list is here too, so a leftover row cannot show up on this tab */
+const CAPITAL_WORLDS = ["Ultramars", "Free Earth"];
+
+function isCapitalWorld(name) {
+    const n = String(name == null ? "" : name).trim().toLowerCase();
+    return CAPITAL_WORLDS.some(c => c.toLowerCase() === n);
+}
+
 function miniMapHtml(kind) {
 
     const W = 480, H = 270;
     const occ = {};
-    for (const o of ov.occupations) { occ[o.planet] = o; }
+    for (const o of (ov.occupations || [])) {
+        if (isCapitalWorld(o.planet)) { continue; }
+        occ[o.planet] = o;
+    }
     const declared = new Set(ov.authorizations.war);
     const targets = new Set(ov.targets.map(t => t.planet));
     const stageCols = ["#d6a84b", "#4cc2ff", "#7a8cff", "#5bff9a"];
@@ -1489,13 +1501,15 @@ function policyLine(planet) {
 
 function occupiedHtml() {
 
-    if (!ov.occupations.length) {
+    const occupied = (ov.occupations || []).filter(o => !isCapitalWorld(o.planet));
+
+    if (!occupied.length) {
         return '<div class="sub">The Authority holds no occupied worlds. When Freedom Authority fleets conquer every city of a planet, it is placed under occupation and moves through four stages: <b>occupied</b>, <b>civilian administration</b>, <b>protected</b> and finally <b>integrated</b>. Each stage takes time and enough stability (relief proposals raise it), and each earns the planet delegates in Congress.</div>';
     }
 
     const names = ["OCCUPIED", "CIVILIAN ADMIN", "PROTECTED", "INTEGRATED"];
 
-    return '<div class="card">' + miniMapHtml("occupied") + '</div>' + ov.occupations.map(function(o) {
+    return '<div class="card">' + miniMapHtml("occupied") + '</div>' + occupied.map(function(o) {
 
         return '<div class="card"><h3>' + esc(o.planet) + '</h3><div class="sub">' + esc(o.stage_name) + ' &middot; ' + o.seats + ' ' + T("of") + ' ' + o.seats_target + ' ' + T("delegates seated") + '</div>' +
             '<div class="steps">' + names.map((n, i) => '<div class="' + (i < o.stage ? "done" : i === o.stage ? "cur" : "") + '">' + T(n) + '</div>').join("") + '</div>' +
