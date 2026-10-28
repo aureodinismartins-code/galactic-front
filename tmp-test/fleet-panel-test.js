@@ -106,6 +106,29 @@ check("the sentence for a neutral or hostile world is translated",
     /neutral or hostile/.test(galaxy) &&
     fs.readFileSync(path.join(ROOT, "i18n.js"), "utf8").indexOf("Não podes reparar aqui") !== -1);
 
+/* ---------------------------------------------------------
+   recruiting is a dock job too: no raising troops over a hostile world
+--------------------------------------------------------- */
+
+check("the recruiting office carries a hint line",
+    galaxy.indexOf('id="fleet-recruit-hint"') !== -1 &&
+    galaxy.indexOf('id="fleet-recruit-hint"') > galaxy.indexOf('id="fleet-recruitment-title"'));
+
+const recruitHandler = galaxy.slice(galaxy.indexOf("recruitButtons.forEach(", galaxy.indexOf("RECRUIT UNITS")));
+
+check("the recruit click asks whether the world is ours before it recruits",
+    recruitHandler.indexOf("recruitHere(") !== -1 &&
+    (recruitHandler.indexOf('rpc(') === -1 ||
+     recruitHandler.indexOf("recruitHere(") < recruitHandler.indexOf("recruit_to_fleet")),
+    "recruitHere at " + recruitHandler.indexOf("recruitHere(") + ", rpc at " + recruitHandler.indexOf("recruit_to_fleet"));
+
+check("the office says why, under its title",
+    /showRecruitHint\(selectedFleet\);/.test(galaxy) && /function showRecruitHint/.test(galaxy));
+
+check("the sentence for recruiting over a neutral or hostile world is translated",
+    /You cannot recruit here/.test(galaxy) &&
+    fs.readFileSync(path.join(ROOT, "i18n.js"), "utf8").indexOf("Não podes recrutar aqui") !== -1);
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 
 if (failed) { process.exit(1); }

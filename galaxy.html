@@ -22,7 +22,7 @@
     ></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=32"></script>
+    <script src="i18n.js?v=33"></script>
         <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
@@ -1038,6 +1038,8 @@
             <div id="fleet-recruitment-title">
                 FLEET RECRUITMENT
             </div>
+
+            <div class="fleet-panel-row" id="fleet-recruit-hint"></div>
 
 
             <div id="fleet-composition">
@@ -2717,6 +2719,10 @@ async function updateRecruitmentPanel() {
           credits;
 
 
+    /* the line under the title, before anybody presses anything */
+    showRecruitHint(selectedFleet);
+
+
     recruitButtons.forEach(
         function(button) {
 
@@ -2878,6 +2884,52 @@ function planetOwner(p_name) {
         });
 
     return el ? String(el.dataset.owner || "").trim() : "";
+
+}
+
+
+/* the same question the dock asks: is this fleet over a world of ours? */
+function recruitHere(fleet) {
+
+    const orbit = fleetOrbitName(fleet);
+
+    if (!orbit) { return false; }
+
+    return planetOwner(orbit) === playerFaction;
+
+}
+
+
+/* and the sentence under the recruiting office when the answer is no */
+function showRecruitHint(fleet) {
+
+    const hint = document.getElementById("fleet-recruit-hint");
+
+    if (!hint) { return; }
+
+    if (!fleet || fleet.player_id !== playerID) {
+        hint.textContent = "";
+        hint.style.display = "none";
+        return;
+    }
+
+    const orbit = fleetOrbitName(fleet);
+    const ours = !!orbit && planetOwner(orbit) === playerFaction;
+
+    if (orbit && !ours) {
+        hint.textContent = T("You cannot recruit here: this world is neutral or hostile. Recruits are raised on a world your faction holds.");
+        hint.style.display = "";
+        return;
+    }
+
+    if (!orbit) {
+        hint.textContent = T("Recruits are raised on a world your faction holds: this fleet is not in orbit of one.");
+        hint.style.display = "";
+        return;
+    }
+
+    hint.textContent = "";
+    hint.style.display = "none";
 
 }
 
@@ -3356,6 +3408,18 @@ recruitButtons.forEach(
 
                     fleetMessage.textContent =
                         "Fleet must be stationed.";
+
+                    return;
+
+                }
+
+
+                /* recruiting is a dock job as well: it only happens over a
+                   world the faction holds, so the buttons stay pressable and
+                   this says why instead of going grey with no reason */
+                if (!recruitHere(selectedFleet)) {
+
+                    showRecruitHint(selectedFleet);
 
                     return;
 

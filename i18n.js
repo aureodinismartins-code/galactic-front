@@ -1217,6 +1217,10 @@
 
         /* ---------- the dock, when it cannot work (2026-11-18) ---------- */
         "You cannot repair here: this world is neutral or hostile. A dock needs a world your faction holds.": "Não podes reparar aqui: este mundo é neutro ou hostil. Uma doca precisa de um mundo que a tua facção controle.",
+
+        /* ---------- the recruiting office, when it cannot work (2026-11-18) ---------- */
+        "You cannot recruit here: this world is neutral or hostile. Recruits are raised on a world your faction holds.": "Não podes recrutar aqui: este mundo é neutro ou hostil. Os recrutas são formados num mundo que a tua facção controle.",
+        "Recruits are raised on a world your faction holds: this fleet is not in orbit of one.": "Os recrutas são formados num mundo que a tua facção controle: esta frota não está em órbita de nenhum.",
         "A dock needs a world your faction holds: this fleet is not in orbit of one.": "Uma doca precisa de um mundo que a tua facção controle: esta frota não está em órbita de nenhum.",
 
         /* ---------- the two chairs (2026-11-06). The chamber's own chair became
