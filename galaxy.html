@@ -22,7 +22,7 @@
     ></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=31"></script>
+    <script src="i18n.js?v=32"></script>
         <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
@@ -1016,6 +1016,8 @@
             >
                 REPAIR FLEET
             </button>
+
+            <div class="fleet-panel-row" id="fleet-dock-hint"></div>
 
         </div>
 
@@ -2815,6 +2817,30 @@ function updateDock(canWork) {
     const dock = document.getElementById("fleet-dock");
     if (dock) { dock.style.display = s.missing > 0 ? "" : "none"; }
 
+    /* where the fleet is sitting, and whether that world is ours. The button
+       stays pressable over a neutral or hostile world so the reason it will
+       not work can be read underneath it, rather than a grey button that says
+       nothing. */
+    const orbit = selectedFleet ? fleetOrbitName(selectedFleet) : "";
+    const ours = !!orbit && planetOwner(orbit) === playerFaction;
+
+    const hint = document.getElementById("fleet-dock-hint");
+
+    if (hint) {
+
+        if (s.missing > 0 && !ours) {
+            hint.textContent = orbit
+                ? T("You cannot repair here: this world is neutral or hostile. A dock needs a world your faction holds.")
+                : T("A dock needs a world your faction holds: this fleet is not in orbit of one.");
+            hint.style.display = "";
+        }
+        else {
+            hint.textContent = "";
+            hint.style.display = "none";
+        }
+
+    }
+
     if (!repairFleetButton) { return; }
 
     repairFleetButton.disabled = !canWork || s.missing <= 0;
@@ -2825,11 +2851,64 @@ function updateDock(canWork) {
 }
 
 
+/* the world a stationed fleet is in orbit of, or "" for open space */
+function fleetOrbitName(fleet) {
+
+    if (!fleet || fleet.status !== "stationed") { return ""; }
+
+    const where = getCurrentLocation(fleet);
+
+    if (!where || /deep space/i.test(where)) { return ""; }
+
+    return String(where).replace(/\s*\(.*\)\s*$/, "").trim();
+
+}
+
+
+/* who holds a world: the map keeps the owner on the planet marker itself */
+function planetOwner(p_name) {
+
+    const name = String(p_name || "").trim().toLowerCase();
+
+    if (!name) { return ""; }
+
+    const el = Array.from(document.querySelectorAll(".planet"))
+        .find(function(e) {
+            return String(e.dataset.name || "").trim().toLowerCase() === name;
+        });
+
+    return el ? String(el.dataset.owner || "").trim() : "";
+
+}
+
+
 if (repairFleetButton) {
 
     repairFleetButton.addEventListener("click", async function() {
 
         if (!selectedFleet) { return; }
+
+        /* the dock only works over a world of ours. The button is pressable
+           everywhere so pressing it here explains itself instead of doing
+           nothing at all. */
+        const orbit = fleetOrbitName(selectedFleet);
+        const hint = document.getElementById("fleet-dock-hint");
+
+        if (!orbit) {
+            if (hint) {
+                hint.textContent = T("A dock needs a world your faction holds: this fleet is not in orbit of one.");
+                hint.style.display = "";
+            }
+            return;
+        }
+
+        if (planetOwner(orbit) !== playerFaction) {
+            if (hint) {
+                hint.textContent = T("You cannot repair here: this world is neutral or hostile. A dock needs a world your faction holds.");
+                hint.style.display = "";
+            }
+            return;
+        }
 
         repairFleetButton.disabled = true;
 
@@ -2839,7 +2918,7 @@ if (repairFleetButton) {
 
         if (error) {
             fleetMessage.textContent = error.message;
-            updateDock(true);
+            updateDock(selectedFleet.player_id === playerID && selectedFleet.status === "stationed");
             return;
         }
 

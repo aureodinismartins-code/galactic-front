@@ -83,6 +83,29 @@ check("the army box sits inside the fleet panel",
     panelOpen !== -1 && armyBox > panelOpen && (panelClose === -1 || armyBox < panelClose),
     "panel " + panelOpen + ", army " + armyBox + ", recruitment " + panelClose);
 
+/* ---------------------------------------------------------
+   the dock says why it cannot work, instead of going grey
+--------------------------------------------------------- */
+
+check("the dock carries a hint line under the repair button",
+    galaxy.indexOf('id="fleet-dock-hint"') !== -1 &&
+    galaxy.indexOf('id="fleet-dock-hint"') > galaxy.indexOf('id="repair-fleet-button"'));
+
+const handler = galaxy.slice(galaxy.indexOf('if (repairFleetButton) {'));
+
+check("the repair click reads the world's owner before it repairs",
+    handler.indexOf("planetOwner(") !== -1 &&
+    (handler.indexOf('rpc("repair_fleet"') === -1 ||
+     handler.indexOf("planetOwner(") < handler.indexOf('rpc("repair_fleet"')),
+    "planetOwner at " + handler.indexOf("planetOwner(") + ", rpc at " + handler.indexOf('rpc("repair_fleet"'));
+
+check("the fleet's orbit is read as a planet, never deep space",
+    /function fleetOrbitName/.test(galaxy) && /deep space/i.test(galaxy));
+
+check("the sentence for a neutral or hostile world is translated",
+    /neutral or hostile/.test(galaxy) &&
+    fs.readFileSync(path.join(ROOT, "i18n.js"), "utf8").indexOf("Não podes reparar aqui") !== -1);
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 
 if (failed) { process.exit(1); }

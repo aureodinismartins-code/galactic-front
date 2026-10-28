@@ -1215,6 +1215,10 @@
         "PHONE MODE": "MODO TELEMÓVEL",
         "DESKTOP MODE": "MODO COMPUTADOR",
 
+        /* ---------- the dock, when it cannot work (2026-11-18) ---------- */
+        "You cannot repair here: this world is neutral or hostile. A dock needs a world your faction holds.": "Não podes reparar aqui: este mundo é neutro ou hostil. Uma doca precisa de um mundo que a tua facção controle.",
+        "A dock needs a world your faction holds: this fleet is not in orbit of one.": "Uma doca precisa de um mundo que a tua facção controle: esta frota não está em órbita de nenhum.",
+
         /* ---------- the two chairs (2026-11-06). The chamber's own chair became
            the Speaker of the Congress on 2026-11-12, so one president is left. ---------- */
         "THE TWO CHAIRS": "AS DUAS CADEIRAS",
