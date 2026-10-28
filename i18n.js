@@ -1249,6 +1249,16 @@
         "Everything the Combine does is on these tabs, and taking part costs nothing: no credits to propose, no credits to vote. The record of it all is on AGITPROP and NEWS.": "Tudo o que o Combine faz está nestes separadores, e participar não custa nada: nada para propor, nada para votar. O registo de tudo está em AGITPROP e NOTÍCIAS.",
         "PHONE MODE": "MODO TELEMÓVEL",
         "DESKTOP MODE": "MODO COMPUTADOR",
+        "WORLDS": "MUNDOS",
+        "SEARCH A WORLD": "PROCURAR UM MUNDO",
+        "NO WORLD MATCHES": "NENHUM MUNDO CORRESPONDE",
+        "SELECT A FLEET FIRST": "SELECIONA PRIMEIRO UMA FROTA",
+        "TAP A WORLD ON THE MAP TO SEND THIS FLEET": "TOCA NUM MUNDO NO MAPA PARA ENVIAR ESTA FROTA",
+        "CLOSE": "FECHAR",
+        "ZOOM IN": "APROXIMAR",
+        "ZOOM OUT": "AFASTAR",
+        "FIT THE MAP": "AJUSTAR O MAPA",
+        "SEND THE FLEET TO A WORLD": "ENVIAR A FROTA PARA UM MUNDO",
 
         /* ---------- the dock, when it cannot work (2026-11-18) ---------- */
         "You cannot repair here: this world is neutral or hostile. A dock needs a world your faction holds.": "Não podes reparar aqui: este mundo é neutro ou hostil. Uma doca precisa de um mundo que a tua facção controle.",
