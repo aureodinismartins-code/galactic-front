@@ -59,9 +59,12 @@
     html.gf-phone .map-header h1 { font-size: 15px; }
     html.gf-phone .main-menu-button { position: static; width: 100%; height: 42px; margin: 6px 10px; }
     html.gf-phone #player-faction-display { position: static; margin: 0 10px 6px; }
+    /* fixed, not absolute: on a phone the page scrolls, and a panel anchored
+       to the document can end up below the fold where it is plainly gone */
     html.gf-phone #fleet-command-panel,
-    html.gf-phone .fleet-panel { left: 10px !important; right: 10px !important; bottom: 10px !important;
-        width: auto !important; max-height: 58vh; overflow: auto; }
+    html.gf-phone .fleet-panel { position: fixed !important; left: 10px !important; right: 10px !important;
+        bottom: 10px !important; top: auto !important; width: auto !important;
+        max-height: 58vh; overflow: auto; z-index: 2000 !important; }
     html.gf-phone .planet-panel { width: calc(100vw - 20px) !important; max-height: 84vh; overflow: auto; }
     html.gf-phone .planet-top { position: static; padding: 8px 10px; }
     html.gf-phone .planet-top h1 { font-size: 22px; }

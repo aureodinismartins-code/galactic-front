@@ -1,0 +1,88 @@
+/* The fleet screen went missing once because selectFleet() filled the panel
+   before showing it, and because a minimised panel or a phone layout could
+   leave it out of sight. These are source-level guards on the three rules that
+   keep it visible; they are deliberately about ordering, not looks.
+
+   Run: node tmp-test/fleet-panel-test.js */
+
+const fs = require("fs");
+const path = require("path");
+
+const ROOT = path.join(__dirname, "..");
+
+let passed = 0;
+let failed = 0;
+
+function check(name, ok, detail) {
+    if (ok) { passed++; console.log("  ok   " + name); }
+    else { failed++; console.log("  FAIL " + name + (detail !== undefined ? "  :: " + detail : "")); }
+}
+
+const galaxy = fs.readFileSync(path.join(ROOT, "galaxy.html"), "utf8");
+const mobile = fs.readFileSync(path.join(ROOT, "mobile.js"), "utf8");
+
+/* ---------------------------------------------------------
+   the body of selectFleet(), up to the next top-level function
+--------------------------------------------------------- */
+
+const start = galaxy.indexOf("function selectFleet(fleet) {");
+
+check("selectFleet exists", start !== -1);
+
+const rest = galaxy.slice(start + 10);
+const nextFn = rest.search(/\nfunction [a-zA-Z]/);
+
+/* comments talk about the calls they guard: measure the code, not the prose */
+const body = (nextFn === -1 ? rest : rest.slice(0, nextFn)).replace(/\/\*[\s\S]*?\*\//g, "");
+
+const shownAt = body.indexOf('classList.add');
+const dockedAt = body.indexOf("updateDock(");
+
+check("the panel is shown inside selectFleet", shownAt !== -1 && /classList\.add\(\s*"visible"\s*\)/.test(body));
+
+check("and it is shown before the dock is updated",
+    shownAt !== -1 && (dockedAt === -1 || shownAt < dockedAt),
+    "visible at " + shownAt + ", updateDock at " + dockedAt);
+
+check("a minimised panel is opened again on selection",
+    body.indexOf('contains("collapsed")') !== -1 && body.indexOf("min-fleet-panel") !== -1);
+
+/* ---------------------------------------------------------
+   the army summary must not be able to take the dock with it
+--------------------------------------------------------- */
+
+const dockStart = galaxy.indexOf("function updateDock(canWork) {");
+const dockRest = galaxy.slice(dockStart + 10);
+const dockEnd = dockRest.search(/\nfunction [a-zA-Z]/);
+const dockBody = (dockEnd === -1 ? dockRest : dockRest.slice(0, dockEnd)).replace(/\/\*[\s\S]*?\*\//g, "");
+
+check("the army refresh is wrapped where the dock calls it",
+    /try\s*\{\s*updateArmySoon\(\);\s*\}\s*catch/.test(dockBody),
+    dockBody.slice(0, 160));
+
+const soonStart = galaxy.indexOf("function updateArmySoon()");
+const soonRest = galaxy.slice(soonStart);
+const soonEnd = soonRest.indexOf("\nfunction ", 10);
+const soonBody = (soonEnd === -1 ? soonRest : soonRest.slice(0, soonEnd)).replace(/\/\*[\s\S]*?\*\//g, "");
+
+check("and it swallows a failed army read", /\.catch\(|catch\s*\(/.test(soonBody));
+
+/* ---------------------------------------------------------
+   the panel must be on screen in the phone layout
+--------------------------------------------------------- */
+
+check("phone mode pins the fleet panel to the viewport",
+    /html\.gf-phone #fleet-command-panel[\s\S]{0,200}position: fixed/.test(mobile));
+
+/* the army box belongs to that panel, not outside it */
+const panelOpen = galaxy.indexOf('<div id="fleet-command-panel">');
+const armyBox = galaxy.indexOf('<div id="fleet-army"></div>');
+const panelClose = galaxy.indexOf('id="fleet-recruitment"');
+
+check("the army box sits inside the fleet panel",
+    panelOpen !== -1 && armyBox > panelOpen && (panelClose === -1 || armyBox < panelClose),
+    "panel " + panelOpen + ", army " + armyBox + ", recruitment " + panelClose);
+
+console.log("\n" + passed + " passed, " + failed + " failed");
+
+if (failed) { process.exit(1); }

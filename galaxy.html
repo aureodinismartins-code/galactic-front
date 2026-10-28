@@ -627,7 +627,7 @@
         .contest-bar > div { height: 100%; }
     </style>
 
-<script src="mobile.js?v=1"></script>
+<script src="mobile.js?v=2"></script>
 </head>
 
 
@@ -2978,10 +2978,19 @@ function selectFleet(fleet) {
 
     /* the panel opens first, before anything fills it in: every step below
        only writes into it, and a panel that is filled but never shown reads
-       to the player as no fleet screen at all */
+       to the player as no fleet screen at all. fleet-panel-test.js keeps this
+       line above every updateDock() call in this function. */
     fleetPanel.classList.add(
         "visible"
     );
+
+    /* selecting a fleet is a request to see it. A panel the player minimised
+       earlier leaves only a name bar, which is easy to read as "no screen",
+       so the selection opens it again through the panel's own button. */
+    if (fleetPanel.classList.contains("collapsed")) {
+        const minButton = document.getElementById("min-fleet-panel");
+        if (minButton) { minButton.click(); }
+    }
 
     selectedFleet =
         fleet;
