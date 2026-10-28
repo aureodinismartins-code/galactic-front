@@ -529,6 +529,8 @@
         /* ---------- congress: election, occupied worlds, authority ---------- */
         "seats": "cadeiras",
         "loyalty": "lealdade",
+        "— THE CHAMBER'S CHOICE —": "— A ESCOLHA DA CÂMARA —",
+        "THE MINISTRY": "O MINISTÉRIO",
         "delegates seated": "delegados sentados",
         "turns (5 minutes each, only counted while stability is high enough)":
             "turnos (5 minutos cada, contados apenas enquanto a estabilidade for alta o suficiente)",

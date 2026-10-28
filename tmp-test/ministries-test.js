@@ -152,7 +152,8 @@ function slice(src, from, to) {
 
         create table public.cs_occupations (
             planet text primary key, stage integer default 0, stability integer default 40,
-            progress integer default 0
+            progress integer default 0, last_turn_at timestamptz, integrated_at timestamptz,
+            last_relief_at timestamptz
         );
 
         create table public.cs_authorizations (
@@ -175,6 +176,25 @@ function slice(src, from, to) {
         "create or replace function public.cg_government"));
 
     await db.exec(next);
+
+    /* the map the occupation seed reads, and the capital rule */
+    await db.exec(`
+        create table public.planets (id serial primary key, name text unique);
+        insert into public.planets (name) values ('Ultramars'), ('Krieg'), ('Vraks'), ('Free Earth');
+
+        create table public.cities (id serial primary key, planet_id int references public.planets (id), faction text);
+        insert into public.cities (planet_id, faction) values
+            (1, 'Combine'), (1, 'Combine'), (1, 'Combine'),
+            (2, 'Combine'), (2, 'Combine'),
+            (3, 'Combine'),
+            (4, 'Freedom Authority');
+
+        create table public.planet_charters (planet text primary key, faction text not null);
+        insert into public.planet_charters (planet, faction) values
+            ('Ultramars', 'Combine'), ('Free Earth', 'Freedom Authority');
+    `);
+
+    await db.exec(fs.readFileSync(path.join(ROOT, "sql", "2026-11-21_capitals_are_never_occupied_and_the_commander_picks.sql"), "utf8"));
 
     console.log("\nthe chamber seats its own ministries");
 
@@ -307,6 +327,62 @@ function slice(src, from, to) {
     const loy3 = await call(db, "select id, loyalty from public.cg_factions order by id");
     check("clearing the office is not an election", Number(loy3[0].loyalty) === 71, JSON.stringify(loy3));
 
+    console.log("\na capital is never occupied");
+
+    await db.exec("select public.cs_seed_occupations()");
+
+    const occ = await call(db, "select planet from public.cs_occupations order by planet");
+    check("Ultramars, the Combine's capital, is not in the occupation book",
+        !occ.some(r => r.planet === "Ultramars"), JSON.stringify(occ));
+    check("but a world the Combine really took still is",
+        occ.some(r => r.planet === "Vraks"), JSON.stringify(occ));
+
+    await db.exec("insert into public.cs_occupations (planet, stage, stability) values ('Ultramars', 1, 47)");
+    const forced = Number((await call(db,
+        "select count(*)::int as n from public.cs_occupations where planet = 'Ultramars'"))[0].n);
+    check("and no insert can put it back", forced === 0, forced);
+
+    await db.exec("insert into public.cg_occupations (planet, stage, stability) values ('Free Earth', 1, 40)");
+    const cgForced = Number((await call(db,
+        "select count(*)::int as n from public.cg_occupations where planet = 'Free Earth'"))[0].n);
+    check("the Congress's book refuses its own capital too", cgForced === 0, cgForced);
+
+    console.log("\nthe player in command chooses the holder");
+
+    await db.exec("update public.cg_state set president_player = '" + ME + "', term_no = 6 where id = 1");
+
+    const eva = Number((await call(db, "select id from public.cg_members where name = 'Eva'"))[0].id);
+
+    const pick = (await call(db, "select public.cg_assign_ministry('treasury', " + eva + ") as r"))[0].r;
+    check("the President names the delegate he wants",
+        pick.holder === "Eva" && Number(pick.member) === eva, JSON.stringify(pick));
+
+    const held = (await call(db, "select public.cg_government() as g"))[0].g;
+    const treasury = held.ministers.find(m => m.post === "treasury");
+
+    check("and the chamber does not overrule him on the next look",
+        treasury.holder === "Eva", treasury.holder);
+    check("the pick brings his own party and his own loyalty",
+        treasury.party_name === "The Reformers" && Number(treasury.loyalty) === 58,
+        JSON.stringify([treasury.party_name, treasury.loyalty]));
+    check("the screen lists the chamber so he can pick",
+        (held.delegates || []).length === 6 && (held.delegates || []).some(d => d.name === "Eva"),
+        JSON.stringify((held.delegates || []).map(d => d.name)));
+
+    let refused = "";
+    try { await db.query("select public.cs_assign_ministry('grain', 1)"); }
+    catch (e) { refused = String(e.message); }
+    check("and only the commander of that chamber may", /Only the High Commissar/.test(refused), refused);
+
+    const auto = (await call(db, "select public.cg_assign_ministry('treasury', null) as r"))[0].r;
+    check("clearing the name gives the post back to the chamber",
+        auto.auto === true && auto.holder === null, JSON.stringify(auto));
+
+    const reseated = (await call(db, "select public.cg_government() as g"))[0].g;
+    check("and the chamber seats its most loyal again",
+        reseated.ministers.find(m => m.post === "treasury").holder === "Beto",
+        reseated.ministers.find(m => m.post === "treasury").holder);
+
     console.log("\nthe Combine's three, which are not the Congress's three");
 
     const posts = (await call(db, "select public.cs_minister_posts() as p"))[0].p;
@@ -319,6 +395,9 @@ function slice(src, from, to) {
 
     await db.exec("insert into public.cs_commissars (name, current_id, oblast, seat, loyalty) values " +
         "('Orlov', 1, 'Krieg', 1, 88), ('Zoya', 1, 'Krieg', 2, 70), ('Mikhail', 2, 'Vraks', 3, 95)");
+    /* the capital test seeded its own worlds: start the Soviet's book clean so
+       exactly one world is waiting for relief */
+    await db.exec("delete from public.cs_occupations");
     await db.exec("insert into public.cs_occupations (planet, stage, stability) values ('Vraks', 1, 30)");
     await db.exec("insert into public.cs_membership (player_id, current_id) values ('" + OTHER + "', 1)");
     await db.exec("update public.cs_state set term_no = 1, confidence = 55, secretary_player = null, secretary_current = null where id = 1");

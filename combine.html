@@ -1243,8 +1243,23 @@ function governmentHtml() {
                 ? esc(m.holder) + ' &middot; ' + esc(m.party_name || "?") +
                   (m.loyalty == null ? "" : ' &middot; ' + esc(T("loyalty")) + ' ' + Math.round(Number(m.loyalty)))
                 : esc(T("No minister"))) + '</div>' +
-            '<div class="sub" style="margin-top:4px">' + esc(ministryEffectLine(m)) + '</div>' +
-            '</div>';
+            '<div class="sub" style="margin-top:4px">' + esc(ministryEffectLine(m)) + '</div>';
+
+        /* the High Commissar picks which commissar holds it; the plenum's own
+           choice is the first entry, so a post left alone stays automatic */
+        if (gov.is_secretary) {
+            h += '<div style="margin-top:6px">' +
+                '<select class="pick" data-post="' + esc(m.post) + '">' +
+                '<option value="">' + esc(T("— THE CHAMBER'S CHOICE —")) + '</option>' +
+                (gov.delegates || []).map(function(d) {
+                    return '<option value="' + esc(d.id) + '"' +
+                        (Number(m.member) === Number(d.id) ? " selected" : "") + '>' +
+                        esc(d.name) + ' &middot; ' + esc(d.party_name || "?") + ' &middot; ' +
+                        Math.round(Number(d.loyalty || 0)) + '</option>';
+                }).join("") + '</select></div>';
+        }
+
+        h += '</div>';
     });
 
     return h + '</div>';
@@ -1261,8 +1276,17 @@ function wireGovernment() {
         await load();
     }));
 
-    /* the commissariats have no controls: the plenum seats them and its
-       holders answer on their own terms, so there is nothing here to press */
+    /* the only control is the High Commissar's picker: who holds the post.
+       What the post then does is the holder's own business, once a term */
+    $("tabbody").querySelectorAll(".pick").forEach(el => el.addEventListener("change", async function() {
+        const { error } = await supabaseClient.rpc("cs_assign_ministry", {
+            p_post: el.dataset.post,
+            p_member: el.value ? Number(el.value) : null
+        });
+        if (error) { toast(error.message, true); return; }
+        toast(T("THE MINISTRY"));
+        await load();
+    }));
 
 }
 
