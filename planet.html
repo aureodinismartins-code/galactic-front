@@ -7,7 +7,7 @@
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     >
 
     <title>Galactic Front - Planet</title>
@@ -20,7 +20,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=34"></script>
+    <script src="i18n.js?v=35"></script>
     <script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
     <script src="news.js?v=1"></script>
@@ -363,7 +363,7 @@
 
     </style>
 
-<script src="mobile.js?v=2"></script>
+<script src="mobile.js?v=4"></script>
 </head>
 
 
@@ -603,7 +603,10 @@ const planetTypes = {
     "Arctyra": "frozen",
     "Free Earth": "earth",
     "Krieg": "industrial",
-    "Vraks": "desert"
+    "Vraks": "desert",
+
+    /* the Tusken homeworld */
+    "Tuskara": "desert"
 };
 
 
@@ -891,6 +894,16 @@ function renderPlanet() {
 
 
     cityContainer.innerHTML = "";
+
+
+    /* Tuskara has no cities to take: its markers are the colonies, drawn by
+       tusken.js, and there is nothing else to render on the globe */
+    if (isTuskenPlanet) {
+        if (typeof window.tuskenRenderMarkers === "function") {
+            window.tuskenRenderMarkers();
+        }
+        return;
+    }
 
 
     const planetIndex =
@@ -2896,6 +2909,9 @@ function gameToast(message) {
 const WAR_PLANETS = ["Krieg", "Vraks"];
 const isWarPlanet = WAR_PLANETS.includes(planetName);
 
+/* the Tusken homeworld: no cities, no garrison, only colonies (tusken.js) */
+const isTuskenPlanet = planetName === "Tuskara";
+
 const WAR_COSTS = { weapons: 200, heavy: 500, reinforce: 150, fortify: 300, relief: 400, sabotage: 500, ceasefire: 700 };
 
 let warFactions = [];
@@ -4501,6 +4517,8 @@ if (isWarPlanet) {
 initialize();
 
 </script>
+
+<script src="tusken.js?v=1"></script>
 
 </body>
 

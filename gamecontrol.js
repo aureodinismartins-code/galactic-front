@@ -89,6 +89,7 @@
                 "- Combine and Freedom Authority keep only their capital\n" +
                 "- the civil wars on Krieg and Vraks restart\n" +
                 "- the Soviet's directives, its parties and its High Commissar are cleared\n" +
+                "- the Tusken colonies on Tuskara are razed and every slave is freed\n" +
                 "- every embassy, the truce and the list of who is playing are cleared\n\n" +
                 "Type RESET to confirm."
             );
@@ -124,6 +125,7 @@
             try { await supabaseClient.rpc("news_clear_trays"); } catch (e) { /* older database */ }
             try { await supabaseClient.rpc("occupation_policy_reset"); } catch (e) { /* older database */ }
             try { await supabaseClient.rpc("committees_and_ministers_reset"); } catch (e) { /* older database */ }
+            try { await supabaseClient.rpc("tusken_world_reset"); } catch (e) { /* older database */ }
 
             if (data && data.warnings && data.warnings.length) {
                 alert("The reset finished, but some parts could not be done:\n\n- " + data.warnings.join("\n- "));
@@ -374,6 +376,14 @@
         };
         setTimeout(unrestTick, 7000);
         setInterval(unrestTick, 60000);
+
+        /* the Tusken colonies take in their bands and land their convoys on
+           the same clock, wherever the player happens to be */
+        const tuskenTick = function() {
+            try { supabaseClient.rpc("tusken_tick").then(function() {}, function() {}); } catch (e) {}
+        };
+        setTimeout(tuskenTick, 8000);
+        setInterval(tuskenTick, 60000);
 
         /* two rival fleets in a neutral orbit fight even if nobody is looking
            at the map (the map's own scan is the fast one) */

@@ -7,7 +7,7 @@
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     >
 
     <title>Galactic Front - Galaxy Map</title>
@@ -22,7 +22,7 @@
     ></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=34"></script>
+    <script src="i18n.js?v=35"></script>
         <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
@@ -570,6 +570,7 @@
         .planet-40 { left:89%; top:84%; }
         .planet-41 { left:70%; top:85%; }
         .planet-42 { left:79%; top:92%; }
+        .planet-43 { left:44%; top:92%; }
 
         /* war worlds glow like a burning front */
         .planet.war {
@@ -653,7 +654,7 @@
         .contest-bar > div { height: 100%; }
     </style>
 
-<script src="mobile.js?v=2"></script>
+<script src="mobile.js?v=4"></script>
 </head>
 
 
@@ -953,6 +954,13 @@
             <span>Vraks</span>
         </div>
 
+        <!-- an independent world like any other: no cities, only colonies -->
+        <div class="planet independent planet-43"
+            data-name="Tuskara"
+            data-owner="Independents">
+            <span>Tuskara</span>
+        </div>
+
         </div>
 
 
@@ -1240,7 +1248,9 @@ const planetData = [
 
     ["Free Earth", "Freedom Authority", 40],
     ["Krieg", "Independents", 41],
-    ["Vraks", "Independents", 42]
+    ["Vraks", "Independents", 42],
+
+    ["Tuskara", "Independents", 43]
 
 ];
 
@@ -1295,7 +1305,9 @@ const planetPositions = {
     "Virelia": [31,88],
     "Arctyra": [58,89],
 
-    "Free Earth": [89,84]
+    "Free Earth": [89,84],
+
+    "Tuskara": [44,92]
 
 };
 
