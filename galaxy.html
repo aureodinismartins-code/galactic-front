@@ -2796,7 +2796,9 @@ function repairPrice(missing) {
 
 function updateDock(canWork) {
 
-    updateArmySoon();
+    /* the army summary is a separate panel below this one: it must never be
+       able to stop the dock from opening */
+    try { updateArmySoon(); } catch (e) { /* the army hides itself */ }
 
     if (!fleetHullRow) { return; }
 
@@ -2872,9 +2874,20 @@ function armyEsc(v) {
 
 /* one reading of the whole faction's army, at most every fifteen seconds */
 function updateArmySoon() {
+
     if (Date.now() - armyAskedAt < 15000) { return; }
+
     armyAskedAt = Date.now();
-    updateArmy();
+
+    try {
+        const pending = updateArmy();
+        if (pending && typeof pending.catch === "function") {
+            pending.catch(function() { /* no army book on this database */ });
+        }
+    } catch (e) {
+        /* the fleet panel is not the army's to break */
+    }
+
 }
 
 async function updateArmy() {
@@ -2962,6 +2975,13 @@ async function updateArmy() {
 
 
 function selectFleet(fleet) {
+
+    /* the panel opens first, before anything fills it in: every step below
+       only writes into it, and a panel that is filled but never shown reads
+       to the player as no fleet screen at all */
+    fleetPanel.classList.add(
+        "visible"
+    );
 
     selectedFleet =
         fleet;
