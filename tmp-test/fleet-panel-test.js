@@ -129,6 +129,24 @@ check("the sentence for recruiting over a neutral or hostile world is translated
     /You cannot recruit here/.test(galaxy) &&
     fs.readFileSync(path.join(ROOT, "i18n.js"), "utf8").indexOf("Não podes recrutar aqui") !== -1);
 
+/* ---------------------------------------------------------
+   and both say so as a warning, not as a footnote
+--------------------------------------------------------- */
+
+check("there is a warning strip to put them in", /\.dock-warning\s*\{/.test(galaxy));
+
+check("both notices are marked as alerts",
+    /id="fleet-dock-hint" role="alert"/.test(galaxy) &&
+    /id="fleet-recruit-hint" role="alert"/.test(galaxy));
+
+check("both notices are shown as warnings",
+    (galaxy.match(/"fleet-panel-row dock-warning"/g) || []).length >= 4,
+    (galaxy.match(/"fleet-panel-row dock-warning"/g) || []).length);
+
+check("and they lead with the warning mark",
+    (galaxy.match(/\\u26a0 /g) || []).length >= 4,
+    (galaxy.match(/\\u26a0 /g) || []).length);
+
 console.log("\n" + passed + " passed, " + failed + " failed");
 
 if (failed) { process.exit(1); }

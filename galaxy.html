@@ -169,6 +169,23 @@
         }
 
 
+        /* why the dock or the recruiting office will not work here: a warning
+           strip, not a footnote, because it is the reason a press does nothing */
+        .dock-warning {
+
+            margin: 8px 0 2px;
+            padding: 7px 9px;
+
+            border-left: 3px solid #d6a84b;
+            background: rgba(214, 168, 75, 0.12);
+
+            color: #ffd37a;
+
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+
         #fleet-command-panel h2 {
 
             margin:
@@ -1017,7 +1034,7 @@
                 REPAIR FLEET
             </button>
 
-            <div class="fleet-panel-row" id="fleet-dock-hint"></div>
+            <div class="fleet-panel-row" id="fleet-dock-hint" role="alert"></div>
 
         </div>
 
@@ -1039,7 +1056,7 @@
                 FLEET RECRUITMENT
             </div>
 
-            <div class="fleet-panel-row" id="fleet-recruit-hint"></div>
+            <div class="fleet-panel-row" id="fleet-recruit-hint" role="alert"></div>
 
 
             <div id="fleet-composition">
@@ -2835,12 +2852,14 @@ function updateDock(canWork) {
     if (hint) {
 
         if (s.missing > 0 && !ours) {
-            hint.textContent = orbit
+            hint.className = "fleet-panel-row dock-warning";
+            hint.textContent = "\u26a0 " + (orbit
                 ? T("You cannot repair here: this world is neutral or hostile. A dock needs a world your faction holds.")
-                : T("A dock needs a world your faction holds: this fleet is not in orbit of one.");
+                : T("A dock needs a world your faction holds: this fleet is not in orbit of one."));
             hint.style.display = "";
         }
         else {
+            hint.className = "fleet-panel-row";
             hint.textContent = "";
             hint.style.display = "none";
         }
@@ -2908,6 +2927,7 @@ function showRecruitHint(fleet) {
     if (!hint) { return; }
 
     if (!fleet || fleet.player_id !== playerID) {
+        hint.className = "fleet-panel-row";
         hint.textContent = "";
         hint.style.display = "none";
         return;
@@ -2917,17 +2937,20 @@ function showRecruitHint(fleet) {
     const ours = !!orbit && planetOwner(orbit) === playerFaction;
 
     if (orbit && !ours) {
-        hint.textContent = T("You cannot recruit here: this world is neutral or hostile. Recruits are raised on a world your faction holds.");
+        hint.className = "fleet-panel-row dock-warning";
+        hint.textContent = "\u26a0 " + T("You cannot recruit here: this world is neutral or hostile. Recruits are raised on a world your faction holds.");
         hint.style.display = "";
         return;
     }
 
     if (!orbit) {
-        hint.textContent = T("Recruits are raised on a world your faction holds: this fleet is not in orbit of one.");
+        hint.className = "fleet-panel-row dock-warning";
+        hint.textContent = "\u26a0 " + T("Recruits are raised on a world your faction holds: this fleet is not in orbit of one.");
         hint.style.display = "";
         return;
     }
 
+    hint.className = "fleet-panel-row";
     hint.textContent = "";
     hint.style.display = "none";
 
@@ -2948,7 +2971,8 @@ if (repairFleetButton) {
 
         if (!orbit) {
             if (hint) {
-                hint.textContent = T("A dock needs a world your faction holds: this fleet is not in orbit of one.");
+                hint.className = "fleet-panel-row dock-warning";
+                hint.textContent = "\u26a0 " + T("A dock needs a world your faction holds: this fleet is not in orbit of one.");
                 hint.style.display = "";
             }
             return;
@@ -2956,7 +2980,8 @@ if (repairFleetButton) {
 
         if (planetOwner(orbit) !== playerFaction) {
             if (hint) {
-                hint.textContent = T("You cannot repair here: this world is neutral or hostile. A dock needs a world your faction holds.");
+                hint.className = "fleet-panel-row dock-warning";
+                hint.textContent = "\u26a0 " + T("You cannot repair here: this world is neutral or hostile. A dock needs a world your faction holds.");
                 hint.style.display = "";
             }
             return;
@@ -3420,6 +3445,11 @@ recruitButtons.forEach(
                 if (!recruitHere(selectedFleet)) {
 
                     showRecruitHint(selectedFleet);
+
+                    /* and beside the panel's own message line, so the warning
+                       is read wherever the player's eye already is */
+                    const warn = document.getElementById("fleet-recruit-hint");
+                    fleetMessage.textContent = warn ? warn.textContent : "";
 
                     return;
 
