@@ -172,6 +172,33 @@ async function open(name, options) {
         ok("the marker takes its faction's colour", markers[0].classList.contains("combine") &&
             markers[1].classList.contains("freedom"));
 
+        console.log("\n== a marker opens its card");
+
+        markers[1].click();
+        await wait(20);
+
+        let lit = doc.querySelectorAll("#tusken-colonies .tusken-card.picked");
+
+        ok("a rival's marker finds its card too", lit.length === 1 &&
+            lit[0].dataset.settlement === "8", lit.length);
+        ok("the card is lit, the other is not",
+            doc.querySelectorAll("#tusken-colonies .tusken-card")[0].classList.contains("picked") === false);
+        ok("and the marker says it was picked", markers[1].classList.contains("picked"),
+            markers[1].className);
+        ok("no server call is needed to open a card",
+            page.calls.filter(function(c) { return c.fn !== "tusken_world"; }).length === 0);
+
+        markers[0].click();
+        await wait(20);
+
+        lit = doc.querySelectorAll("#tusken-colonies .tusken-card.picked");
+
+        ok("another marker moves the pick", lit.length === 1 && lit[0].dataset.settlement === "7",
+            lit.length);
+        ok("the globe agrees", markers[0].classList.contains("picked") &&
+            !markers[1].classList.contains("picked"),
+            markers[0].className + " / " + markers[1].className);
+
         console.log("\n== founding");
 
         const found = panel.querySelector("#tusken-found");
@@ -188,6 +215,13 @@ async function open(name, options) {
         ok("and it names the fleet that holds the orbit",
             /Spear of Ultramar/.test(panel.querySelector("#tusken-msg").textContent),
             panel.querySelector("#tusken-msg").textContent);
+
+        const keptLit = doc.querySelectorAll("#tusken-colonies .tusken-card.picked");
+
+        ok("the pick survives the redraw", keptLit.length === 1 &&
+            keptLit[0].dataset.settlement === "7", keptLit.length);
+        ok("and the fresh markers still carry it",
+            doc.querySelector("#cities .city.tusken.picked") !== null);
 
         console.log("\n== growing a settlement");
 

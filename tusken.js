@@ -22,6 +22,11 @@
    Transports are permanent: 350 credits buys a hull once, it
    takes up to 2,500, and the trip itself costs nothing.
 
+   A marker on the dust and a card in the panel are the same
+   settlement: pressing the marker picks the settlement, brings
+   its card up in the panel and leaves it lit until another is
+   picked, so an owner's card and a rival's card both answer.
+
    This file is loaded by planet.html and only does anything
    when the page is Tuskara. Everything it draws comes from
    public.tusken_world(); see sql/2026-11-26_the_tusken_world.sql
@@ -40,6 +45,9 @@
     let state = null;
     let busy = false;
     let optionsKey = "";
+
+    /* the settlement the player last pressed on the globe (or null) */
+    let picked = null;
 
     /* ---------- small talk ---------- */
 
@@ -181,6 +189,18 @@
                 box-shadow: 0 0 10px 2px rgba(214, 168, 75, .8) !important;
             }
             .city.tusken span { color: #f0cf8a; font-size: 10px; }
+            .city.tusken { cursor: pointer; }
+            .city.tusken.picked .city-marker {
+                background: #fff3d6 !important;
+                border-color: #fffaf0 !important;
+                box-shadow: 0 0 18px 5px rgba(255, 211, 122, .95) !important;
+            }
+            .city.tusken.picked span { color: #fff3d6; font-weight: bold; }
+            #tusken-panel .tusken-card.picked {
+                border-color: #ffd37a;
+                background: rgba(240,207,138,.13);
+                box-shadow: inset 0 0 0 1px rgba(255, 211, 122, .5);
+            }
             @media (max-width: 780px) {
                 #tusken-panel {
                     left: 10px; right: 10px; top: auto; bottom: 10px;
@@ -390,7 +410,7 @@
 
         }
 
-        return '<div class="tusken-card' + (c.mine ? ' mine' : '') + '">' +
+        return '<div class="tusken-card' + (c.mine ? ' mine' : '') + '" data-settlement="' + c.id + '">' +
             '<div class="tusken-line"><h3>' + esc(c.name || "SETTLEMENT") + '</h3>' +
             '<span>' + factionName(c.faction) + '</span></div>' +
             '<div class="tusken-sub">SIZE ' + c.size + ' · CATCH ' + c.catch + ' · HOLD ' + c.hold + '</div>' +
@@ -434,6 +454,10 @@
         document.getElementById("tusken-colonies").innerHTML = (state.colonies || []).length
             ? state.colonies.map(colonyCard).join("")
             : '<div class="tusken-sub">The dust is empty. Nobody has settled Tuskara yet.</div>';
+
+        /* the eight-second redraw throws the cards away: the one the
+           player picked is lit again on the new set */
+        drawSelection(false);
 
         /* ---- the found button answers to all three gates ---- */
         const found = document.getElementById("tusken-found");
@@ -566,6 +590,54 @@
 
     }
 
+    /* ---------- the marker and its card ---------- */
+
+    /* Pressing a marker picks that settlement: its card is lit and
+       scrolled up in the panel. It stays lit across redraws until
+       another settlement is picked, so a player coming back to the
+       globe still sees which one they were looking at. */
+    function pick(id) {
+
+        picked = id === null || id === undefined ? null : Number(id);
+
+        if (!picked) { picked = null; }
+
+        drawSelection(true);
+
+    }
+
+    function drawSelection(scroll) {
+
+        document.querySelectorAll("#tusken-colonies .tusken-card").forEach(function (card) {
+            card.classList.toggle("picked", Number(card.dataset.settlement) === picked);
+        });
+
+        document.querySelectorAll("#cities .city.tusken").forEach(function (marker) {
+            marker.classList.toggle("picked", Number(marker.dataset.colony) === picked);
+        });
+
+        if (!scroll || picked === null) { return; }
+
+        const card = document.querySelector(
+            '#tusken-colonies .tusken-card[data-settlement="' + picked + '"]');
+
+        const panel = document.getElementById("tusken-panel");
+
+        if (!card || !panel) { return; }
+
+        /* the card is brought to the top of the panel rather than the
+           page: the panel is its own scroller and the globe stays put */
+        const top = Math.max(0, Number(card.offsetTop || 0) - 12);
+
+        if (typeof panel.scrollTo === "function") {
+            panel.scrollTo({ top: top, behavior: "smooth" });
+        }
+        else {
+            panel.scrollTop = top;
+        }
+
+    }
+
     function drawMarkers() {
 
         const container = document.getElementById("cities");
@@ -580,7 +652,8 @@
 
             const el = document.createElement("div");
 
-            el.className = "city tusken " + factionClass(c.faction);
+            el.className = "city tusken " + factionClass(c.faction) +
+                (picked === Number(c.id) ? " picked" : "");
             el.style.left = Number(c.x || 50) + "%";
             el.style.top = Number(c.y || 50) + "%";
             el.dataset.colony = c.id;
@@ -590,14 +663,7 @@
             el.innerHTML = '<div class="city-marker"></div><span>' +
                 esc(c.name || "Settlement") + " · " + num(c.slaves) + "</span>";
 
-            el.addEventListener("click", function () {
-                const btn = document.querySelector(
-                    '#tusken-colonies [data-colony="' + c.id + '"]');
-                const card = btn ? btn.closest(".tusken-card") : null;
-                if (card && card.scrollIntoView) {
-                    card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-                }
-            });
+            el.addEventListener("click", function () { pick(c.id); });
 
             container.appendChild(el);
 
