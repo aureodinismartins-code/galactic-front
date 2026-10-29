@@ -45,8 +45,15 @@ function payload(over) {
               capacity: 1500, per_hour: 500,
               size_cost: 400, catch_cost: 300, hold_cost: 300 }
         ],
+        fleets: [
+            { id: "f1", name: "Spear of Ultramar", status: "stationed", at: "Tuskara",
+              stationed: true, lift: 2500, transports: 1, soldiers: 3000 },
+            { id: "f2", name: "Hammer of Mars", status: "travelling", at: null,
+              stationed: false, lift: 0, transports: 0, soldiers: 0 }
+        ],
         ships: [
-            { id: 1, name: "Transport 1", capacity: 2500, at_sea: false, to: null, seconds: 0 }
+            { id: 1, name: "Transport 1", capacity: 2500, fleet_id: "f1",
+              fleet: "Spear of Ultramar", at_sea: false, to: null, seconds: 0 }
         ],
         idle_ships: 1,
         workforce: [
@@ -58,8 +65,8 @@ function payload(over) {
             { planet: "Ultramars", x: 10, y: 19, income: 100, slaves: 4000, seconds: 240 }
         ],
         convoys: [
-            { id: 3, from: "Tuskara", to: "Krieg", amount: 2500, ship: "Transport 2",
-              arrival: "2026-11-27T00:00:00Z", seconds: 192 }
+            { id: 3, from: "Tuskara", to: "Krieg", amount: 2500, ships: 1,
+              fleet: "Spear of Ultramar", status: "sailing", outcome: null, seconds: 192 }
         ]
     }, over || {});
 }
@@ -93,12 +100,14 @@ async function open(name, options) {
                                  fleet: "Spear of Ultramar" }, error: null };
             }
             if (fn === "tusken_buy_ship") {
-                return { data: { ok: true, id: 2, name: "Transport 2", paid: 350, capacity: 2500 }, error: null };
+                return { data: { ok: true, id: 2, name: "Transport 2", paid: 350, capacity: 2500,
+                                 fleet: "Spear of Ultramar", fleet_id: args.p_fleet, lift: 5000 }, error: null };
             }
             if (fn === "tusken_upgrade") { return { data: { ok: true, paid: 800, track: args.p_track }, error: null }; }
             if (fn === "tusken_ship") {
                 return { data: { ok: true, amount: args.p_amount, to: args.p_to, paid: 0,
-                                 ship: "Transport 1", capacity: 2500, seconds: 180 }, error: null };
+                                 fleet: "Spear of Ultramar", fleet_id: args.p_fleet, ships: 1,
+                                 lift: 2500, escort: 3000, seconds: 180 }, error: null };
             }
             return { data: null, error: { message: "unknown call" } };
         }
@@ -242,13 +251,30 @@ async function open(name, options) {
             /Transport 1/.test(panel.querySelector("#tusken-ships").textContent) &&
             /DOCKED/.test(panel.querySelector("#tusken-ships").textContent),
             panel.querySelector("#tusken-ships").textContent);
+        ok("the hull names the fleet it sails with",
+            /Spear of Ultramar/.test(panel.querySelector("#tusken-ships").textContent),
+            panel.querySelector("#tusken-ships").textContent);
+        ok("the fleet's lift is listed",
+            /Spear of Ultramar/.test(panel.querySelector("#tusken-fleets").textContent) &&
+            /1 HULLS · 2,500 LIFT/.test(panel.querySelector("#tusken-fleets").textContent),
+            panel.querySelector("#tusken-fleets").textContent);
+        ok("a fleet with no hulls says so",
+            /NO TRANSPORTS/.test(panel.querySelector("#tusken-fleets").textContent),
+            panel.querySelector("#tusken-fleets").textContent);
+
+        const buyPicker = panel.querySelector("#tusken-buy-fleet");
+        ok("the hull is bought for one of our fleets", buyPicker.options.length === 2 &&
+            buyPicker.value === "f1", buyPicker.value);
 
         panel.querySelector("#tusken-buy-ship").click();
         await wait(30);
 
         const buyCall = page.calls.filter(function(c) { return c.fn === "tusken_buy_ship"; })[0];
         ok("buying a hull asks the server", !!buyCall);
-        ok("the hull is reported", /Transport 2 is yours/.test(panel.querySelector("#tusken-msg").textContent),
+        ok("and names the fleet that takes it", buyCall && buyCall.args.p_fleet === "f1",
+            buyCall && buyCall.args);
+        ok("the hull is reported with its fleet",
+            /Transport 2 joins the Spear of Ultramar/.test(panel.querySelector("#tusken-msg").textContent),
             panel.querySelector("#tusken-msg").textContent);
 
         console.log("\n== sending a load");
@@ -261,9 +287,17 @@ async function open(name, options) {
         ok("Tuskara is one of them", from.options[0].value === "Tuskara");
         ok("only worlds we hold whole are offered", to.options.length === 2 &&
             Array.from(to.options).every(function(o) { return o.value !== "Tuskara"; }), to.options.length);
-        ok("the load defaults to one hull", amount.value === "1850", amount.value);
+        ok("the load defaults to the fleet's lift", amount.value === "1850", amount.value);
         ok("the trip is stated as free", /trip is free/.test(panel.querySelector("#tusken-available").textContent),
             panel.querySelector("#tusken-available").textContent);
+        ok("the lift is stated on the fleet that carries it",
+            /2,500 lift/.test(panel.querySelector("#tusken-available").textContent),
+            panel.querySelector("#tusken-available").textContent);
+
+        const loadPicker = panel.querySelector("#tusken-fleet");
+        ok("only a fleet in orbit of the source carries it",
+            loadPicker.options.length === 1 && loadPicker.value === "f1",
+            loadPicker.options.length + " " + loadPicker.value);
 
         to.value = "Krieg";
         amount.value = "1850";
@@ -273,8 +307,10 @@ async function open(name, options) {
         const shipCall = page.calls.filter(function(c) { return c.fn === "tusken_ship"; })[0];
         ok("the load is sent from the pens", shipCall && shipCall.args.p_from === "Tuskara" &&
             shipCall.args.p_to === "Krieg" && shipCall.args.p_amount === 1850, shipCall && shipCall.args);
-        ok("the load is reported on the hull that carried it",
-            /1,850 Tusken aboard the Transport 1 for Krieg/.test(panel.querySelector("#tusken-msg").textContent),
+        ok("and the fleet that carries it is named", shipCall && shipCall.args.p_fleet === "f1",
+            shipCall && shipCall.args);
+        ok("the load is reported on the fleet that carried it",
+            /1,850 Tusken aboard the Spear of Ultramar for Krieg/.test(panel.querySelector("#tusken-msg").textContent),
             panel.querySelector("#tusken-msg").textContent);
         ok("and the trip is called free", /costs nothing/.test(panel.querySelector("#tusken-msg").textContent));
 

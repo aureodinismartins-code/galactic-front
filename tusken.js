@@ -19,8 +19,18 @@
    faction holds whole add 1 credit to that world's payment,
    and the world they left loses exactly that.
 
-   Transports are permanent: 350 credits buys a hull once, it
-   takes up to 2,500, and the trip itself costs nothing.
+   A transport is not a ship of its own: it JOINS A FLEET. 350
+   credits buys a hull once, the buyer names the fleet it is
+   for, and that fleet's lift is the sum of its hulls — so a
+   load is a fleet order, not a hull order. The fleet must be
+   in orbit of the world the Tusken are leaving, and the trip
+   itself costs nothing.
+
+   A fleet in orbit of the destination may fall on the load: if
+   the escort (the slaving fleet's own soldiers) is weaker, the
+   fleet and its hulls are taken and the Tusken work for the
+   captor; if it is stronger, the load lands and the raider is
+   mauled.
 
    A marker on the dust and a card in the panel are the same
    settlement: pressing the marker picks the settlement, brings
@@ -181,6 +191,7 @@
             #tusken-panel .tusken-row b { color: #fff3d6; }
             #tusken-panel .tusken-row.sea b { color: #ffd37a; }
             #tusken-panel .tusken-row.dock b { color: #9fe08a; }
+            #tusken-panel .tusken-row.taken b { color: #ff8f7a; }
             .city.tusken .city-marker {
                 width: 9px !important;
                 height: 9px !important;
@@ -236,17 +247,26 @@
                 Every 1,000 Tusken put to work on a world add 1 credit to that world's payment.
                 On Tuskara itself they earn nothing — a slave is only worth the ship that carries it,
                 and a settlement needs a fleet overhead before the bands walk out.
+                A transport joins a fleet: the hulls give that fleet its lift, and the fleet carries
+                the load — through an enemy orbit, if the escort is strong enough.
             </div>
 
             <div class="tusken-head"><h3>SETTLEMENTS</h3><span id="tusken-colony-count"></span></div>
             <div id="tusken-colonies"></div>
             <button type="button" id="tusken-found" class="tusken-btn go">FOUND A SETTLEMENT</button>
 
+            <div class="tusken-head"><h3>FLEETS</h3><span>AND THE LIFT THEIR HULLS GIVE THEM</span></div>
+            <div id="tusken-fleets"></div>
+
             <div class="tusken-head"><h3>TRANSPORTS</h3><span id="tusken-ship-price"></span></div>
             <div id="tusken-ships"></div>
+            <label class="tusken-label" for="tusken-buy-fleet">THE FLEET THE NEXT HULL JOINS</label>
+            <select id="tusken-buy-fleet" class="tusken-select"></select>
             <button type="button" id="tusken-buy-ship" class="tusken-btn">BUY A TRANSPORT</button>
 
             <div class="tusken-head"><h3>SEND A LOAD</h3><span>THE TRIP IS FREE</span></div>
+            <label class="tusken-label" for="tusken-fleet">CARRIED BY</label>
+            <select id="tusken-fleet" class="tusken-select"></select>
             <label class="tusken-label" for="tusken-from">FROM</label>
             <select id="tusken-from" class="tusken-select"></select>
             <label class="tusken-label" for="tusken-to">TO</label>
@@ -324,7 +344,16 @@
                 result = await supabaseClient.rpc("tusken_found_colony");
             }
             else if (kind === "buy") {
-                result = await supabaseClient.rpc("tusken_buy_ship");
+
+                const picker = document.getElementById("tusken-buy-fleet");
+
+                if (!picker.value) {
+                    say("No fleet to join: a hull has to be given to one of your fleets.");
+                }
+                else {
+                    result = await supabaseClient.rpc("tusken_buy_ship", { p_fleet: picker.value });
+                }
+
             }
             else if (kind === "upgrade" && btn) {
                 result = await supabaseClient.rpc("tusken_upgrade", {
@@ -344,8 +373,12 @@
                 else if (!(amount > 0)) {
                     say("The load needs a number of Tusken in it.");
                 }
+                else if (!document.getElementById("tusken-fleet").value) {
+                    say("No slaving fleet in orbit of " + from + ": a load needs a fleet with hulls overhead.");
+                }
                 else {
                     result = await supabaseClient.rpc("tusken_ship", {
+                        p_fleet: document.getElementById("tusken-fleet").value,
                         p_from: from, p_to: to, p_amount: amount
                     });
                 }
@@ -364,14 +397,16 @@
                         " credits. " + (d.fleet || "Your fleet") + " holds the orbit.");
                 }
                 else if (kind === "buy") {
-                    say(d.name + " is yours, for " + num(d.paid) + " credits. It stays yours.");
+                    say(d.name + " joins the " + d.fleet + ", for " + num(d.paid) +
+                        " credits. The fleet now carries " + num(d.lift) + ".");
                 }
                 else if (kind === "upgrade") {
                     say("The work is done: " + String(d.track).toUpperCase() + ", for " + num(d.paid) + " credits.");
                 }
                 else if (kind === "ship") {
-                    say(num(d.amount) + " Tusken aboard the " + d.ship + " for " + d.to +
-                        " — the trip costs nothing, " + duration(d.seconds) + " on the road.");
+                    say(num(d.amount) + " Tusken aboard the " + d.fleet + " for " + d.to +
+                        " — " + num(d.ships) + (Number(d.ships) === 1 ? " hull, " : " hulls, ") +
+                        "the trip costs nothing, " + duration(d.seconds) + " on the road.");
                 }
 
             }
@@ -478,7 +513,20 @@
         found.textContent = why || "FOUND A SETTLEMENT — " + num(state.prices.colony) + " CR";
         found.disabled = !!why;
 
-        /* ---- the hulls ---- */
+        /* ---- the fleets, and the lift their hulls give them ---- */
+        const fleets = state.fleets || [];
+
+        document.getElementById("tusken-fleets").innerHTML = fleets.length
+            ? fleets.map(function (f) {
+                return '<div class="tusken-row' + (f.stationed ? "" : " sea") + '"><span>' +
+                    esc(f.name) + ' · ' + esc(f.at || (f.stationed ? "NOWHERE" : "AT SEA")) +
+                    '</span><b>' + (Number(f.transports) > 0
+                        ? num(f.transports) + " HULLS · " + num(f.lift) + " LIFT"
+                        : "NO TRANSPORTS") + '</b></div>';
+            }).join("")
+            : '<div class="tusken-sub">No fleet of your faction yet. A hull has to join one.</div>';
+
+        /* ---- the hulls, each under the fleet it sails with ---- */
         const ships = state.ships || [];
         const idle = Number(state.idle_ships || 0);
 
@@ -489,15 +537,34 @@
             ? ships.map(function (s) {
                 const atSea = s.at_sea === true;
                 return '<div class="tusken-row ' + (atSea ? "sea" : "dock") + '"><span>' +
-                    esc(s.name) + (atSea ? " → " + esc(s.to) : "") + '</span><b>' +
-                    (atSea ? duration(s.seconds) : "DOCKED") + '</b></div>';
+                    esc(s.name) + ' · ' + esc(s.fleet || "NO FLEET") + '</span><b>' +
+                    (atSea ? "AT SEA → " + esc(s.to) : "DOCKED") + '</b></div>';
             }).join("")
-            : '<div class="tusken-sub">No transports. Buy one hull and it is yours for good.</div>';
+            : '<div class="tusken-sub">No transports. Buy a hull, name the fleet it joins, and it is yours for good.</div>';
+
+        /* the fleet the next hull joins */
+        const buyPicker = document.getElementById("tusken-buy-fleet");
+        const buyKey = fleets.map(function (f) { return f.id; }).join("|");
+
+        if (buyPicker.dataset.key !== buyKey) {
+
+            const keep = buyPicker.value;
+
+            buyPicker.innerHTML = fleets.map(function (f) {
+                return '<option value="' + esc(f.id) + '">' + esc(f.name) +
+                    (f.at ? " · " + esc(f.at) : "") + "</option>";
+            }).join("") || '<option value="">NO FLEET</option>';
+
+            buyPicker.dataset.key = buyKey;
+
+            if (fleets.some(function (f) { return f.id === keep; })) { buyPicker.value = keep; }
+            else if (orbit.fleet_id) { buyPicker.value = orbit.fleet_id; }
+        }
 
         const buy = document.getElementById("tusken-buy-ship");
 
         buy.textContent = "BUY A TRANSPORT — " + num(state.prices.ship) + " CR";
-        buy.disabled = Number(state.credits || 0) < Number(state.prices.ship || 0);
+        buy.disabled = !fleets.length || Number(state.credits || 0) < Number(state.prices.ship || 0);
 
         /* the two pickers are only rebuilt when their lists change, so a
            number typed into the load box is not erased every eight seconds */
@@ -539,7 +606,31 @@
         const source = sources.filter(function (x) { return x.planet === chosen; })[0] ||
             { amount: 0 };
 
-        const capacity = Number(state.prices.capacity) || 0;
+        /* only a fleet in orbit of the source, with hulls aboard, can carry it */
+        const slavers = fleets.filter(function (f) {
+            return f.stationed === true && Number(f.lift) > 0 && f.at === chosen;
+        });
+
+        const loadPicker = document.getElementById("tusken-fleet");
+        const slaverKey = slavers.map(function (f) { return f.id; }).join("|");
+
+        if (loadPicker.dataset.key !== slaverKey) {
+
+            const keep = loadPicker.value;
+
+            loadPicker.innerHTML = slavers.map(function (f) {
+                return '<option value="' + esc(f.id) + '">' + esc(f.name) + " · " +
+                    num(f.lift) + " LIFT</option>";
+            }).join("") || '<option value="">NO SLAVING FLEET HERE</option>';
+
+            loadPicker.dataset.key = slaverKey;
+
+            if (slavers.some(function (f) { return f.id === keep; })) { loadPicker.value = keep; }
+        }
+
+        const carrying = slavers.filter(function (f) { return f.id === loadPicker.value; })[0] || null;
+
+        const capacity = carrying ? Number(carrying.lift) : 0;
         const most = Math.min(capacity, Number(source.amount));
 
         const send = document.getElementById("tusken-ship");
@@ -550,8 +641,9 @@
                 " credits buys a hull, and the trips after it are free.";
             send.disabled = true;
         }
-        else if (idle < 1) {
-            available.textContent = "Every hull is at sea. The next load waits for one to make port.";
+        else if (!slavers.length) {
+            available.textContent = "No slaving fleet in orbit of " + chosen +
+                ": sail one here, or give hulls to the fleet already overhead.";
             send.disabled = true;
         }
         else if (!(most > 0)) {
@@ -559,8 +651,8 @@
             send.disabled = true;
         }
         else {
-            available.textContent = "Up to " + num(most) + " from here · one hull holds " +
-                num(capacity) + " · the trip is free";
+            available.textContent = "Up to " + num(most) + " on the " + carrying.name + " · " +
+                num(carrying.lift) + " lift · the trip is free";
             send.disabled = false;
         }
 
@@ -583,8 +675,13 @@
 
         document.getElementById("tusken-convoys").innerHTML = convoys.length
             ? convoys.map(function (k) {
-                return '<div class="tusken-row"><span>' + esc(k.from) + ' → ' + esc(k.to) +
-                    '</span><b>' + num(k.amount) + ' · ' + duration(k.seconds) + '</b></div>';
+                const done = !!k.status && k.status !== "sailing";
+                return '<div class="tusken-row ' +
+                    (k.status === "captured" ? "taken" : (done ? "" : "sea")) + '"><span>' +
+                    esc(k.from) + ' → ' + esc(k.to) + (k.fleet ? " · " + esc(k.fleet) : "") +
+                    '</span><b>' + (done
+                        ? esc(String(k.outcome || k.status).toUpperCase())
+                        : num(k.amount) + ' · ' + duration(k.seconds)) + '</b></div>';
             }).join("")
             : '<div class="tusken-sub">No ships on the road.</div>';
 
