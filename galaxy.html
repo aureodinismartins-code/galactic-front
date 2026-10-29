@@ -1351,6 +1351,9 @@ let fleets = [];
 
 let selectedFleet = null;
 
+/* how many hulls each cargo fleet carries, counted by public.tusken_hull_counts() */
+let hullCounts = {};
+
 let refreshTimer = null;
 
 
@@ -2265,6 +2268,8 @@ async function loadFleets() {
        recomputed without asking the database again. */
     if (!refreshError) { fleetSource = (refreshed || []); }
 
+    await loadHullCounts();
+
     reportedContacts = new Set();
 
     /* and whatever the server's own reading can see is added on top */
@@ -2341,6 +2346,32 @@ async function loadFleets() {
 ========================================= */
 
 
+async function loadHullCounts() {
+
+    try {
+
+        const { data, error } = await supabaseClient.rpc("tusken_hull_counts");
+
+        if (error || !Array.isArray(data)) { return; }
+
+        const counts = {};
+
+        for (const row of data) {
+            if (row && row.fleet_id) {
+                counts[String(row.fleet_id)] = Number(row.hulls) || 0;
+            }
+        }
+
+        hullCounts = counts;
+
+    }
+    catch (e) {
+        /* without the patch every cargo fleet draws a single slaver */
+    }
+
+}
+
+
 function renderFleets() {
 
     fleetLayer.innerHTML = "";
@@ -2367,6 +2398,12 @@ const orbitSlots = {};
 
             continue;
 
+        }
+
+
+        /* a cargo fleet flies one slaver per two hulls it carries */
+        if (isCargoFleet(fleet)) {
+            fleet.hulls = hullCounts[String(fleet.id)] || 0;
         }
 
 

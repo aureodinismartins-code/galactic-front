@@ -21,7 +21,8 @@ const PATCHES = [
     "2026-11-28_transport_fleets.sql",
     "2026-11-29_the_eyes_and_the_ledger.sql",
     "2026-11-30_the_cargo_fleets.sql",
-    "2026-11-31_the_cargo_holds_no_troops.sql"
+    "2026-11-31_the_cargo_holds_no_troops.sql",
+    "2026-11-32_the_hull_counts.sql"
 ];
 
 let pass = 0;
@@ -606,6 +607,13 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
             state.ships.every(function(x) { return x.fleet === "Spear of Ultramar"; }), state.ships);
         ok("and the fleet's lift doubled",
             Number(state.fleets.filter(function(f) { return f.id === spear; })[0].lift) === 2000, state.fleets);
+
+        const hulls = await q(db, "select fleet_id, hulls from public.tusken_hull_counts()");
+
+        ok("the map can ask how many hulls a fleet carries",
+            Number((hulls.filter(function(r) { return r.fleet_id === spear; })[0] || {}).hulls) === 2, hulls);
+        ok("and a fleet with no hulls is not in the answer",
+            !hulls.some(function(r) { return r.fleet_id === barge; }), hulls);
 
         console.log("\n== the interception");
 

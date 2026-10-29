@@ -16,6 +16,10 @@ const api = new Function(SOURCE + `
         SLAVER_CLASS: SLAVER_CLASS,
         LINE_SHIP_SIZES: LINE_SHIP_SIZES,
         SLAVER_FORMATION: SLAVER_FORMATION,
+        SLAVERS_MAX: SLAVERS_MAX,
+        HULLS_PER_SLAVER: HULLS_PER_SLAVER,
+        slaverIcons: slaverIcons,
+        slaverFormation: slaverFormation,
         fleetShipsSVG: fleetShipsSVG,
         isCargoFleet: isCargoFleet,
         shipComposition: shipComposition
@@ -91,7 +95,8 @@ const lineSvg = api.fleetShipsSVG(LINE);
 const armouredSvg = api.fleetShipsSVG(ARMOURED);
 
 ok("the cargo marker is marked as cargo", /class="fleet-ships cargo"/.test(cargoSvg), cargoSvg.slice(0, 80));
-ok("it flies three hulls", (cargoSvg.match(/<path /g) || []).length === 3,
+ok("a cargo fleet with no count flies one slaver",
+    (cargoSvg.match(/<path /g) || []).length === 1,
     (cargoSvg.match(/<path /g) || []).length);
 ok("they are the slaver hull", cargoSvg.indexOf(slaver.d) !== -1);
 ok("and nothing from the line", cargoSvg.indexOf(api.SHIP_ART_BY_NAME.small1.d) === -1 &&
@@ -101,6 +106,30 @@ ok("a warship still flies the small hulls", lineSvg.indexOf(api.SHIP_ART_BY_NAME
     lineSvg.indexOf(slaver.d) === -1);
 ok("and an armoured one still leads with the big ships",
     armouredSvg.indexOf(api.SHIP_ART_BY_NAME.bigA.d) !== -1 && armouredSvg.indexOf(slaver.d) === -1);
+
+console.log("\n== one slaver for every two hulls");
+
+const flown = function (hulls) {
+    return (api.fleetShipsSVG({ id: "x", squads: [], transport_fleet: true, hulls: hulls })
+        .match(/<path /g) || []).length;
+};
+
+ok("one hull flies its only boat", flown(1) === 1, flown(1));
+ok("two hulls fly one slaver", flown(2) === 1, flown(2));
+ok("three hulls fly two", flown(3) === 2, flown(3));
+ok("four hulls fly two", flown(4) === 2, flown(4));
+ok("seven hulls fly four", flown(7) === 4, flown(7));
+ok("twelve hulls fly six", flown(12) === 6, flown(12));
+ok("and a great many are capped at six", flown(40) === 6, flown(40));
+ok("a fleet with no count at all still shows one", flown(0) === 1 && flown(undefined) === 1,
+    [flown(0), flown(undefined)]);
+ok("the board's own word for the count works too",
+    (api.fleetShipsSVG({ squads: [], transport: true, transports: 6 }).match(/<path /g) || []).length === 3);
+ok("the count is the graphics' rule, written down",
+    api.HULLS_PER_SLAVER === 2 && api.SLAVERS_MAX === 6, [api.HULLS_PER_SLAVER, api.SLAVERS_MAX]);
+ok("the icons utility answers the same",
+    api.slaverIcons(2) === 1 && api.slaverIcons(5) === 3 && api.slaverIcons(99) === 6,
+    [api.slaverIcons(2), api.slaverIcons(5), api.slaverIcons(99)]);
 
 console.log("\n== how big it is drawn");
 
@@ -123,6 +152,10 @@ console.log("\n== the formation");
 ok("three places are declared", api.SLAVER_FORMATION.length === 3, api.SLAVER_FORMATION.length);
 ok("no two hulls share a place",
     new Set(api.SLAVER_FORMATION.map(function(p) { return p.join(","); })).size === 3);
+ok("a formation is built for any count",
+    api.slaverFormation(5).length === 5 && api.slaverFormation(1).length === 1);
+ok("and every place in it is its own",
+    new Set(api.slaverFormation(6).map(function(p) { return p.join(","); })).size === 6);
 
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
