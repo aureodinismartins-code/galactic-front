@@ -1332,7 +1332,93 @@
         /* ---------- page titles ---------- */
         "Galactic Front - Galaxy Map": "Galactic Front - Mapa da Galáxia",
         "Galactic Front - Planet": "Galactic Front - Planeta",
-        "Galactic Wars - City Battle": "Galactic Wars - Batalha Urbana"
+        "Galactic Wars - City Battle": "Galactic Wars - Batalha Urbana",
+        /* ---------- Tuskara, the slave trade and the reset ---------- */
+        "THE TUSKEN HOMEWORLD · NOTHING IS CONQUERED HERE, ONLY SETTLED": "O MUNDO NATAL DOS TUSKEN · AQUI NADA É CONQUISTADO, SÓ COLONIZADO",
+        "FACTION CREDITS": "CRÉDITOS DA FACÇÃO",
+        "IN THE PENS": "NOS CERCOS",
+        "TUSKEN AT WORK": "TUSKEN EM SERVIÇO",
+        "THEIR INCOME": "A RENDA DELES",
+        "ORBIT": "ÓRBITA",
+        "Every 1,000 Tusken put to work on a world add 1 credit to that world's payment. On Tuskara itself they earn nothing — a slave is only worth the ship that carries it, and a settlement needs a fleet overhead before the bands walk out. A transport joins a fleet: the hulls give that fleet its lift, and the fleet carries the load — through an enemy orbit, if the escort is strong enough.": "Cada 1.000 tusken postos a trabalhar em um mundo somam 1 crédito ao pagamento desse mundo. No próprio Tuskara eles não rendem nada — um escravo vale apenas pelo navio que o carrega, e um assentamento precisa de uma frota em órbita antes de os bandos saírem. Um transporte entra numa frota: os cascos dão a ela a capacidade, e a frota leva a carga — por uma órbita inimiga, se a escolta for forte o bastante.",
+        "SETTLEMENT": "ASSENTAMENTO",
+        "FOUND A SETTLEMENT": "FUNDAR UM ASSENTAMENTO",
+        "TRANSPORT FLEETS": "FROTAS DE TRANSPORTE",
+        "THE ONLY FLEETS A HULL SAILS WITH": "AS ÚNICAS FROTAS COM QUE UM CASCO NAVEGA",
+        "TRANSPORTS": "TRANSPORTES",
+        "THE FLEET THE NEXT HULL JOINS": "A FROTA QUE O PRÓXIMO CASCO INTEGRA",
+        "BUY A TRANSPORT": "COMPRAR UM TRANSPORTE",
+        "A FLEET OF TRANSPORTS ONLY — NO CONGRESS, NO QUOTA": "UMA FROTA SÓ DE TRANSPORTES — SEM CONGRESSO, SEM COTA",
+        "Transport fleet name": "Nome da frota de transporte",
+        "FOUR TRANSPORT FLEETS — THE LIMIT": "QUATRO FROTAS DE TRANSPORTE — O LIMITE",
+        "SEND A LOAD": "ENVIAR UMA CARGA",
+        "THE TRIP IS FREE": "A VIAGEM É GRÁTIS",
+        "CARRIED BY": "TRANSPORTADA POR",
+        "FROM": "DE",
+        "TO": "PARA",
+        "HOW MANY": "QUANTOS",
+        "SEND THE LOAD": "ENVIAR A CARGA",
+        "AT WORK": "EM SERVIÇO",
+        "WHAT THEY PAY": "O QUE ELES RENDEM",
+        "CONVOYS": "COMBOIOS",
+        "ON THE ROAD": "NA ESTRADA",
+        "UNKNOWN SETTLEMENT": "ASSENTAMENTO DESCONHECIDO",
+        "UNSCOUTED": "NÃO EXPLORADO",
+        "FINISHED": "CONCLUÍDO",
+        "PENS": "CERCOS",
+        "GROW THE SETTLEMENT": "AMPLIAR O ASSENTAMENTO",
+        "BETTER BANDS (CATCH)": "MELHORES BANDOS (CAPTURA)",
+        "BIGGER PENS (HOLD)": "CERCOS MAIORES (CAPACIDADE)",
+        "NO MORE SETTLEMENTS": "NENHUM ASSENTAMENTO A MAIS",
+        "NO FLEET IN ORBIT": "NENHUMA FROTA EM ÓRBITA",
+        "IN ORBIT": "EM ÓRBITA",
+        "NOWHERE": "EM LUGAR NENHUM",
+        "AT SEA": "NO MAR",
+        "DOCKED": "ATRACADO",
+        "NO FLEET": "SEM FROTA",
+        "NO HULLS": "SEM CASCOS",
+        "NO TRANSPORT FLEET — FORM ONE BELOW": "NENHUMA FROTA DE TRANSPORTE — FORME UMA ABAIXO",
+        "NOWHERE YET": "AINDA EM LUGAR NENHUM",
+        "NO SLAVING FLEET HERE": "NENHUMA FROTA ESCRAVISTA AQUI",
+        "No transports. Buy a hull, name the fleet it joins, and it is yours for good.": "Nenhum transporte. Compre um casco, diga a frota que ele integra, e ele é seu para sempre.",
+        "No transport fleet yet. A hull sails with one of those, and one costs nothing but credits — form it below.": "Ainda não há frota de transporte. Um casco navega com uma delas, e ela custa apenas créditos — forme uma abaixo.",
+        "No Tusken are at work yet. Send a load.": "Nenhum tusken está em serviço ainda. Envie uma carga.",
+        "No ships on the road.": "Nenhum navio na estrada.",
+        "Nothing to load here.": "Não há nada para carregar aqui.",
+        "No fleet to join: a hull has to be given to one of your fleets.": "Nenhuma frota para integrar: um casco tem de ser entregue a uma das suas frotas.",
+        "There is nowhere to land the load: hold a world whole first.": "Não há onde desembarcar a carga: domine um mundo inteiro primeiro.",
+        "The load needs a number of Tusken in it.": "A carga precisa de um número de tusken.",
+        "Press a settlement on the globe. You know every one of your own; a rival's takes a spy.": "Pressione um assentamento no globo. Você conhece todos os seus; o de um rival exige um espião.",
+        "Not ours, and nothing is known of it: no name, no owner, no count of the pens. Only a spy can open it.": "Não é nosso, e nada se sabe dele: nenhum nome, nenhum dono, nenhuma contagem dos cercos. Só um espião pode abri-lo.",
+        "SLAVES": "ESCRAVOS",
+        "THE LEDGER OF THE TUSKEN": "O LIVRO DOS TUSKEN",
+        "PENS ON TUSKARA": "CERCOS EM TUSKARA",
+        "THEY PAY": "ELES PAGAM",
+        "EVERY 1,000": "A CADA 1.000",
+        "1 CREDIT": "1 CRÉDITO",
+        "WORLDS HOLDING TUSKEN": "MUNDOS COM TUSKEN",
+        "None at work: the pens are full and nothing has been shipped.": "Nenhum em serviço: os cercos estão cheios e nada foi enviado.",
+        "DESTINATION": "DESTINO",
+        "Only the Freedom Authority and the Combine ship the Tusken": "Só a Freedom Authority e o Combine transportam os tusken",
+        "Only the Freedom Authority and the Combine settle Tuskara": "Só a Freedom Authority e o Combine colonizam Tuskara",
+        "Only the Freedom Authority and the Combine keep spies": "Só a Freedom Authority e o Combine mantêm espiões",
+        "Choose the transport fleet the hull is to join": "Escolha a frota de transporte que o casco vai integrar",
+        "Choose the fleet the transport is to join": "Escolha a frota que o transporte vai integrar",
+        "Choose the fleet that carries the load": "Escolha a frota que leva a carga",
+        "There is no such fleet": "Não existe essa frota",
+        "There is no such settlement": "Não existe esse assentamento",
+        "That fleet is not yours": "Essa frota não é sua",
+        "That settlement is ours: no spy is needed": "Esse assentamento é nosso: não é preciso espião",
+        "That fleet is in battle: no hull joins it until the shooting stops": "Essa frota está em batalha: nenhum casco a integra até o tiroteio parar",
+        "A hull sails only in a transport fleet: form one first, and no chamber has to approve it": "Um casco navega só numa frota de transporte: forme uma primeiro, e nenhuma câmara precisa aprovar",
+        "A slaving fleet carries Tusken, not soldiers: no troops can be raised into it": "Uma frota escravista leva tusken, não soldados: nenhuma tropa pode ser recrutada nela",
+        "No fleet of yours is in orbit of Tuskara: bring one before you settle the dust": "Nenhuma frota sua está em órbita de Tuskara: leve uma antes de assentar a poeira",
+        "A load can only be landed on a world you hold whole": "Uma carga só pode ser desembarcada num mundo que você domina inteiro",
+        "The ship is already there": "O navio já está lá",
+        "This account is not part of the war": "Esta conta não faz parte da guerra",
+        "The reset finished, but the newer systems could not be cleared:": "O reinício terminou, mas os sistemas mais novos não puderam ser limpos:",
+        "The whole game is back to the start.": "O jogo inteiro voltou ao começo.",
+
     };
 
     /* prefixes: matched only at the start of a text node, so the value
@@ -1377,7 +1463,21 @@
         ["Cost:", "Custo:"],
         ["Cost ", "Custo "],
         ["Status:", "Status:"],
-        ["Planet:", "Planeta:"]
+        ["Planet:", "Planeta:"],
+        ["SEND A SPY — ", "ENVIAR UM ESPIÃO — "],
+        ["BUY A TRANSPORT — ", "COMPRAR UM TRANSPORTE — "],
+        ["FORM A FLEET — ", "FORME UMA FROTA — "],
+        ["THE BANDS REST — ", "OS BANDOS DESCANSAM — "],
+        ["SCOUTED · THE SPY IS STILL INSIDE · ", "EXPLORADO · O ESPIÃO AINDA ESTÁ DENTRO · "],
+        ["No transport fleet in orbit of ", "Nenhuma frota de transporte em órbita de "],
+        ["No slaving fleet in orbit of ", "Nenhuma frota escravista em órbita de "],
+        ["No hull yet: ", "Nenhum casco ainda: "],
+        ["takes up to ", "captura até "],
+        ["Up to ", "Até "],
+        ["The settlements answer nothing: ", "Os assentamentos não respondem: "],
+        ["The ledgers answer nothing: ", "Os livros não respondem: "],
+        ["FOUND A SETTLEMENT — ", "FUNDAR UM ASSENTAMENTO — "],
+
     ];
 
     /* trailing words after a number: "176 DELEGATES", "12 VOTES" */
@@ -1387,8 +1487,44 @@
         [" VOTES", " VOTOS"],
         [" CREDITS", " CRÉDITOS"],
         [" UNITS", " UNIDADES"],
-        [" SOLDIERS", " SOLDADOS"]
+        [" SOLDIERS", " SOLDADOS"],
+        [" SETTLED", " COLONIZADOS"],
+        [" HULLS", " CASCOS"],
+        [" LIFT", " CAPACIDADE"],
+        [" / PAYMENT", " / PAGAMENTO"],
     ];
+
+    /* sentences with numbers or names inside them: a word-for-word table
+       cannot translate "A transport costs 350 credits" without losing the
+       350, so these are matched as patterns and the values are kept */
+    const RULES = [
+        [ /^([\d.,]+) HULLS · ([\d.,]+) LIFT$/, "$1 CASCOS · $2 CAPACIDADE" ],
+        [ /^([\d.,]+) OF ([\d.,]+) SETTLED$/, "$1 DE $2 COLONIZADOS" ],
+        [ /^([\d.,]+) IN PORT · ([\d.,]+) A HULL$/, "$1 NO PORTO · $2 POR CASCO" ],
+        [ /^\+([\d.,]+) \/ PAYMENT$/, "+$1 / PAGAMENTO" ],
+        [ /^AT SEA → (.+)$/, "NO MAR → $1" ],
+        [ /^takes up to ([\d.,]+) an hour$/, "captura até $1 por hora" ],
+        [ /^Up to ([\d.,]+) on the (.+) · ([\d.,]+) lift · the trip is free$/, "Até $1 no $2 · $3 de capacidade · a viagem é grátis" ],
+        [ /^A transport fleet costs ([\d.,]+) credits$/, "Uma frota de transporte custa $1 créditos" ],
+        [ /^A transport costs ([\d.,]+) credits$/, "Um transporte custa $1 créditos" ],
+        [ /^A spy costs ([\d.,]+) credits$/, "Um espião custa $1 créditos" ],
+        [ /^A settlement costs ([\d.,]+) credits$/, "Um assentamento custa $1 créditos" ],
+        [ /^Our eyes are still inside that settlement: (\d+) seconds left$/, "Nossos olhos ainda estão dentro desse assentamento: $1 segundos restantes" ],
+        [ /^The bands are still moving: another settlement in (\d+) seconds$/, "Os bandos ainda se movem: outro assentamento em $1 segundos" ],
+        [ /^The dust will not feed another settlement: (\d+) stand already$/, "A poeira não alimenta outro assentamento: $1 já estão de pé" ],
+        [ /^The (.+) is not in port: a fleet at sea cannot take a load$/, "A $1 não está no porto: uma frota no mar não pode levar carga" ],
+        [ /^The (.+) carries no transports: buy a hull for it first$/, "A $1 não tem transportes: compre um casco para ela primeiro" ],
+        [ /^The (.+) is in orbit of (.+), not (.+): the load is waiting at (.+)$/, "A $1 está em órbita de $2, não de $3: a carga espera em $4" ],
+        [ /^An enemy fleet holds the orbit of (.+): the load cannot sail$/, "Uma frota inimiga domina a órbita de $1: a carga não pode zarpar" ],
+        [ /^There are no Tusken waiting at (.+)$/, "Não há tusken esperando em $1" ],
+        [ /^A settlement rises at (.+), for ([\d.,]+) credits\. (.+) holds the orbit\.$/, "Um assentamento nasce em $1, por $2 créditos. $3 domina a órbita." ],
+        [ /^(.+) joins the (.+), for ([\d.,]+) credits\. The fleet now carries ([\d.,]+)\.$/, "$1 entra na $2, por $3 créditos. A frota agora carrega $4." ],
+        [ /^The work is done: (.+), for ([\d.,]+) credits\.$/, "A obra está feita: $1, por $2 créditos." ],
+        [ /^(.+) is formed at Tuskara for ([\d.,]+) credits — no bill and no quota\. Give it hulls and it can sail\.$/, "$1 é formada em Tuskara por $2 créditos — sem projeto e sem cota. Dê cascos a ela e ela navega." ],
+        [ /^([\d.,]+) Tusken aboard the (.+) for (.+) — ([\d.,]+) hulls?, the trip costs nothing, (.+) on the road\.$/, "$1 tusken a bordo da $2 para $3 — $4 cascos, a viagem não custa nada, $5 na estrada." ],
+        [ /^(.+) is ours to read for (.+): ([\d.,]+) in the pens, size (.+), catch (.+), hold (.+) — the spy cost ([\d.,]+) credits\.$/, "$1 está aberto para nós por $2: $3 nos cercos, tamanho $4, captura $5, capacidade $6 — o espião custou $7 créditos." ],
+    ];
+
 
     /* never translated, even if a dictionary key would match */
     const PROTECTED = /^(GALACTIC WARS|GALACTIC FRONT|THE GALACTIC FRONT|Galactic Wars: The Galactic Front|Freedom Authority|Combine|Independents|Free Earth|Krieg|Vraks|Ultramars|Liberty City|New Ardent|New Lisbon|Rifle|MG|Assault|AT|Sniper|Tank|Artillery|Krieg|Arstartes|Knightmare)$/;
@@ -1670,6 +1806,10 @@
         if (Object.prototype.hasOwnProperty.call(DICT, core)) { return DICT[core]; }
         if (Object.prototype.hasOwnProperty.call(SERVER_PT, core)) { return SERVER_PT[core]; }
 
+        for (let i = 0; i < RULES.length; i++) {
+            if (RULES[i][0].test(core)) { return core.replace(RULES[i][0], RULES[i][1]); }
+        }
+
         for (let i = 0; i < PREFIX.length; i++) {
             const en = PREFIX[i][0];
             if (core.length > en.length && core.slice(0, en.length).toUpperCase() === en.toUpperCase()) {
@@ -1704,7 +1844,7 @@
 
     function translateTextNode(node) {
         const raw = node.nodeValue;
-        if (!raw || raw.length > 400) { return; }
+        if (!raw || raw.length > 900) { return; }
         const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(raw);
         if (!m || !m[2]) { return; }
         const out = (activeLookup || lookup)(m[2]);

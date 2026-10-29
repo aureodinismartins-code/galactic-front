@@ -23,7 +23,8 @@ const PATCHES = [
     "2026-11-30_the_cargo_fleets.sql",
     "2026-11-31_the_cargo_holds_no_troops.sql",
     "2026-11-32_the_hull_counts.sql",
-    "2026-11-33_the_slave_routes.sql"
+    "2026-11-33_the_slave_routes.sql",
+    "2026-11-34_the_reset_catches_up.sql"
 ];
 
 let pass = 0;
