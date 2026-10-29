@@ -2702,6 +2702,25 @@ async function loadPlayerCredits() {
 
 async function updateRecruitmentPanel() {
 
+    /* a cargo fleet has no recruiting office at all: the whole section is
+       removed from the panel while it is selected, and put back for the next
+       warship. Nothing here can raise a soldier, so nothing is offered. */
+    const recruitPanel =
+        document.getElementById("fleet-recruitment");
+
+    if (recruitPanel) {
+
+        recruitPanel.style.display =
+            isCargoFleet(selectedFleet) ? "none" : "";
+
+    }
+
+    if (isCargoFleet(selectedFleet)) {
+
+        return;
+
+    }
+
     if (
         !selectedFleet
     ) {
