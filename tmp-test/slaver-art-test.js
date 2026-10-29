@@ -114,22 +114,36 @@ const flown = function (hulls) {
         .match(/<path /g) || []).length;
 };
 
-ok("one hull flies its only boat", flown(1) === 1, flown(1));
+ok("one hull is not a pair yet", flown(1) === 0, flown(1));
 ok("two hulls fly one slaver", flown(2) === 1, flown(2));
-ok("three hulls fly two", flown(3) === 2, flown(3));
+ok("three hulls still fly one", flown(3) === 1, flown(3));
 ok("four hulls fly two", flown(4) === 2, flown(4));
-ok("seven hulls fly four", flown(7) === 4, flown(7));
+ok("seven hulls fly three", flown(7) === 3, flown(7));
 ok("twelve hulls fly six", flown(12) === 6, flown(12));
 ok("and a great many are capped at six", flown(40) === 6, flown(40));
-ok("a fleet with no count at all still shows one", flown(0) === 1 && flown(undefined) === 1,
-    [flown(0), flown(undefined)]);
+ok("a fleet with no hulls draws no ship at all", flown(0) === 0, flown(0));
+ok("a fleet nobody has counted still shows one", flown(undefined) === 1, flown(undefined));
 ok("the board's own word for the count works too",
     (api.fleetShipsSVG({ squads: [], transport: true, transports: 6 }).match(/<path /g) || []).length === 3);
 ok("the count is the graphics' rule, written down",
     api.HULLS_PER_SLAVER === 2 && api.SLAVERS_MAX === 6, [api.HULLS_PER_SLAVER, api.SLAVERS_MAX]);
 ok("the icons utility answers the same",
-    api.slaverIcons(2) === 1 && api.slaverIcons(5) === 3 && api.slaverIcons(99) === 6,
+    api.slaverIcons(2) === 1 && api.slaverIcons(5) === 2 && api.slaverIcons(99) === 6,
     [api.slaverIcons(2), api.slaverIcons(5), api.slaverIcons(99)]);
+
+console.log("\n== the ratio never touches a warship");
+
+const warshipWithHulls = api.fleetShipsSVG({
+    squads: [{ type: "Rifle", amount: 5 }],
+    hulls: 40,
+    transport_fleet: false
+});
+
+ok("a warship still flies one ship per division",
+    (warshipWithHulls.match(/<path /g) || []).length === 5,
+    (warshipWithHulls.match(/<path /g) || []).length);
+ok("and never a slaver, whatever it is carrying", warshipWithHulls.indexOf(slaver.d) === -1);
+ok("a hull count alone does not make a fleet cargo", api.isCargoFleet({ hulls: 40 }) === false);
 
 console.log("\n== how big it is drawn");
 
