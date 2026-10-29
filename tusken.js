@@ -19,12 +19,14 @@
    faction holds whole add 1 credit to that world's payment,
    and the world they left loses exactly that.
 
-   A transport is not a ship of its own: it JOINS A FLEET. 350
-   credits buys a hull once, the buyer names the fleet it is
-   for, and that fleet's lift is the sum of its hulls — so a
-   load is a fleet order, not a hull order. The fleet must be
-   in orbit of the world the Tusken are leaving, and the trip
-   itself costs nothing.
+   A transport is not a ship of its own: it JOINS A TRANSPORT
+   FLEET, one of the congress-free cargo fleets. 350 credits
+   buys a hull once, the buyer names the cargo fleet it is for,
+   and that fleet's lift is the sum of its hulls. A hull is
+   never given to a warship, and no soldier is ever raised into
+   a cargo fleet: it carries Tusken and nothing else. The fleet
+   must be in orbit of the world the Tusken are leaving, and
+   the trip itself costs nothing.
 
    A fleet in orbit of the destination may fall on the load: if
    the escort (the slaving fleet's own soldiers) is weaker, the
@@ -275,7 +277,7 @@
             <div id="tusken-colony"></div>
             <button type="button" id="tusken-found" class="tusken-btn go">FOUND A SETTLEMENT</button>
 
-            <div class="tusken-head"><h3>FLEETS</h3><span>AND THE LIFT THEIR HULLS GIVE THEM</span></div>
+            <div class="tusken-head"><h3>TRANSPORT FLEETS</h3><span>THE ONLY FLEETS A HULL SAILS WITH</span></div>
             <div id="tusken-fleets"></div>
 
             <div class="tusken-head"><h3>TRANSPORTS</h3><span id="tusken-ship-price"></span></div>
@@ -607,18 +609,23 @@
         found.textContent = why || "FOUND A SETTLEMENT — " + num(state.prices.colony) + " CR";
         found.disabled = !!why;
 
-        /* ---- the fleets, and the lift their hulls give them ---- */
+        /* ---- the cargo fleets, and the lift their hulls give them ---- */
         const fleets = state.fleets || [];
 
-        document.getElementById("tusken-fleets").innerHTML = fleets.length
-            ? fleets.map(function (f) {
+        /* a hull sails with a transport fleet only: the battle line is never
+           offered here, and a ship of the line never appears in the picker */
+        const carriers = fleets.filter(function (f) { return f.transport !== false; });
+
+        document.getElementById("tusken-fleets").innerHTML = carriers.length
+            ? carriers.map(function (f) {
                 return '<div class="tusken-row' + (f.stationed ? "" : " sea") + '"><span>' +
                     esc(f.name) + ' · ' + esc(f.at || (f.stationed ? "NOWHERE" : "AT SEA")) +
                     '</span><b>' + (Number(f.transports) > 0
                         ? num(f.transports) + " HULLS · " + num(f.lift) + " LIFT"
-                        : "NO TRANSPORTS") + '</b></div>';
+                        : "NO HULLS") + '</b></div>';
             }).join("")
-            : '<div class="tusken-sub">No fleet of your faction yet. A hull has to join one.</div>';
+            : '<div class="tusken-sub">No transport fleet yet. A hull sails with one of those, ' +
+                'and one costs nothing but credits — form it below.</div>';
 
         /* ---- the hulls, each under the fleet it sails with ---- */
         const ships = state.ships || [];
@@ -638,27 +645,29 @@
 
         /* the fleet the next hull joins */
         const buyPicker = document.getElementById("tusken-buy-fleet");
-        const buyKey = fleets.map(function (f) { return f.id; }).join("|");
+        const buyKey = carriers.map(function (f) { return f.id; }).join("|");
 
         if (buyPicker.dataset.key !== buyKey) {
 
             const keep = buyPicker.value;
 
-            buyPicker.innerHTML = fleets.map(function (f) {
+            buyPicker.innerHTML = carriers.map(function (f) {
                 return '<option value="' + esc(f.id) + '">' + esc(f.name) +
                     (f.at ? " · " + esc(f.at) : "") + "</option>";
-            }).join("") || '<option value="">NO FLEET</option>';
+            }).join("") || '<option value="">NO TRANSPORT FLEET — FORM ONE BELOW</option>';
 
             buyPicker.dataset.key = buyKey;
 
-            if (fleets.some(function (f) { return f.id === keep; })) { buyPicker.value = keep; }
-            else if (orbit.fleet_id) { buyPicker.value = orbit.fleet_id; }
+            if (carriers.some(function (f) { return f.id === keep; })) { buyPicker.value = keep; }
+            else if (carriers.some(function (f) { return f.id === orbit.fleet_id; })) {
+                buyPicker.value = orbit.fleet_id;
+            }
         }
 
         const buy = document.getElementById("tusken-buy-ship");
 
         buy.textContent = "BUY A TRANSPORT — " + num(state.prices.ship) + " CR";
-        buy.disabled = !fleets.length || Number(state.credits || 0) < Number(state.prices.ship || 0);
+        buy.disabled = !carriers.length || Number(state.credits || 0) < Number(state.prices.ship || 0);
 
         /* a transport fleet is bought, not voted on: no chamber is asked */
         const fonder = document.getElementById("tusken-new-fleet");
@@ -712,7 +721,8 @@
 
         /* only a fleet in orbit of the source, with hulls aboard, can carry it */
         const slavers = fleets.filter(function (f) {
-            return f.stationed === true && Number(f.lift) > 0 && f.at === chosen;
+            return f.stationed === true && Number(f.lift) > 0 && f.at === chosen &&
+                f.transport !== false;
         });
 
         const loadPicker = document.getElementById("tusken-fleet");
@@ -741,13 +751,13 @@
         const available = document.getElementById("tusken-available");
 
         if (!ships.length) {
-            available.textContent = "No transport yet: " + num(state.prices.ship) +
-                " credits buys a hull, and the trips after it are free.";
+            available.textContent = "No hull yet: " + num(state.prices.ship) +
+                " credits buys one for a transport fleet, and the trips after it are free.";
             send.disabled = true;
         }
         else if (!slavers.length) {
-            available.textContent = "No slaving fleet in orbit of " + chosen +
-                ": sail one here, or give hulls to the fleet already overhead.";
+            available.textContent = "No transport fleet in orbit of " + chosen +
+                ": sail one here, or give hulls to the cargo fleet already overhead.";
             send.disabled = true;
         }
         else if (!(most > 0)) {

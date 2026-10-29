@@ -19,7 +19,8 @@ const PATCHES = [
     "2026-11-26_the_tusken_world.sql",
     "2026-11-27_the_pens_and_the_transports.sql",
     "2026-11-28_transport_fleets.sql",
-    "2026-11-29_the_eyes_and_the_ledger.sql"
+    "2026-11-29_the_eyes_and_the_ledger.sql",
+    "2026-11-30_the_cargo_fleets.sql"
 ];
 
 let pass = 0;
@@ -283,7 +284,7 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("no settlements yet", state.my_colonies === 0);
         ok("no Tusken captured yet", Number(state.pool) === 0);
         ok("the first settlement costs 500", state.prices.colony === 500, state.prices);
-        ok("a hull takes 2500", Number(state.prices.capacity) === 2500);
+        ok("a hull takes 1000", Number(state.prices.capacity) === 1000);
         ok("the screen knows the new rate", Number(state.prices.per_credit) === 1000, state.prices);
         ok("the screen knows the cooldown", Number(state.prices.cooldown) === 300, state.prices);
         ok("no fleet is in orbit yet", state.orbit.here === false, state.orbit);
@@ -317,8 +318,8 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         await db.exec("delete from public.fleets");
 
         await db.exec(`
-            insert into public.fleets (player_id, faction, name, status, origin)
-            values ('${AUTH}', 'Combine', 'Spear of Ultramar', 'stationed', 'Tuskara')`);
+            insert into public.fleets (player_id, faction, name, status, origin, transport_fleet)
+            values ('${AUTH}', 'Combine', 'Spear of Ultramar', 'stationed', 'Tuskara', true)`);
 
         state = await rpc(db, "select public.tusken_world() as s");
         ok("the fleet overhead is read", state.orbit.here === true, state.orbit);
@@ -434,7 +435,7 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("a load needs a fleet named", err && /Choose the fleet/.test(err), err);
 
         err = await expectError(db, "select public.tusken_buy_ship(null)");
-        ok("a hull cannot be bought without naming a fleet", err && /Choose the fleet/.test(err), err);
+        ok("a hull cannot be bought without naming a fleet", err && /Choose the transport fleet/.test(err), err);
 
         err = await expectError(db, "select public.tusken_buy_ship('" + lantern + "')");
         ok("a hull is not bought for the enemy", err && /not yours/.test(err), err);
@@ -445,14 +446,29 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("it cost 350", (await credits()) === cash - 350);
         ok("it is named in order", bought.name === "Transport 1", bought.name);
         ok("it joins the fleet that was named", bought.fleet === "Spear of Ultramar", bought.fleet);
-        ok("the fleet's lift is the hull's capacity", Number(bought.lift) === 2500, bought.lift);
+        ok("the fleet's lift is the hull's capacity", Number(bought.lift) === 1000, bought.lift);
 
         state = await rpc(db, "select public.tusken_world() as s");
         ok("the hull is on the screen", state.ships.length === 1 && state.ships[0].at_sea === false, state.ships);
         ok("under the fleet it sails with", state.ships[0].fleet === "Spear of Ultramar", state.ships[0]);
         ok("the fleet reads with its lift",
-            Number(state.fleets.filter(function(f) { return f.id === spear; })[0].lift) === 2500, state.fleets);
+            Number(state.fleets.filter(function(f) { return f.id === spear; })[0].lift) === 1000, state.fleets);
         ok("it is in port", Number(state.idle_ships) === 1);
+
+        /* ---- a hull left on a warship by an older save comes home ---- */
+        await db.exec(`
+            insert into public.fleets (player_id, faction, name, status, origin)
+            values ('${AUTH}', 'Combine', 'Old Barge', 'stationed', 'Tuskara')`);
+
+        const oldBarge = (await one(db, "select id from public.fleets where name = 'Old Barge'")).id;
+
+        await db.query("update public.tusken_ships set fleet_id = $1 where id = $2", [oldBarge, bought.id]);
+        await db.exec(fs.readFileSync(path.join(ROOT, "sql", "2026-11-30_the_cargo_fleets.sql"), "utf8"));
+
+        const moved = await one(db, "select fleet_id, capacity from public.tusken_ships where id = $1", [bought.id]);
+
+        ok("a hull on a warship is moved to a transport fleet", moved.fleet_id === spear, moved.fleet_id);
+        ok("and every hull is the small one", Number(moved.capacity) === 1000, moved.capacity);
 
         /* a fleet with no hulls cannot carry anything */
         await db.exec(`
@@ -461,6 +477,9 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         const barge = (await one(db, "select id from public.fleets where name = 'Empty Barge'")).id;
         err = await expectError(db, "select public.tusken_ship('" + barge + "', 'Tuskara', 'Krieg', 500)");
         ok("a fleet without transports carries nothing", err && /carries no transports/.test(err), err);
+
+        err = await expectError(db, "select public.tusken_buy_ship('" + barge + "')");
+        ok("a hull is not sold for a battle fleet", err && /transport fleet/.test(err), err);
 
         cash = await credits();
         let ship = await rpc(db, "select public.tusken_ship('" + spear + "', 'Tuskara', 'Krieg', 1000) as s");
@@ -531,12 +550,12 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("the network splits out the slave income", krieg && Number(krieg.slave_income) === 25, krieg);
 
         /* moving them off Krieg takes the income with them */
-        await rpc(db, "select public.tusken_ship('" + spear + "', 'Krieg', 'Ultramars', 2500) as s");
+        await rpc(db, "select public.tusken_ship('" + spear + "', 'Krieg', 'Ultramars', 2000) as s");
         await db.query("update public.tusken_convoys set arrival_at = now() - interval '1 second' where status = 'sailing'");
         await rpc(db, "select public.tusken_tick() as s");
 
-        ok("Krieg has 22,500 left", Number((await one(db, "select amount from public.tusken_workforce where planet = 'Krieg' and faction = 'Combine'")).amount) === 22500);
-        ok("Ultramars got the load", Number((await one(db, "select amount from public.tusken_workforce where planet = 'Ultramars' and faction = 'Combine'")).amount) === 2500);
+        ok("Krieg has 24,000 left", Number((await one(db, "select amount from public.tusken_workforce where planet = 'Krieg' and faction = 'Combine'")).amount) === 24000);
+        ok("Ultramars got the load", Number((await one(db, "select amount from public.tusken_workforce where planet = 'Ultramars' and faction = 'Combine'")).amount) === 1000);
         await db.query("update public.tusken_workforce set amount = 500 where planet = 'Krieg' and faction = 'Combine'");
         ok("500 Tusken pay nothing", Number(await rpc(db, "select public.tusken_income_bonus('Krieg', 'Combine') as v")) === 0);
 
@@ -564,7 +583,7 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
 
         await db.query("update public.tusken_colonies set slaves = 5000 where id = $1", [colonies[0].id]);
         ship = await rpc(db, "select public.tusken_ship('" + spear + "', 'Tuskara', 'Krieg', 9000) as s");
-        ok("a bigger load is clamped to the fleet's lift", Number(ship.amount) === 2500, ship);
+        ok("a bigger load is clamped to the fleet's lift", Number(ship.amount) === 1000, ship);
         await db.query("update public.tusken_convoys set arrival_at = now() - interval '1 second' where status = 'sailing'");
         await rpc(db, "select public.tusken_tick() as s");
 
@@ -578,7 +597,7 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("both sail with the same fleet",
             state.ships.every(function(x) { return x.fleet === "Spear of Ultramar"; }), state.ships);
         ok("and the fleet's lift doubled",
-            Number(state.fleets.filter(function(f) { return f.id === spear; })[0].lift) === 5000, state.fleets);
+            Number(state.fleets.filter(function(f) { return f.id === spear; })[0].lift) === 2000, state.fleets);
 
         console.log("\n== the interception");
 
@@ -608,34 +627,31 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("and the captor is paid for them",
             Number(await rpc(db, "select public.tusken_income_bonus('Ultramars', 'Freedom Authority') as v")) === 2);
 
-        /* ---- an escort strong enough to bring the load in ---- */
+        /* ---- a slaving fleet is not a warship ---- */
         await db.exec(`
             insert into public.fleets (player_id, faction, name, status, origin, squads)
             values ('${AUTH}', 'Combine', 'Hammer of Mars', 'stationed', 'Tuskara',
                     '[{"type":"Rifle","amount":5,"soldiers":5000}]'::jsonb)`);
         const hammer = (await one(db, "select id from public.fleets where name = 'Hammer of Mars'")).id;
 
-        await rpc(db, "select public.tusken_buy_ship('" + hammer + "') as s");
-        await db.query("update public.tusken_colonies set slaves = 1000");
-        await db.query("update public.fleets set origin = 'Krieg' where name = 'Sword of Earth'");
+        err = await expectError(db, "select public.tusken_buy_ship('" + hammer + "')");
+        ok("a hull does not join a military fleet", err && /transport fleet/.test(err), err);
+        ok("and the warship gets no lift of its own",
+            Number(await rpc(db, "select public.tusken_fleet_lift('" + hammer + "') as v")) === 0);
 
-        const fight = await rpc(db, "select public.tusken_ship('" + hammer + "', 'Tuskara', 'Krieg', 1000) as s");
-        ok("the escort is the fleet's own soldiers", fight && Number(fight.escort) === 5000, fight);
+        const cargo = await rpc(db, "select public.tusken_new_fleet('Cargo Test') as s");
 
-        await db.query("update public.tusken_convoys set arrival_at = now() - interval '1 second' where status = 'sailing'");
-        const won = await rpc(db, "select public.tusken_tick() as s");
-        ok("the escort fights the raider off", Number(won.fought) === 1, won);
-        ok("the load lands anyway",
-            Number((await one(db, "select amount from public.tusken_workforce where planet = 'Krieg' and faction = 'Combine'")).amount) === 2000);
+        err = await expectError(db,
+            "update public.fleets set squads = '[{\"type\":\"Rifle\",\"amount\":1,\"soldiers\":1000}]'::jsonb where id = '" + cargo.id + "'");
+        ok("no soldier is raised into a slaving fleet", err && /carries Tusken, not soldiers/.test(err), err);
+        ok("and its squads stay empty",
+            Number((await one(db, "select jsonb_array_length(squads) as n from public.fleets where id = $1", [cargo.id])).n) === 0);
 
-        const raider = await one(db, "select squads from public.fleets where name = 'Sword of Earth'");
-        ok("the raider is mauled", Number(raider.squads[0].soldiers) === 2700, raider.squads);
-        ok("the slaving fleet stays ours",
-            (await one(db, "select faction from public.fleets where id = $1", [hammer])).faction === "Combine");
-
-        const foughtRecord = await one(db, "select status, outcome from public.tusken_convoys order by id desc limit 1");
-        ok("the crossing is marked landed after the fight", foughtRecord.status === "landed" &&
-            /fought through/.test(foughtRecord.outcome || ""), foughtRecord);
+        state = await rpc(db, "select public.tusken_world() as s");
+        ok("the screen marks the cargo fleet",
+            state.fleets.filter(function(f) { return f.id === cargo.id; })[0].transport === true, state.fleets);
+        ok("and a warship is not marked so",
+            state.fleets.filter(function(f) { return f.id === hammer; })[0].transport === false, state.fleets);
 
         console.log("\n== a frozen world");
 
@@ -729,18 +745,17 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("and it belongs to us", coffinRow.faction === "Combine", coffinRow.faction);
 
         state = await rpc(db, "select public.tusken_world() as s");
-        ok("the screen counts transport fleets", Number(state.transport_fleets.used) === 1, state.transport_fleets);
+        ok("the screen counts transport fleets", Number(state.transport_fleets.used) === 2, state.transport_fleets);
         ok("and shows the limit", Number(state.transport_fleets.max) === 4);
 
         await rpc(db, "select public.tusken_buy_ship('" + coffins.id + "') as s");
         ok("a hull joins the new fleet",
-            Number(await rpc(db, "select public.tusken_fleet_lift('" + coffins.id + "') as v")) === 2500);
+            Number(await rpc(db, "select public.tusken_fleet_lift('" + coffins.id + "') as v")) === 1000);
 
         await rpc(db, "select public.tusken_new_fleet('Coffin Ships') as s");
         const twinned = await one(db, "select name from public.fleets where transport_fleet and id <> $1 order by name", [coffins.id]);
         ok("a second fleet with the same name gets its own", twinned && twinned.name !== "Coffin Ships", twinned);
 
-        await rpc(db, "select public.tusken_new_fleet(null) as s");
         await rpc(db, "select public.tusken_new_fleet(null) as s");
 
         err = await expectError(db, "select public.tusken_new_fleet('A Fifth')");

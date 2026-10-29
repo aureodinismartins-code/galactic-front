@@ -34,7 +34,7 @@ function payload(over) {
         max_colonies: 8,
         orbit: { here: true, fleet: "Spear of Ultramar" },
         cooldown: 0,
-        prices: { colony: 1000, ship: 350, capacity: 2500, per_credit: 1000, cooldown: 300 },
+        prices: { colony: 1000, ship: 350, capacity: 1000, per_credit: 1000, cooldown: 300 },
         spy: { price: 250, seconds: 1800 },
         transport_fleets: { price: 300, max: 4, used: 0 },
         colonies: [
@@ -51,12 +51,14 @@ function payload(over) {
         ],
         fleets: [
             { id: "f1", name: "Spear of Ultramar", status: "stationed", at: "Tuskara",
-              stationed: true, lift: 2500, transports: 1, soldiers: 3000 },
+              stationed: true, lift: 1000, transports: 1, soldiers: 0, transport: true },
             { id: "f2", name: "Hammer of Mars", status: "travelling", at: null,
-              stationed: false, lift: 0, transports: 0, soldiers: 0 }
+              stationed: false, lift: 0, transports: 0, soldiers: 0, transport: false },
+            { id: "f3", name: "Sword of Earth", status: "stationed", at: "Tuskara",
+              stationed: true, lift: 0, transports: 0, soldiers: 3000, transport: false }
         ],
         ships: [
-            { id: 1, name: "Transport 1", capacity: 2500, fleet_id: "f1",
+            { id: 1, name: "Transport 1", capacity: 1000, fleet_id: "f1",
               fleet: "Spear of Ultramar", at_sea: false, to: null, seconds: 0 }
         ],
         idle_ships: 1,
@@ -69,7 +71,7 @@ function payload(over) {
             { planet: "Ultramars", x: 10, y: 19, income: 100, slaves: 4000, seconds: 240 }
         ],
         convoys: [
-            { id: 3, from: "Tuskara", to: "Krieg", amount: 2500, ships: 1,
+            { id: 3, from: "Tuskara", to: "Krieg", amount: 1000, ships: 1,
               fleet: "Spear of Ultramar", status: "sailing", outcome: null, seconds: 192 }
         ]
     }, over || {});
@@ -104,8 +106,8 @@ async function open(name, options) {
                                  fleet: "Spear of Ultramar" }, error: null };
             }
             if (fn === "tusken_buy_ship") {
-                return { data: { ok: true, id: 2, name: "Transport 2", paid: 350, capacity: 2500,
-                                 fleet: "Spear of Ultramar", fleet_id: args.p_fleet, lift: 5000 }, error: null };
+                return { data: { ok: true, id: 2, name: "Transport 2", paid: 350, capacity: 1000,
+                                 fleet: "Spear of Ultramar", fleet_id: args.p_fleet, lift: 2000 }, error: null };
             }
             if (fn === "tusken_upgrade") { return { data: { ok: true, paid: 800, track: args.p_track }, error: null }; }
             if (fn === "tusken_spy") {
@@ -120,7 +122,7 @@ async function open(name, options) {
             if (fn === "tusken_ship") {
                 return { data: { ok: true, amount: args.p_amount, to: args.p_to, paid: 0,
                                  fleet: "Spear of Ultramar", fleet_id: args.p_fleet, ships: 1,
-                                 lift: 2500, escort: 3000, seconds: 180 }, error: null };
+                                 lift: 1000, escort: 0, seconds: 180 }, error: null };
             }
             return { data: null, error: { message: "unknown call" } };
         }
@@ -276,7 +278,7 @@ async function open(name, options) {
         console.log("\n== the hulls");
 
         ok("the price and the hull's size are stated",
-            /2,500 A HULL/.test(panel.querySelector("#tusken-ship-price").textContent),
+            /1,000 A HULL/.test(panel.querySelector("#tusken-ship-price").textContent),
             panel.querySelector("#tusken-ship-price").textContent);
         ok("the hull in port is listed",
             /Transport 1/.test(panel.querySelector("#tusken-ships").textContent) &&
@@ -287,15 +289,15 @@ async function open(name, options) {
             panel.querySelector("#tusken-ships").textContent);
         ok("the fleet's lift is listed",
             /Spear of Ultramar/.test(panel.querySelector("#tusken-fleets").textContent) &&
-            /1 HULLS · 2,500 LIFT/.test(panel.querySelector("#tusken-fleets").textContent),
+            /1 HULLS · 1,000 LIFT/.test(panel.querySelector("#tusken-fleets").textContent),
             panel.querySelector("#tusken-fleets").textContent);
-        ok("a fleet with no hulls says so",
-            /NO TRANSPORTS/.test(panel.querySelector("#tusken-fleets").textContent),
+        ok("a warship is not offered as a carrier",
+            !/Sword of Earth/.test(panel.querySelector("#tusken-fleets").textContent),
             panel.querySelector("#tusken-fleets").textContent);
 
         const buyPicker = panel.querySelector("#tusken-buy-fleet");
-        ok("the hull is bought for one of our fleets", buyPicker.options.length === 2 &&
-            buyPicker.value === "f1", buyPicker.value);
+        ok("only a transport fleet can take a hull", buyPicker.options.length === 1 &&
+            buyPicker.value === "f1", buyPicker.options.length + " " + buyPicker.value);
 
         panel.querySelector("#tusken-buy-ship").click();
         await wait(30);
@@ -366,11 +368,11 @@ async function open(name, options) {
         ok("Tuskara is one of them", from.options[0].value === "Tuskara");
         ok("only worlds we hold whole are offered", to.options.length === 2 &&
             Array.from(to.options).every(function(o) { return o.value !== "Tuskara"; }), to.options.length);
-        ok("the load defaults to the fleet's lift", amount.value === "1850", amount.value);
+        ok("the load defaults to the fleet's lift", amount.value === "1000", amount.value);
         ok("the trip is stated as free", /trip is free/.test(panel.querySelector("#tusken-available").textContent),
             panel.querySelector("#tusken-available").textContent);
         ok("the lift is stated on the fleet that carries it",
-            /2,500 lift/.test(panel.querySelector("#tusken-available").textContent),
+            /1,000 lift/.test(panel.querySelector("#tusken-available").textContent),
             panel.querySelector("#tusken-available").textContent);
 
         const loadPicker = panel.querySelector("#tusken-fleet");
@@ -379,17 +381,17 @@ async function open(name, options) {
             loadPicker.options.length + " " + loadPicker.value);
 
         to.value = "Krieg";
-        amount.value = "1850";
+        amount.value = "1000";
         panel.querySelector("#tusken-ship").click();
         await wait(30);
 
         const shipCall = page.calls.filter(function(c) { return c.fn === "tusken_ship"; })[0];
         ok("the load is sent from the pens", shipCall && shipCall.args.p_from === "Tuskara" &&
-            shipCall.args.p_to === "Krieg" && shipCall.args.p_amount === 1850, shipCall && shipCall.args);
+            shipCall.args.p_to === "Krieg" && shipCall.args.p_amount === 1000, shipCall && shipCall.args);
         ok("and the fleet that carries it is named", shipCall && shipCall.args.p_fleet === "f1",
             shipCall && shipCall.args);
         ok("the load is reported on the fleet that carried it",
-            /1,850 Tusken aboard the Spear of Ultramar for Krieg/.test(panel.querySelector("#tusken-msg").textContent),
+            /1,000 Tusken aboard the Spear of Ultramar for Krieg/.test(panel.querySelector("#tusken-msg").textContent),
             panel.querySelector("#tusken-msg").textContent);
         ok("and the trip is called free", /costs nothing/.test(panel.querySelector("#tusken-msg").textContent));
 
@@ -399,7 +401,7 @@ async function open(name, options) {
             /\+25/.test(panel.querySelector("#tusken-workforce").textContent),
             panel.querySelector("#tusken-workforce").textContent);
         ok("a convoy is listed with its clock", /Tuskara → Krieg/.test(panel.querySelector("#tusken-convoys").textContent) &&
-            /2,500 · 3m 12s/.test(panel.querySelector("#tusken-convoys").textContent),
+            /1,000 · 3m 12s/.test(panel.querySelector("#tusken-convoys").textContent),
             panel.querySelector("#tusken-convoys").textContent);
 
         ok("the panel is styled by its own stylesheet", !!doc.getElementById("tusken-css"));
