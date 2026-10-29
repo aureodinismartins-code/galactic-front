@@ -20,7 +20,8 @@ const PATCHES = [
     "2026-11-27_the_pens_and_the_transports.sql",
     "2026-11-28_transport_fleets.sql",
     "2026-11-29_the_eyes_and_the_ledger.sql",
-    "2026-11-30_the_cargo_fleets.sql"
+    "2026-11-30_the_cargo_fleets.sql",
+    "2026-11-31_the_cargo_holds_no_troops.sql"
 ];
 
 let pass = 0;
@@ -105,6 +106,13 @@ insert into public.cities (planet_id, faction, name) values
     ('Asteron', 'Independents', 'Aster');
 
 create table public.city_buildings (id serial primary key, city_id int, building_type text);
+
+create table public.fleet_recruits (
+    id serial primary key,
+    fleet_id uuid,
+    squad_type text,
+    ready_at timestamptz default now()
+);
 
 ${FLEETS}
 
@@ -760,6 +768,40 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
 
         err = await expectError(db, "select public.tusken_new_fleet('A Fifth')");
         ok("a fifth transport fleet is refused", err && /at most 4/.test(err), err);
+
+        console.log("\n== a slave fleet made before the rule");
+
+        /* an older save: an ordinary fleet, troops aboard, a hull in its hold and
+           a squad already paid for and queued */
+        await db.exec(`
+            insert into public.fleets (player_id, faction, name, status, origin, squads)
+            values ('${AUTH}', 'Combine', 'Old Slaver', 'stationed', 'Tuskara',
+                    '[{"type":"MG","amount":1,"soldiers":750},
+                      {"type":"Assault","amount":1,"soldiers":1000}]'::jsonb)`);
+
+        const oldSlaver = (await one(db, "select id from public.fleets where name = 'Old Slaver'")).id;
+
+        await db.query("insert into public.tusken_ships (faction, player_id, name, capacity, fleet_id) values ('Combine', $1, 'Old Hull', 2500, $2)", [AUTH, oldSlaver]);
+        await db.query("insert into public.fleet_recruits (fleet_id, squad_type, ready_at) values ($1, 'Assault', now() + interval '1 minute')", [oldSlaver]);
+
+        await db.exec(fs.readFileSync(path.join(ROOT, "sql", "2026-11-31_the_cargo_holds_no_troops.sql"), "utf8"));
+
+        const slaver = await one(db, "select transport_fleet, jsonb_array_length(squads) as n from public.fleets where id = $1", [oldSlaver]);
+
+        ok("a fleet holding a hull is made a cargo fleet", slaver.transport_fleet === true, slaver);
+        ok("its MGs and assaults are disbanded", Number(slaver.n) === 0, slaver);
+        ok("its hull is the small one",
+            Number((await one(db, "select capacity from public.tusken_ships where fleet_id = $1", [oldSlaver])).capacity) === 1000);
+        ok("the squad it was training is dropped",
+            Number((await one(db, "select count(*) as n from public.fleet_recruits where fleet_id = $1", [oldSlaver])).n) === 0);
+
+        err = await expectError(db,
+            "insert into public.fleet_recruits (fleet_id, squad_type, ready_at) values ('" + oldSlaver + "', 'MG', now() + interval '1 minute')");
+        ok("and no new squad can be queued into it", err && /carries Tusken, not soldiers/.test(err), err);
+
+        await db.query("insert into public.fleet_recruits (fleet_id, squad_type, ready_at) values ($1, 'MG', now() + interval '1 minute')", [hammer]);
+        ok("a warship still raises its own",
+            Number((await one(db, "select count(*) as n from public.fleet_recruits where fleet_id = $1", [hammer])).n) === 1);
 
         console.log("\n== the ledger of the Tusken");
 

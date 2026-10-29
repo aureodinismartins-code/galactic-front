@@ -1266,6 +1266,10 @@
         /* ---------- the recruiting office, when it cannot work (2026-11-18) ---------- */
         "You cannot recruit here: this world is neutral or hostile. Recruits are raised on a world your faction holds.": "Não podes recrutar aqui: este mundo é neutro ou hostil. Os recrutas são formados num mundo que a tua facção controle.",
 
+        /* ---------- the cargo fleets (2026-11-30 / 2026-11-31) ---------- */
+        "You cannot recruit here: this is a cargo fleet. A slaving fleet carries Tusken, not soldiers.": "Não podes recrutar aqui: esta é uma frota de carga. Uma frota de escravos transporta Tusken, não soldados.",
+        "CARGO FLEET — IT CARRIES TUSKEN, NOT SOLDIERS": "FROTA DE CARGA — TRANSPORTA TUSKEN, NÃO SOLDADOS",
+
         /* ---------- a half-applied committee patch (2026-11-19) ---------- */
         "This database still has an earlier version of the committee functions. Run sql/2026-11-15_committees_and_ministers.sql again: it replaces them.": "Esta base de dados ainda tem a versão anterior das funções das comissões. Rode sql/2026-11-15_committees_and_ministers.sql outra vez: ele substitui-as.",
         "Recruits are raised on a world your faction holds: this fleet is not in orbit of one.": "Os recrutas são formados num mundo que a tua facção controle: esta frota não está em órbita de nenhum.",

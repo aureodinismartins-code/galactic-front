@@ -2744,7 +2744,9 @@ async function updateRecruitmentPanel() {
 
     }
 
-    fleetComposition.textContent = compositionText;
+    fleetComposition.textContent = selectedFleet.transport_fleet === true
+        ? T("CARGO FLEET — IT CARRIES TUSKEN, NOT SOLDIERS") + " · " + compositionText
+        : compositionText;
 
 
     const credits =
@@ -2780,6 +2782,7 @@ async function updateRecruitmentPanel() {
             button.disabled =
                 !isOwner ||
                 !stationed ||
+                selectedFleet.transport_fleet === true ||
                 credits === null ||
                 credits < cost ||
                 unitCount + amount > 20;
@@ -2932,6 +2935,9 @@ function planetOwner(p_name) {
 /* the same question the dock asks: is this fleet over a world of ours? */
 function recruitHere(fleet) {
 
+    /* a cargo fleet is the pens at sea: it carries Tusken, not soldiers */
+    if (fleet && fleet.transport_fleet === true) { return false; }
+
     const orbit = fleetOrbitName(fleet);
 
     if (!orbit) { return false; }
@@ -2952,6 +2958,15 @@ function showRecruitHint(fleet) {
         hint.className = "fleet-panel-row";
         hint.textContent = "";
         hint.style.display = "none";
+        return;
+    }
+
+    /* a cargo fleet is never a recruiting office, whatever world it is over */
+    if (fleet.transport_fleet === true) {
+        hint.className = "fleet-panel-row dock-warning";
+        hint.textContent = "\u26a0 " +
+            T("You cannot recruit here: this is a cargo fleet. A slaving fleet carries Tusken, not soldiers.");
+        hint.style.display = "";
         return;
     }
 
@@ -3446,19 +3461,26 @@ recruitButtons.forEach(
 
                     return;
 
-                }
-
-
-                if (
+                }                if (
                     selectedFleet.status !==
                     "stationed"
                 ) {
-
                     fleetMessage.textContent =
                         "Fleet must be stationed.";
+                    return;
+                }
+
+
+                /* a cargo fleet carries Tusken and nothing else: the server
+                   refuses the order, and this says why before it is sent */
+                if (selectedFleet.transport_fleet === true) {
+
+                    showRecruitHint(selectedFleet);
+
+                    const cargoWarn = document.getElementById("fleet-recruit-hint");
+                    fleetMessage.textContent = cargoWarn ? cargoWarn.textContent : "";
 
                     return;
-
                 }
 
 
