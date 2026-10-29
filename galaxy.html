@@ -597,6 +597,9 @@
         .fleet-marker { box-shadow: none !important; animation: none !important; border-radius: 0 !important; }
         .fleet-marker.selected { outline: 2px dashed rgba(143,208,255,.9) !important; outline-offset: 2px; border-radius: 8px !important; }
         .fleet-marker .hull { stroke: none; fill: #f3f5fb; }
+        /* ---- THE SLAVER CLASS: the smallest, unarmed hull on the map ---- */
+        .fleet-marker.cargo .hull { fill: #e6dcc2; }
+        .fleet-marker.cargo { filter: drop-shadow(0 0 3px rgba(240, 207, 138, 0.55)) !important; }
         .fleet-marker .trim { fill: none; stroke: #d9b45a; stroke-width: 0.8; }
         .fleet-marker .glow { fill: #ffffff; }
         .fleet-marker svg.fleet-ships { transition: transform 0.4s linear; }
@@ -2381,6 +2384,12 @@ const orbitSlots = {};
             factionClass(
                 fleet.faction
             );
+
+
+        /* a transport fleet flies the slaver class: three small hulls */
+        if (isCargoFleet(fleet)) {
+            marker.classList.add("cargo");
+        }
 
 
                 if (
