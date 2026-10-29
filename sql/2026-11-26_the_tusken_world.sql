@@ -283,12 +283,14 @@ as $function$
 $function$;
 
 
+/* small settlements, many of them: eight per faction, sixteen places
+   (11-27 restates this number; the two files must never disagree) */
 create or replace function public.tusken_max_colonies()
 returns integer
 language sql
 immutable
 as $function$
-    select 3
+    select 8
 $function$;
 
 
@@ -306,12 +308,14 @@ as $function$
 $function$;
 
 
+/* the small slaver hull: 1,000 Tusken a trip (11-30 restates this, so a
+   re-run of this file cannot quietly hand out 2,500 again) */
 create or replace function public.tusken_ship_capacity()
 returns bigint
 language sql
 immutable
 as $function$
-    select 2500::bigint
+    select 1000::bigint
 $function$;
 
 
@@ -324,12 +328,14 @@ as $function$
 $function$;
 
 
+/* 1,000 Tusken at work on a world pay it 1 credit (11-27 restates this;
+   the two files must never disagree, because any patch may be re-run) */
 create or replace function public.tusken_slaves_per_credit()
 returns bigint
 language sql
 immutable
 as $function$
-    select 10000::bigint
+    select 1000::bigint
 $function$;
 
 

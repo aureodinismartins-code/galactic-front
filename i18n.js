@@ -1418,6 +1418,9 @@
         "This account is not part of the war": "Esta conta não faz parte da guerra",
         "The reset finished, but the newer systems could not be cleared:": "O reinício terminou, mas os sistemas mais novos não puderam ser limpos:",
         "The whole game is back to the start.": "O jogo inteiro voltou ao começo.",
+        "Only the President of the Congress may veto": "Só o Presidente da Câmara pode vetar",
+        "The veto of this term has been used": "O veto deste mandato já foi usado",
+        "Only a live bill can be vetoed": "Só um projeto em andamento pode ser vetado",
 
     };
 

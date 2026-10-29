@@ -1142,11 +1142,13 @@ language sql
 immutable
 as $function$ select 12.0 $function$;
 
+/* the fog of war reaches 20 on the map (11-05 widens it; this file says the
+   same number so a re-run does not shrink every sensor) */
 create or replace function public.sensor_world_range()
 returns numeric
 language sql
 immutable
-as $function$ select 10.0 $function$;
+as $function$ select 20.0 $function$;
 
 
 /*

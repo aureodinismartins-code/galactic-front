@@ -1117,7 +1117,7 @@ begin
     select * into st from public.cg_speaker_state as s where s.id = 1;
 
     if st.speaker_player is null or st.speaker_player <> me then
-        raise exception 'Only the President of the Congress may veto';
+        raise exception 'Only the Speaker of the Congress may veto';
     end if;
 
     if st.veto_used then
