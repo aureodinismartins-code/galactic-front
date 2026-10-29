@@ -104,6 +104,10 @@
         if (el) { el.textContent = text || ""; }
     }
 
+    function spyPrice() {
+        return state && state.spy ? Number(state.spy.price) : 250;
+    }
+
     /* ---------- the board ---------- */
 
     function addStyles() {
@@ -212,6 +216,22 @@
                 background: rgba(240,207,138,.13);
                 box-shadow: inset 0 0 0 1px rgba(255, 211, 122, .5);
             }
+            #tusken-panel .tusken-split { display: flex; gap: 6px; align-items: stretch; margin-top: 5px; }
+            #tusken-panel .tusken-split .tusken-input { flex: 1; margin-top: 0; }
+            #tusken-panel .tusken-split .tusken-btn { width: auto; flex: 0 0 auto; margin-top: 0; }
+            #tusken-panel .tusken-card.unknown { border-style: dashed; border-color: rgba(200,180,140,.4); }
+            #tusken-panel .tusken-card.scouted { border-color: rgba(160,210,255,.4); }
+            .city.tusken.unknown .city-marker {
+                background: #7d7159 !important;
+                border-color: #a99a7c !important;
+                box-shadow: none !important;
+            }
+            .city.tusken.unknown span { color: #9c8f74; }
+            .city.tusken.unknown.picked .city-marker {
+                background: #c9b994 !important;
+                border-color: #efe3cb !important;
+                box-shadow: 0 0 14px 3px rgba(201,185,148,.7) !important;
+            }
             @media (max-width: 780px) {
                 #tusken-panel {
                     left: 10px; right: 10px; top: auto; bottom: 10px;
@@ -251,8 +271,8 @@
                 the load — through an enemy orbit, if the escort is strong enough.
             </div>
 
-            <div class="tusken-head"><h3>SETTLEMENTS</h3><span id="tusken-colony-count"></span></div>
-            <div id="tusken-colonies"></div>
+            <div class="tusken-head"><h3>SETTLEMENT</h3><span id="tusken-colony-count"></span></div>
+            <div id="tusken-colony"></div>
             <button type="button" id="tusken-found" class="tusken-btn go">FOUND A SETTLEMENT</button>
 
             <div class="tusken-head"><h3>FLEETS</h3><span>AND THE LIFT THEIR HULLS GIVE THEM</span></div>
@@ -263,6 +283,13 @@
             <label class="tusken-label" for="tusken-buy-fleet">THE FLEET THE NEXT HULL JOINS</label>
             <select id="tusken-buy-fleet" class="tusken-select"></select>
             <button type="button" id="tusken-buy-ship" class="tusken-btn">BUY A TRANSPORT</button>
+
+            <label class="tusken-label" for="tusken-new-fleet-name">A FLEET OF TRANSPORTS ONLY — NO CONGRESS, NO QUOTA</label>
+            <div class="tusken-split">
+                <input id="tusken-new-fleet-name" class="tusken-input" type="text" maxlength="40"
+                       placeholder="Transport fleet name">
+                <button type="button" id="tusken-new-fleet" class="tusken-btn">FORM A FLEET — 300 CR</button>
+            </div>
 
             <div class="tusken-head"><h3>SEND A LOAD</h3><span>THE TRIP IS FREE</span></div>
             <label class="tusken-label" for="tusken-fleet">CARRIED BY</label>
@@ -289,11 +316,20 @@
 
         panel.querySelector("#tusken-found").addEventListener("click", function () { act("found"); });
         panel.querySelector("#tusken-buy-ship").addEventListener("click", function () { act("buy"); });
+        panel.querySelector("#tusken-new-fleet").addEventListener("click", function () { act("newfleet"); });
         panel.querySelector("#tusken-ship").addEventListener("click", function () { act("ship"); });
 
         panel.addEventListener("click", function (ev) {
-            const btn = ev.target && ev.target.closest ? ev.target.closest("[data-up]") : null;
-            if (btn) { act("upgrade", btn); }
+
+            if (!ev.target || !ev.target.closest) { return; }
+
+            const up = ev.target.closest("[data-up]");
+            if (up) { act("upgrade", up); return; }
+
+            /* the spy button lives inside the settlement card */
+            const spy = ev.target.closest("[data-act='spy']");
+            if (spy) { act("spy", spy); }
+
         });
 
     }
@@ -361,6 +397,20 @@
                     p_track: btn.dataset.up
                 });
             }
+            else if (kind === "spy" && btn) {
+
+                result = await supabaseClient.rpc("tusken_spy", {
+                    p_colony: Number(btn.dataset.colony)
+                });
+
+            }
+            else if (kind === "newfleet") {
+
+                const name = document.getElementById("tusken-new-fleet-name").value.trim();
+
+                result = await supabaseClient.rpc("tusken_new_fleet", { p_name: name || null });
+
+            }
             else if (kind === "ship") {
 
                 const from = document.getElementById("tusken-from").value;
@@ -403,6 +453,15 @@
                 else if (kind === "upgrade") {
                     say("The work is done: " + String(d.track).toUpperCase() + ", for " + num(d.paid) + " credits.");
                 }
+                else if (kind === "spy") {
+                    say(d.name + " is ours to read for " + duration(d.seconds) + ": " + num(d.slaves) +
+                        " in the pens, size " + d.size + ", catch " + d.catch + ", hold " + d.hold +
+                        " — the spy cost " + num(d.paid) + " credits.");
+                }
+                else if (kind === "newfleet") {
+                    say(d.name + " is formed at Tuskara for " + num(d.paid) +
+                        " credits — no bill and no quota. Give it hulls and it can sail.");
+                }
                 else if (kind === "ship") {
                     say(num(d.amount) + " Tusken aboard the " + d.fleet + " for " + d.to +
                         " — " + num(d.ships) + (Number(d.ships) === 1 ? " hull, " : " hulls, ") +
@@ -424,7 +483,25 @@
 
     /* ---------- drawing ---------- */
 
-    function colonyCard(c) {
+    /* one settlement, the one the player pressed: the panel is a tab on the
+       marker, not a list of everything on the dust. What we do not own is
+       closed until a spy has been inside it. */
+    function settlementCard(c) {
+
+        if (!c) {
+            return '<div class="tusken-sub">Press a settlement on the globe. ' +
+                'You know every one of your own; a rival\'s takes a spy.</div>';
+        }
+
+        if (!c.known) {
+            return '<div class="tusken-card unknown" data-settlement="' + c.id + '">' +
+                '<div class="tusken-line"><h3>UNKNOWN SETTLEMENT</h3><span>UNSCOUTED</span></div>' +
+                '<div class="tusken-sub">Not ours, and nothing is known of it: no name, no owner, ' +
+                'no count of the pens. Only a spy can open it.</div>' +
+                '<button type="button" class="tusken-btn" data-act="spy" data-colony="' + c.id + '">' +
+                'SEND A SPY — ' + num(spyPrice()) + ' CR</button>' +
+                '</div>';
+        }
 
         const pct = Number(c.capacity) > 0
             ? Math.min(100, 100 * Number(c.slaves) / Number(c.capacity))
@@ -445,7 +522,7 @@
 
         }
 
-        return '<div class="tusken-card' + (c.mine ? ' mine' : '') + '" data-settlement="' + c.id + '">' +
+        return '<div class="tusken-card' + (c.mine ? ' mine' : ' scouted') + '" data-settlement="' + c.id + '">' +
             '<div class="tusken-line"><h3>' + esc(c.name || "SETTLEMENT") + '</h3>' +
             '<span>' + factionName(c.faction) + '</span></div>' +
             '<div class="tusken-sub">SIZE ' + c.size + ' · CATCH ' + c.catch + ' · HOLD ' + c.hold + '</div>' +
@@ -453,10 +530,29 @@
             num(c.capacity) + '</span></div>' +
             '<div class="tusken-bar"><div style="width:' + pct.toFixed(1) + '%"></div></div>' +
             '<div class="tusken-sub">takes up to ' + num(c.per_hour) + ' an hour</div>' +
+            (c.mine ? "" : '<div class="tusken-sub">SCOUTED · THE SPY IS STILL INSIDE · ' +
+                duration(c.spied_left) + '</div>') +
             track("size", c.size_cost, "GROW THE SETTLEMENT") +
             track("catch", c.catch_cost, "BETTER BANDS (CATCH)") +
             track("hold", c.hold_cost, "BIGGER PENS (HOLD)") +
             '</div>';
+
+    }
+
+    /* the one settlement on the board: the picked one, or the hint */
+    function drawSettlement() {
+
+        if (!state) { return; }
+
+        const colonies = state.colonies || [];
+
+        const shown = picked === null
+            ? null
+            : colonies.filter(function (c) { return Number(c.id) === picked; })[0] || null;
+
+        if (picked !== null && !shown) { picked = null; }
+
+        document.getElementById("tusken-colony").innerHTML = settlementCard(shown);
 
     }
 
@@ -486,12 +582,10 @@
         document.getElementById("tusken-colony-count").textContent =
             state.my_colonies + " OF " + state.max_colonies + " SETTLED";
 
-        document.getElementById("tusken-colonies").innerHTML = (state.colonies || []).length
-            ? state.colonies.map(colonyCard).join("")
-            : '<div class="tusken-sub">The dust is empty. Nobody has settled Tuskara yet.</div>';
+        /* only the settlement the player pressed is shown, and a redraw every
+           eight seconds keeps it: the pick is an id, not a DOM node */
+        drawSettlement();
 
-        /* the eight-second redraw throws the cards away: the one the
-           player picked is lit again on the new set */
         drawSelection(false);
 
         /* ---- the found button answers to all three gates ---- */
@@ -565,6 +659,16 @@
 
         buy.textContent = "BUY A TRANSPORT — " + num(state.prices.ship) + " CR";
         buy.disabled = !fleets.length || Number(state.credits || 0) < Number(state.prices.ship || 0);
+
+        /* a transport fleet is bought, not voted on: no chamber is asked */
+        const fonder = document.getElementById("tusken-new-fleet");
+        const tf = state.transport_fleets || { price: 300, max: 4, used: 0 };
+
+        fonder.textContent = Number(tf.used) >= Number(tf.max)
+            ? "FOUR TRANSPORT FLEETS — THE LIMIT"
+            : "FORM A FLEET — " + num(tf.price) + " CR";
+        fonder.disabled = Number(tf.used) >= Number(tf.max) ||
+            Number(state.credits || 0) < Number(tf.price);
 
         /* the two pickers are only rebuilt when their lists change, so a
            number typed into the load box is not erased every eight seconds */
@@ -699,39 +803,16 @@
 
         if (!picked) { picked = null; }
 
-        drawSelection(true);
+        drawSettlement();
+        drawSelection();
 
     }
 
-    function drawSelection(scroll) {
-
-        document.querySelectorAll("#tusken-colonies .tusken-card").forEach(function (card) {
-            card.classList.toggle("picked", Number(card.dataset.settlement) === picked);
-        });
+    function drawSelection() {
 
         document.querySelectorAll("#cities .city.tusken").forEach(function (marker) {
             marker.classList.toggle("picked", Number(marker.dataset.colony) === picked);
         });
-
-        if (!scroll || picked === null) { return; }
-
-        const card = document.querySelector(
-            '#tusken-colonies .tusken-card[data-settlement="' + picked + '"]');
-
-        const panel = document.getElementById("tusken-panel");
-
-        if (!card || !panel) { return; }
-
-        /* the card is brought to the top of the panel rather than the
-           page: the panel is its own scroller and the globe stays put */
-        const top = Math.max(0, Number(card.offsetTop || 0) - 12);
-
-        if (typeof panel.scrollTo === "function") {
-            panel.scrollTo({ top: top, behavior: "smooth" });
-        }
-        else {
-            panel.scrollTop = top;
-        }
 
     }
 
@@ -747,18 +828,25 @@
 
         state.colonies.forEach(function (c) {
 
+            /* a settlement nobody has scouted is a marker on the dust: the
+               server sends no name, no owner and no count to draw */
+            const known = c.mine === true || c.known === true;
+
             const el = document.createElement("div");
 
-            el.className = "city tusken " + factionClass(c.faction) +
+            el.className = "city tusken " + (known ? factionClass(c.faction) : "unknown") +
                 (picked === Number(c.id) ? " picked" : "");
             el.style.left = Number(c.x || 50) + "%";
             el.style.top = Number(c.y || 50) + "%";
             el.dataset.colony = c.id;
-            el.title = (c.name || "Settlement") + " — " + factionName(c.faction) +
-                " · " + num(c.slaves) + " in the pens";
+            el.title = known
+                ? (c.name || "Settlement") + " — " + factionName(c.faction) +
+                    " · " + num(c.slaves) + " in the pens"
+                : "An unidentified settlement — send a spy to read it";
 
-            el.innerHTML = '<div class="city-marker"></div><span>' +
-                esc(c.name || "Settlement") + " · " + num(c.slaves) + "</span>";
+            el.innerHTML = '<div class="city-marker"></div><span>' + (known
+                ? esc(c.name || "Settlement") + " · " + num(c.slaves)
+                : "UNKNOWN") + "</span>";
 
             el.addEventListener("click", function () { pick(c.id); });
 

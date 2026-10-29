@@ -98,6 +98,149 @@
 
 
         /* =====================================================
+           THE LEDGER OF THE TUSKEN (a tab on every planet)
+        ===================================================== */
+
+        #slaves-tab {
+
+            position: fixed;
+            left: 30px;
+            bottom: 26px;
+            z-index: 45;
+
+            padding: 9px 16px;
+
+            background: rgba(12, 10, 6, 0.94);
+            color: #f0cf8a;
+            border: 1px solid #6b552c;
+
+            font: bold 11px Arial, sans-serif;
+            letter-spacing: 2px;
+
+            cursor: pointer;
+        }
+
+        #slaves-tab:hover,
+        #slaves-tab.active {
+
+            background: rgba(60, 46, 16, 0.95);
+            color: #fff3d6;
+        }
+
+        #slaves-panel {
+
+            display: none;
+
+            position: fixed;
+            left: 30px;
+            bottom: 72px;
+
+            width: 340px;
+            max-height: 55vh;
+            overflow-y: auto;
+
+            padding: 16px 18px 18px;
+
+            background: rgba(12, 10, 6, 0.96);
+            border: 1px solid #6b552c;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+
+            color: #efe3cb;
+            font: 13px Arial, sans-serif;
+
+            z-index: 46;
+        }
+
+        #slaves-panel.open { display: block; }
+
+        #slaves-panel .ledger-top {
+
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+
+            margin-bottom: 8px;
+
+            color: #f0cf8a;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 3px;
+        }
+
+        #slaves-close {
+
+            background: none;
+            border: none;
+            color: #a99a7c;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #slaves-panel .ledger-line,
+        #slaves-panel .ledger-row {
+
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: baseline;
+
+            padding: 5px 0;
+
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: #c9b994;
+        }
+
+        #slaves-panel .ledger-line b,
+        #slaves-panel .ledger-row b { color: #fff3d6; font-size: 13px; }
+
+        #slaves-panel .ledger-line.good b { color: #9fe08a; }
+
+        #slaves-panel .ledger-row { border-top: 1px dashed rgba(240, 207, 138, 0.12); }
+
+        #slaves-panel .ledger-head {
+
+            margin: 12px 0 4px;
+            padding-bottom: 4px;
+
+            border-bottom: 1px solid rgba(240, 207, 138, 0.25);
+
+            color: #f0cf8a;
+            font-size: 10px;
+            letter-spacing: 2px;
+        }
+
+        #slaves-panel .ledger-sub {
+
+            color: #9c8f74;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 780px) {
+
+            #slaves-tab {
+
+                left: auto;
+                right: 10px;
+                top: 72px;
+                bottom: auto;
+            }
+
+            #slaves-panel {
+
+                left: 10px;
+                right: 10px;
+                bottom: auto;
+                top: 108px;
+
+                width: auto;
+                max-height: 46vh;
+            }
+        }
+
+
+        /* =====================================================
            FLEET LIST
         ===================================================== */
 
@@ -436,6 +579,32 @@
             </div>
 
         </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         THE LEDGER OF THE TUSKEN
+    ===================================================== -->
+
+    <button
+        id="slaves-tab"
+        type="button"
+    >
+        SLAVES
+    </button>
+
+    <div id="slaves-panel">
+
+        <div class="ledger-top">
+
+            <span>THE LEDGER OF THE TUSKEN</span>
+
+            <button id="slaves-close" type="button">✕</button>
+
+        </div>
+
+        <div id="slaves-body"></div>
 
     </div>
 
@@ -4518,7 +4687,113 @@ initialize();
 
 </script>
 
-<script src="tusken.js?v=1"></script>
+<script src="tusken.js?v=2"></script>
+
+<script>
+
+/* =========================================================
+   THE LEDGER OF THE TUSKEN
+
+   A tab on every planet, not just the homeworld: how many
+   Tusken this faction holds, where they are, and what each
+   world pays because of them. It reads
+   public.tusken_ledger() — see
+   sql/2026-11-29_the_eyes_and_the_ledger.sql.
+========================================================= */
+
+(function () {
+
+    const tab = document.getElementById("slaves-tab");
+    const panel = document.getElementById("slaves-panel");
+    const body = document.getElementById("slaves-body");
+
+    if (!tab || !panel || !body) { return; }
+
+    let shown = false;
+    let busy = false;
+
+    function num(n) {
+        return Number(n || 0).toLocaleString("en-US");
+    }
+
+    function esc(s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+    }
+
+    function draw(d) {
+
+        const worlds = d.worlds || [];
+
+        body.innerHTML =
+            '<div class="ledger-line"><span>PENS ON TUSKARA</span><b>' + num(d.pens) +
+                ' · ' + num(d.settlements) + ' SETTLED</b></div>' +
+            '<div class="ledger-line"><span>AT WORK</span><b>' + num(d.at_work) + '</b></div>' +
+            '<div class="ledger-line good"><span>THEY PAY</span><b>+' + num(d.income) +
+                ' / PAYMENT</b></div>' +
+            '<div class="ledger-line"><span>EVERY 1,000</span><b>1 CREDIT</b></div>' +
+            '<div class="ledger-head">WORLDS HOLDING TUSKEN</div>' +
+            (worlds.length
+                ? worlds.map(function (w) {
+                    return '<div class="ledger-row"><span>' + esc(w.planet) + '</span><b>' +
+                        num(w.amount) + ' · +' + num(w.bonus) + '</b></div>';
+                }).join("")
+                : '<div class="ledger-sub">None at work: the pens are full and nothing has been shipped.</div>');
+
+    }
+
+    async function load() {
+
+        if (busy) { return; }
+
+        busy = true;
+
+        try {
+
+            const { data, error } = await supabaseClient.rpc("tusken_ledger");
+
+            if (error) {
+                body.innerHTML = '<div class="ledger-sub">The ledgers answer nothing: ' +
+                    esc(error.message) + ' — run sql/2026-11-29_the_eyes_and_the_ledger.sql.</div>';
+            }
+            else if (data) {
+                draw(data);
+            }
+
+        }
+        catch (e) {
+            body.innerHTML = '<div class="ledger-sub">' + esc(e && e.message ? e.message : e) + '</div>';
+        }
+
+        busy = false;
+
+    }
+
+    function close() {
+        shown = false;
+        panel.classList.remove("open");
+        tab.classList.remove("active");
+    }
+
+    tab.addEventListener("click", function () {
+
+        if (shown) { close(); return; }
+
+        shown = true;
+        panel.classList.add("open");
+        tab.classList.add("active");
+        load();
+
+    });
+
+    document.getElementById("slaves-close").addEventListener("click", close);
+
+    setInterval(function () { if (shown) { load(); } }, 15000);
+
+})();
+
+</script>
 
 </body>
 

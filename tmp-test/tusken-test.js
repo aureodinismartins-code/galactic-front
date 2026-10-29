@@ -18,7 +18,8 @@ const FREE = "33333333-3333-4333-8333-333333333333";   // a Freedom Authority pl
 const PATCHES = [
     "2026-11-26_the_tusken_world.sql",
     "2026-11-27_the_pens_and_the_transports.sql",
-    "2026-11-28_transport_fleets.sql"
+    "2026-11-28_transport_fleets.sql",
+    "2026-11-29_the_eyes_and_the_ledger.sql"
 ];
 
 let pass = 0;
@@ -645,6 +646,129 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("and the pens stay empty", Number((await one(db, "select coalesce(sum(slaves),0) as n from public.tusken_colonies")).n) === 0);
         await db.query("update public.game_control set started = true");
 
+        console.log("\n== what a rival's settlement shows");
+
+        state = await rpc(db, "select public.tusken_world() as s");
+
+        const rival = state.colonies.filter(function(c) { return Number(c.id) === Number(theirs.id); })[0];
+
+        ok("a rival settlement is on the dust as a marker", !!rival, state.colonies);
+        ok("but it is not known", rival && rival.known === false, rival);
+        ok("no name is sent", rival && rival.name === undefined, rival);
+        ok("no owner is sent", rival && rival.faction === undefined, rival);
+        ok("no pens are sent", rival && rival.slaves === undefined, rival);
+        ok("its place on the globe is still sent, so the marker can stand",
+            rival && Number(rival.x) > 0 && Number(rival.y) > 0, rival);
+
+        const own = state.colonies.filter(function(c) { return c.mine === true; })[0];
+        ok("our own settlement is known without a spy", own && own.known === true, own && own.known);
+        ok("and keeps its numbers", own && own.name === "Red Hollow" && Number(own.slaves) >= 0, own && own.name);
+        ok("the spy has a price on the screen", Number(state.spy.price) === 250, state.spy);
+        ok("and a clock", Number(state.spy.seconds) === 1800, state.spy);
+
+        console.log("\n== sending a spy");
+
+        err = await expectError(db, "select public.tusken_spy(" + colonies[0].id + ")");
+        ok("we do not spy on our own", err && /no spy is needed/.test(err), err);
+
+        err = await expectError(db, "select public.tusken_spy(999999)");
+        ok("a settlement that does not exist is refused", err && /no such settlement/i.test(err), err);
+
+        cash = await credits();
+        const spy = await rpc(db, "select public.tusken_spy(" + theirs.id + ") as s");
+
+        ok("a spy is sent into a rival's camp", spy && spy.ok === true, spy);
+        ok("the spy cost 250", (await credits()) === cash - 250, await credits());
+        ok("he comes back with the numbers",
+            spy && spy.slaves !== undefined && spy.name !== undefined && Number(spy.size) >= 1, spy);
+
+        state = await rpc(db, "select public.tusken_world() as s");
+
+        const seen = state.colonies.filter(function(c) { return Number(c.id) === Number(theirs.id); })[0];
+
+        ok("the settlement is known now", seen && seen.known === true && seen.spied === true, seen);
+        ok("with its name", seen && seen.name === spy.name, seen && seen.name);
+        ok("and its pens", seen && Number(seen.slaves) === Number(spy.slaves), seen && seen.slaves);
+        ok("the spy's clock runs on the screen", seen && Number(seen.spied_left) > 1700, seen && seen.spied_left);
+
+        err = await expectError(db, "select public.tusken_spy(" + theirs.id + ")");
+        ok("a second spy is refused while the first is inside", err && /still inside/.test(err), err);
+
+        await db.query("update public.tusken_intel set spied_until = now() - interval '1 minute'");
+        state = await rpc(db, "select public.tusken_world() as s");
+
+        const dark = state.colonies.filter(function(c) { return Number(c.id) === Number(theirs.id); })[0];
+
+        ok("when the spy comes out the camp goes dark again", dark && dark.known === false, dark);
+        ok("and its name is gone from the answer", dark && dark.name === undefined, dark);
+
+        console.log("\n== a fleet of transports, and no congress");
+
+        ok("a transport fleet costs 300",
+            Number(await rpc(db, "select public.tusken_transport_fleet_price() as v")) === 300);
+        ok("a faction may keep four",
+            Number(await rpc(db, "select public.tusken_transport_fleet_max() as v")) === 4);
+        ok("this install has no congress table at all",
+            (await one(db, "select to_regclass('public.cs_authorizations') as t")).t === null &&
+            (await one(db, "select to_regclass('public.cg_authorizations') as t")).t === null);
+
+        await as(db, AUTH);
+
+        cash = await credits();
+        const coffins = await rpc(db, "select public.tusken_new_fleet('Coffin Ships') as s");
+
+        ok("a transport fleet is raised without a bill", coffins && coffins.ok === true, coffins);
+        ok("it cost 300", (await credits()) === cash - 300, await credits());
+        ok("it is named", coffins.name === "Coffin Ships", coffins.name);
+
+        const coffinRow = await one(db, "select * from public.fleets where id = $1", [coffins.id]);
+
+        ok("it is flagged a transport fleet", coffinRow.transport_fleet === true, coffinRow.transport_fleet);
+        ok("it flies no soldiers", Array.isArray(coffinRow.squads) && coffinRow.squads.length === 0, coffinRow.squads);
+        ok("it stands at Tuskara", coffinRow.origin === "Tuskara" && coffinRow.status === "stationed", coffinRow);
+        ok("and it belongs to us", coffinRow.faction === "Combine", coffinRow.faction);
+
+        state = await rpc(db, "select public.tusken_world() as s");
+        ok("the screen counts transport fleets", Number(state.transport_fleets.used) === 1, state.transport_fleets);
+        ok("and shows the limit", Number(state.transport_fleets.max) === 4);
+
+        await rpc(db, "select public.tusken_buy_ship('" + coffins.id + "') as s");
+        ok("a hull joins the new fleet",
+            Number(await rpc(db, "select public.tusken_fleet_lift('" + coffins.id + "') as v")) === 2500);
+
+        await rpc(db, "select public.tusken_new_fleet('Coffin Ships') as s");
+        const twinned = await one(db, "select name from public.fleets where transport_fleet and id <> $1 order by name", [coffins.id]);
+        ok("a second fleet with the same name gets its own", twinned && twinned.name !== "Coffin Ships", twinned);
+
+        await rpc(db, "select public.tusken_new_fleet(null) as s");
+        await rpc(db, "select public.tusken_new_fleet(null) as s");
+
+        err = await expectError(db, "select public.tusken_new_fleet('A Fifth')");
+        ok("a fifth transport fleet is refused", err && /at most 4/.test(err), err);
+
+        console.log("\n== the ledger of the Tusken");
+
+        await db.query("update public.tusken_workforce set amount = 3000 where planet = 'Krieg' and faction = 'Combine'");
+
+        const ledger = await rpc(db, "select public.tusken_ledger() as s");
+
+        ok("the ledger reads for the faction", ledger && ledger.me === "Combine", ledger);
+        ok("the pens on Tuskara are counted", Number(ledger.pens) === Number((
+            await one(db, "select coalesce(sum(slaves),0) as n from public.tusken_colonies where faction = 'Combine'")
+        ).n), ledger.pens);
+        ok("the Tusken at work are counted", Number(ledger.at_work) === Number((
+            await one(db, "select coalesce(sum(amount),0) as n from public.tusken_workforce where faction = 'Combine'")
+        ).n), ledger.at_work);
+        ok("the total is the two together", Number(ledger.total) === Number(ledger.pens) + Number(ledger.at_work), ledger.total);
+        ok("the worlds are listed", ledger.worlds.some(function(w) { return w.planet === "Krieg"; }), ledger.worlds);
+
+        const kriegRow = ledger.worlds.filter(function(w) { return w.planet === "Krieg"; })[0];
+
+        ok("Krieg's row carries its count", kriegRow && Number(kriegRow.amount) === 3000, kriegRow);
+        ok("and what those 3,000 pay", kriegRow && Number(kriegRow.bonus) === 3, kriegRow);
+        ok("a world we do not hold is marked so",
+            ledger.worlds.some(function(w) { return w.held === false; }) === false, ledger.worlds);
+
         console.log("\n== the host's reset");
 
         await as(db, FREE);
@@ -657,6 +781,9 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("the workforce is gone", Number((await one(db, "select count(*) as n from public.tusken_workforce")).n) === 0);
         ok("the convoys are gone", Number((await one(db, "select count(*) as n from public.tusken_convoys")).n) === 0);
         ok("the hulls are gone", Number((await one(db, "select count(*) as n from public.tusken_ships")).n) === 0);
+        ok("the spies are gone", Number((await one(db, "select count(*) as n from public.tusken_intel")).n) === 0);
+        ok("the transport fleets are gone",
+            Number((await one(db, "select count(*) as n from public.fleets where transport_fleet")).n) === 0);
         ok("the world itself stays on the map", !!(await one(db, "select 1 as x from public.planets where name = 'Tuskara'")));
 
         await db.close();
