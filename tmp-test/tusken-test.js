@@ -22,7 +22,8 @@ const PATCHES = [
     "2026-11-29_the_eyes_and_the_ledger.sql",
     "2026-11-30_the_cargo_fleets.sql",
     "2026-11-31_the_cargo_holds_no_troops.sql",
-    "2026-11-32_the_hull_counts.sql"
+    "2026-11-32_the_hull_counts.sql",
+    "2026-11-33_the_slave_routes.sql"
 ];
 
 let pass = 0;
@@ -834,6 +835,37 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("a world we do not hold is marked so",
             ledger.worlds.some(function(w) { return w.held === false; }) === false, ledger.worlds);
 
+        console.log("\n== the lanes of the slave trade");
+
+        const lanes = await rpc(db, "select public.tusken_trade_routes() as s");
+
+        ok("the map reads its own lanes", lanes && lanes.me === "Combine", lanes);
+
+        const kriegLane = (lanes.routes || []).filter(function(r) {
+            return r.from === "Tuskara" && r.to === "Krieg";
+        })[0];
+
+        ok("the crossing just sailed is a lane", !!kriegLane, lanes.routes);
+        ok("with its crossings counted", kriegLane && Number(kriegLane.trips) >= 2, kriegLane && kriegLane.trips);
+        ok("and the Tusken it carried", kriegLane && Number(kriegLane.slaves) >= 1000, kriegLane && kriegLane.slaves);
+        ok("both ends are placed for the drawing",
+            kriegLane && Number(kriegLane.x1) > 0 && Number(kriegLane.x2) > 0, kriegLane);
+        ok("the busiest is marked", kriegLane && kriegLane.major === true, kriegLane && kriegLane.major);
+        ok("and carries the full weight", kriegLane && Number(kriegLane.weight) === 1,
+            kriegLane && kriegLane.weight);
+        ok("no more than eight lanes are sent", (lanes.routes || []).length <= 8, lanes.routes);
+
+        /* the other side's book never carries our lane */
+        await as(db, FREE);
+        const theirLanes = await rpc(db, "select public.tusken_trade_routes() as s");
+        ok("the other faction is told its own name",
+            theirLanes && theirLanes.me === "Freedom Authority", theirLanes && theirLanes.me);
+        ok("and never our lane",
+            (theirLanes.routes || []).every(function(r) {
+                return !(r.from === "Tuskara" && r.to === "Krieg");
+            }), theirLanes.routes);
+        await as(db, AUTH);
+
         console.log("\n== the host's reset");
 
         await as(db, FREE);
@@ -849,6 +881,8 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("the spies are gone", Number((await one(db, "select count(*) as n from public.tusken_intel")).n) === 0);
         ok("the transport fleets are gone",
             Number((await one(db, "select count(*) as n from public.fleets where transport_fleet")).n) === 0);
+        ok("the lanes of the trade are gone",
+            Number((await one(db, "select count(*) as n from public.tusken_routes")).n) === 0);
         ok("the world itself stays on the map", !!(await one(db, "select 1 as x from public.planets where name = 'Tuskara'")));
 
         await db.close();
