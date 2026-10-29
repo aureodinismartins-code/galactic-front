@@ -1,23 +1,31 @@
 /* =========================================================
    TUSKARA — THE TUSKEN HOMEWORLD
 
-   Tuskara cannot be conquered: it has no cities and no
-   garrison. It is worked through COLONIES, and a colony is
-   a pen.
+   Tuskara is not a three-city world: nothing is conquered
+   here, it is settled. What stands on the dust are small
+   settlements, each on its own patch of the desert, and a
+   settlement is a pen.
 
      SIZE   how big the settlement (and its pens) is
      CATCH  how many Tusken the bands take per hour
      HOLD   how many they can keep before a load must leave
 
+   A settlement can only be raised while a fleet of the
+   faction is in orbit of Tuskara, and the bands need a pause
+   between two of them.
+
    A Tusken still standing on Tuskara is worth nothing: the
-   desert has no industry. Every 10,000 shipped to a world the
+   desert has no industry. Every 1,000 shipped to a world the
    faction holds whole add 1 credit to that world's payment,
-   and the world they left loses exactly that. Moving them is
-   a purchase: 350 credits buys one transport of up to 2,500.
+   and the world they left loses exactly that.
+
+   Transports are permanent: 350 credits buys a hull once, it
+   takes up to 2,500, and the trip itself costs nothing.
 
    This file is loaded by planet.html and only does anything
    when the page is Tuskara. Everything it draws comes from
-   public.tusken_world(); see sql/2026-11-26_the_tusken_world.sql.
+   public.tusken_world(); see sql/2026-11-26_the_tusken_world.sql
+   and sql/2026-11-27_the_pens_and_the_transports.sql.
    ========================================================= */
 
 (function () {
@@ -28,8 +36,6 @@
         (new URLSearchParams(window.location.search).get("name") || "") === PLANET;
 
     if (!here) { return; }
-
-    const SPOTS = [[26, 34], [58, 52], [74, 30], [42, 72], [64, 22]];
 
     let state = null;
     let busy = false;
@@ -116,6 +122,8 @@
                 margin-top: 5px; font-size: 11px; letter-spacing: 1px; color: #c9b994;
             }
             #tusken-panel .tusken-line b { color: #fff3d6; font-size: 13px; }
+            #tusken-panel .tusken-line.good b { color: #9fe08a; }
+            #tusken-panel .tusken-line.bad b { color: #ff9a7a; }
             #tusken-panel .tusken-head {
                 display: flex; justify-content: space-between; align-items: baseline;
                 gap: 8px; margin: 16px 0 6px; padding-bottom: 4px;
@@ -163,12 +171,16 @@
                 font-size: 11px; letter-spacing: 1px; color: #c9b994;
             }
             #tusken-panel .tusken-row b { color: #fff3d6; }
+            #tusken-panel .tusken-row.sea b { color: #ffd37a; }
+            #tusken-panel .tusken-row.dock b { color: #9fe08a; }
             .city.tusken .city-marker {
+                width: 9px !important;
+                height: 9px !important;
                 background: #e6c17a !important;
                 border-color: #ffe6b0 !important;
-                box-shadow: 0 0 12px 3px rgba(214, 168, 75, .85) !important;
+                box-shadow: 0 0 10px 2px rgba(214, 168, 75, .8) !important;
             }
-            .city.tusken span { color: #f0cf8a; }
+            .city.tusken span { color: #f0cf8a; font-size: 10px; }
             @media (max-width: 780px) {
                 #tusken-panel {
                     left: 10px; right: 10px; top: auto; bottom: 10px;
@@ -192,23 +204,29 @@
         panel.id = "tusken-panel";
         panel.innerHTML = `
             <div class="tusken-title">TUSKARA</div>
-            <div class="tusken-sub">THE TUSKEN HOMEWORLD · NO CITIES, NO GARRISON — ONLY THE PENS</div>
+            <div class="tusken-sub">THE TUSKEN HOMEWORLD · NOTHING IS CONQUERED HERE, ONLY SETTLED</div>
 
             <div class="tusken-line"><span>FACTION CREDITS</span><b id="tusken-credits">—</b></div>
             <div class="tusken-line"><span>IN THE PENS</span><b id="tusken-pool">—</b></div>
             <div class="tusken-line"><span>TUSKEN AT WORK</span><b id="tusken-work">—</b></div>
             <div class="tusken-line"><span>THEIR INCOME</span><b id="tusken-work-income">—</b></div>
+            <div class="tusken-line" id="tusken-orbit-line"><span>ORBIT</span><b id="tusken-orbit">—</b></div>
 
             <div class="tusken-sub">
-                Every 10,000 Tusken put to work on a world add 1 credit to that world's payment.
-                On Tuskara itself they earn nothing — a slave is only worth the ship that carries it.
+                Every 1,000 Tusken put to work on a world add 1 credit to that world's payment.
+                On Tuskara itself they earn nothing — a slave is only worth the ship that carries it,
+                and a settlement needs a fleet overhead before the bands walk out.
             </div>
 
-            <div class="tusken-head"><h3>COLONIES</h3><span id="tusken-colony-count"></span></div>
+            <div class="tusken-head"><h3>SETTLEMENTS</h3><span id="tusken-colony-count"></span></div>
             <div id="tusken-colonies"></div>
-            <button type="button" id="tusken-found" class="tusken-btn go">FOUND A COLONY</button>
+            <button type="button" id="tusken-found" class="tusken-btn go">FOUND A SETTLEMENT</button>
 
-            <div class="tusken-head"><h3>LOAD A TRANSPORT</h3><span id="tusken-ship-price"></span></div>
+            <div class="tusken-head"><h3>TRANSPORTS</h3><span id="tusken-ship-price"></span></div>
+            <div id="tusken-ships"></div>
+            <button type="button" id="tusken-buy-ship" class="tusken-btn">BUY A TRANSPORT</button>
+
+            <div class="tusken-head"><h3>SEND A LOAD</h3><span>THE TRIP IS FREE</span></div>
             <label class="tusken-label" for="tusken-from">FROM</label>
             <select id="tusken-from" class="tusken-select"></select>
             <label class="tusken-label" for="tusken-to">TO</label>
@@ -216,7 +234,7 @@
             <label class="tusken-label" for="tusken-amount">HOW MANY</label>
             <input id="tusken-amount" class="tusken-input" type="number" min="1" step="100" value="2500">
             <div class="tusken-sub" id="tusken-available"></div>
-            <button type="button" id="tusken-ship" class="tusken-btn go">BUY THE SHIP AND LOAD IT</button>
+            <button type="button" id="tusken-ship" class="tusken-btn go">SEND THE LOAD</button>
 
             <div id="tusken-msg" class="tusken-msg"></div>
 
@@ -230,6 +248,7 @@
         document.body.appendChild(panel);
 
         panel.querySelector("#tusken-found").addEventListener("click", function () { act("found"); });
+        panel.querySelector("#tusken-buy-ship").addEventListener("click", function () { act("buy"); });
         panel.querySelector("#tusken-ship").addEventListener("click", function () { act("ship"); });
 
         panel.addEventListener("click", function (ev) {
@@ -247,8 +266,8 @@
 
         if (error) {
             state = null;
-            say("The colonies answer nothing: " + error.message +
-                " — run sql/2026-11-26_the_tusken_world.sql in the Supabase editor.");
+            say("The settlements answer nothing: " + error.message +
+                " — run sql/2026-11-26_the_tusken_world.sql and sql/2026-11-27_the_pens_and_the_transports.sql in the Supabase editor.");
             return false;
         }
 
@@ -284,6 +303,9 @@
             if (kind === "found") {
                 result = await supabaseClient.rpc("tusken_found_colony");
             }
+            else if (kind === "buy") {
+                result = await supabaseClient.rpc("tusken_buy_ship");
+            }
             else if (kind === "upgrade" && btn) {
                 result = await supabaseClient.rpc("tusken_upgrade", {
                     p_colony: Number(btn.dataset.colony),
@@ -318,14 +340,18 @@
                 const d = result.data;
 
                 if (kind === "found") {
-                    say("A colony rises at " + d.name + ", for " + num(d.paid) + " credits.");
+                    say("A settlement rises at " + d.name + ", for " + num(d.paid) +
+                        " credits. " + (d.fleet || "Your fleet") + " holds the orbit.");
+                }
+                else if (kind === "buy") {
+                    say(d.name + " is yours, for " + num(d.paid) + " credits. It stays yours.");
                 }
                 else if (kind === "upgrade") {
                     say("The work is done: " + String(d.track).toUpperCase() + ", for " + num(d.paid) + " credits.");
                 }
                 else if (kind === "ship") {
-                    say(num(d.amount) + " Tusken aboard for " + d.to + " — " +
-                        num(d.paid) + " credits, " + duration(d.seconds) + " on the road.");
+                    say(num(d.amount) + " Tusken aboard the " + d.ship + " for " + d.to +
+                        " — the trip costs nothing, " + duration(d.seconds) + " on the road.");
                 }
 
             }
@@ -365,14 +391,14 @@
         }
 
         return '<div class="tusken-card' + (c.mine ? ' mine' : '') + '">' +
-            '<div class="tusken-line"><h3>' + esc(c.name || "COLONY") + '</h3>' +
+            '<div class="tusken-line"><h3>' + esc(c.name || "SETTLEMENT") + '</h3>' +
             '<span>' + factionName(c.faction) + '</span></div>' +
             '<div class="tusken-sub">SIZE ' + c.size + ' · CATCH ' + c.catch + ' · HOLD ' + c.hold + '</div>' +
             '<div class="tusken-line"><span>PENS</span><span>' + num(c.slaves) + ' / ' +
             num(c.capacity) + '</span></div>' +
             '<div class="tusken-bar"><div style="width:' + pct.toFixed(1) + '%"></div></div>' +
             '<div class="tusken-sub">takes up to ' + num(c.per_hour) + ' an hour</div>' +
-            track("size", c.size_cost, "GROW THE COLONY") +
+            track("size", c.size_cost, "GROW THE SETTLEMENT") +
             track("catch", c.catch_cost, "BETTER BANDS (CATCH)") +
             track("hold", c.hold_cost, "BIGGER PENS (HOLD)") +
             '</div>';
@@ -393,6 +419,15 @@
         document.getElementById("tusken-work").textContent = num(atWork);
         document.getElementById("tusken-work-income").textContent = "+" + num(bonus) + " / PAYMENT";
 
+        /* the fleet in orbit is the gate on settling: say plainly which way it is */
+        const orbit = state.orbit || { here: false, fleet: null };
+        const orbitLine = document.getElementById("tusken-orbit-line");
+
+        document.getElementById("tusken-orbit").textContent =
+            orbit.here ? (orbit.fleet || "IN ORBIT") : "NO FLEET IN ORBIT";
+
+        orbitLine.className = "tusken-line " + (orbit.here ? "good" : "bad");
+
         document.getElementById("tusken-colony-count").textContent =
             state.my_colonies + " OF " + state.max_colonies + " SETTLED";
 
@@ -400,16 +435,45 @@
             ? state.colonies.map(colonyCard).join("")
             : '<div class="tusken-sub">The dust is empty. Nobody has settled Tuskara yet.</div>';
 
+        /* ---- the found button answers to all three gates ---- */
         const found = document.getElementById("tusken-found");
+        const wait = Number(state.cooldown || 0);
 
-        found.textContent = state.my_colonies >= state.max_colonies
-            ? "NO MORE COLONIES"
-            : "FOUND A COLONY — " + num(state.prices.colony) + " CR";
+        let why = null;
 
-        found.disabled = state.my_colonies >= state.max_colonies;
+        if (state.my_colonies >= state.max_colonies) {
+            why = "NO MORE SETTLEMENTS";
+        }
+        else if (!orbit.here) {
+            why = "NO FLEET IN ORBIT";
+        }
+        else if (wait > 0) {
+            why = "THE BANDS REST — " + duration(wait);
+        }
+
+        found.textContent = why || "FOUND A SETTLEMENT — " + num(state.prices.colony) + " CR";
+        found.disabled = !!why;
+
+        /* ---- the hulls ---- */
+        const ships = state.ships || [];
+        const idle = Number(state.idle_ships || 0);
 
         document.getElementById("tusken-ship-price").textContent =
-            num(state.prices.ship) + " CR · " + num(state.prices.capacity) + " PER SHIP";
+            num(idle) + " IN PORT · " + num(state.prices.capacity) + " A HULL";
+
+        document.getElementById("tusken-ships").innerHTML = ships.length
+            ? ships.map(function (s) {
+                const atSea = s.at_sea === true;
+                return '<div class="tusken-row ' + (atSea ? "sea" : "dock") + '"><span>' +
+                    esc(s.name) + (atSea ? " → " + esc(s.to) : "") + '</span><b>' +
+                    (atSea ? duration(s.seconds) : "DOCKED") + '</b></div>';
+            }).join("")
+            : '<div class="tusken-sub">No transports. Buy one hull and it is yours for good.</div>';
+
+        const buy = document.getElementById("tusken-buy-ship");
+
+        buy.textContent = "BUY A TRANSPORT — " + num(state.prices.ship) + " CR";
+        buy.disabled = Number(state.credits || 0) < Number(state.prices.ship || 0);
 
         /* the two pickers are only rebuilt when their lists change, so a
            number typed into the load box is not erased every eight seconds */
@@ -451,11 +515,30 @@
         const source = sources.filter(function (x) { return x.planet === chosen; })[0] ||
             { amount: 0 };
 
-        const most = Math.min(Number(state.prices.capacity), Number(source.amount));
+        const capacity = Number(state.prices.capacity) || 0;
+        const most = Math.min(capacity, Number(source.amount));
 
-        document.getElementById("tusken-available").textContent =
-            "Up to " + num(Math.max(0, most)) + " from here · one ship holds " +
-            num(state.prices.capacity);
+        const send = document.getElementById("tusken-ship");
+        const available = document.getElementById("tusken-available");
+
+        if (!ships.length) {
+            available.textContent = "No transport yet: " + num(state.prices.ship) +
+                " credits buys a hull, and the trips after it are free.";
+            send.disabled = true;
+        }
+        else if (idle < 1) {
+            available.textContent = "Every hull is at sea. The next load waits for one to make port.";
+            send.disabled = true;
+        }
+        else if (!(most > 0)) {
+            available.textContent = "Nothing to load here.";
+            send.disabled = true;
+        }
+        else {
+            available.textContent = "Up to " + num(most) + " from here · one hull holds " +
+                num(capacity) + " · the trip is free";
+            send.disabled = false;
+        }
 
         const amount = document.getElementById("tusken-amount");
 
@@ -465,14 +548,12 @@
 
         amount.max = String(Math.max(1, most));
 
-        document.getElementById("tusken-ship").disabled = !(most > 0);
-
         document.getElementById("tusken-workforce").innerHTML = workforce.length
             ? workforce.map(function (w) {
                 return '<div class="tusken-row"><span>' + esc(w.planet) + '</span><b>' +
                     num(w.amount) + ' · +' + num(w.bonus) + '</b></div>';
             }).join("")
-            : '<div class="tusken-sub">No Tusken are at work yet. Load a transport.</div>';
+            : '<div class="tusken-sub">No Tusken are at work yet. Send a load.</div>';
 
         const convoys = state.convoys || [];
 
@@ -495,21 +576,19 @@
 
         if (!state || !(state.colonies || []).length) { return; }
 
-        state.colonies.forEach(function (c, index) {
-
-            const spot = SPOTS[index % SPOTS.length];
+        state.colonies.forEach(function (c) {
 
             const el = document.createElement("div");
 
             el.className = "city tusken " + factionClass(c.faction);
-            el.style.left = spot[0] + "%";
-            el.style.top = spot[1] + "%";
+            el.style.left = Number(c.x || 50) + "%";
+            el.style.top = Number(c.y || 50) + "%";
             el.dataset.colony = c.id;
-            el.title = (c.name || "Colony") + " — " + factionName(c.faction) +
+            el.title = (c.name || "Settlement") + " — " + factionName(c.faction) +
                 " · " + num(c.slaves) + " in the pens";
 
             el.innerHTML = '<div class="city-marker"></div><span>' +
-                esc(c.name || "Colony") + " · " + num(c.slaves) + "</span>";
+                esc(c.name || "Settlement") + " · " + num(c.slaves) + "</span>";
 
             el.addEventListener("click", function () {
                 const btn = document.querySelector(
@@ -534,7 +613,7 @@
 
         refresh();
 
-        /* the colonies are the world's only clock: this keeps the pens and
+        /* the settlements are the world's only clock: this keeps the pens and
            the convoys moving while somebody is standing on the dust */
         setInterval(refresh, 8000);
 

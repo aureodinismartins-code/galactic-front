@@ -1,6 +1,7 @@
-/* Load tusken.js in jsdom against a stubbed server and press the board:
-   the panel, the colonies, the three upgrade tracks, the two pickers, the
-   found and ship buttons, and the markers on the globe.
+/* Load tusken.js in jsdom against a stubbed server and press the board: the
+   panel, the settlements, the three upgrade tracks, the fleet in orbit, the
+   cooldown, the hulls, the two pickers, the found / buy / send buttons, and
+   the markers on the globe.
 
    Run: NODE_PATH=/tmp/gfnode/node_modules node tmp-test/tusken-page-test.js */
 
@@ -30,33 +31,42 @@ function payload(over) {
         credits: 4200,
         pool: 1850,
         my_colonies: 2,
-        max_colonies: 3,
-        prices: { colony: 1000, ship: 350, capacity: 2500, per_credit: 10000 },
+        max_colonies: 8,
+        orbit: { here: true, fleet: "Spear of Ultramar" },
+        cooldown: 0,
+        prices: { colony: 1000, ship: 350, capacity: 2500, per_credit: 1000, cooldown: 300 },
         colonies: [
             { id: 7, name: "Red Hollow", faction: "Combine", mine: true,
-              size: 2, catch: 1, hold: 2, slaves: 1200,
+              spot: 1, x: 22, y: 24, size: 2, catch: 1, hold: 2, slaves: 1200,
               capacity: 6000, per_hour: 1000,
               size_cost: 800, catch_cost: 300, hold_cost: 600 },
             { id: 8, name: "Dry Verge", faction: "Freedom Authority", mine: false,
-              size: 1, catch: 1, hold: 1, slaves: 400,
+              spot: 2, x: 50, y: 18, size: 1, catch: 1, hold: 1, slaves: 400,
               capacity: 1500, per_hour: 500,
               size_cost: 400, catch_cost: 300, hold_cost: 300 }
         ],
+        ships: [
+            { id: 1, name: "Transport 1", capacity: 2500, at_sea: false, to: null, seconds: 0 }
+        ],
+        idle_ships: 1,
         workforce: [
-            { planet: "Krieg", amount: 25000, bonus: 2 },
-            { planet: "Ultramars", amount: 4000, bonus: 0 }
+            { planet: "Krieg", amount: 25000, bonus: 25 },
+            { planet: "Ultramars", amount: 4000, bonus: 4 }
         ],
         destinations: [
             { planet: "Krieg", x: 70, y: 85, income: 100, slaves: 25000, seconds: 300 },
             { planet: "Ultramars", x: 10, y: 19, income: 100, slaves: 4000, seconds: 240 }
         ],
         convoys: [
-            { id: 3, from: "Tuskara", to: "Krieg", amount: 2500, arrival: "2026-11-26T00:00:00Z", seconds: 192 }
+            { id: 3, from: "Tuskara", to: "Krieg", amount: 2500, ship: "Transport 2",
+              arrival: "2026-11-27T00:00:00Z", seconds: 192 }
         ]
     }, over || {});
 }
 
-async function open(name, broken) {
+async function open(name, options) {
+
+    options = options || {};
 
     const dom = new JSDOM(
         '<!doctype html><html><head></head><body>' +
@@ -71,16 +81,25 @@ async function open(name, broken) {
 
     const calls = [];
 
-    const state = payload();
+    const state = options.state || payload();
 
     dom.window.supabaseClient = {
         rpc: async function(fn, args) {
             calls.push({ fn: fn, args: args });
-            if (broken) { return { data: null, error: { message: "function public.tusken_world() does not exist" } }; }
+            if (options.broken) { return { data: null, error: { message: "function public.tusken_world() does not exist" } }; }
             if (fn === "tusken_world") { return { data: state, error: null }; }
-            if (fn === "tusken_found_colony") { return { data: { ok: true, name: "The Bone Yard", paid: 1000 }, error: null }; }
+            if (fn === "tusken_found_colony") {
+                return { data: { ok: true, name: "The Bone Yard", paid: 500, spot: 2, x: 50, y: 18,
+                                 fleet: "Spear of Ultramar" }, error: null };
+            }
+            if (fn === "tusken_buy_ship") {
+                return { data: { ok: true, id: 2, name: "Transport 2", paid: 350, capacity: 2500 }, error: null };
+            }
             if (fn === "tusken_upgrade") { return { data: { ok: true, paid: 800, track: args.p_track }, error: null }; }
-            if (fn === "tusken_ship") { return { data: { ok: true, amount: args.p_amount, to: args.p_to, paid: 350, seconds: 180 }, error: null }; }
+            if (fn === "tusken_ship") {
+                return { data: { ok: true, amount: args.p_amount, to: args.p_to, paid: 0,
+                                 ship: "Transport 1", capacity: 2500, seconds: 180 }, error: null };
+            }
             return { data: null, error: { message: "unknown call" } };
         }
     };
@@ -112,14 +131,18 @@ async function open(name, broken) {
         ok("the pens are shown", panel.querySelector("#tusken-pool").textContent === "1,850");
         ok("the Tusken at work are counted", panel.querySelector("#tusken-work").textContent === "29,000",
             panel.querySelector("#tusken-work").textContent);
-        ok("their income is summed", panel.querySelector("#tusken-work-income").textContent === "+2 / PAYMENT",
+        ok("their income is summed", panel.querySelector("#tusken-work-income").textContent === "+29 / PAYMENT",
             panel.querySelector("#tusken-work-income").textContent);
-        ok("the colonies are counted", /2 OF 3/.test(panel.querySelector("#tusken-colony-count").textContent));
+        ok("the settlements are counted", /2 OF 8/.test(panel.querySelector("#tusken-colony-count").textContent),
+            panel.querySelector("#tusken-colony-count").textContent);
+        ok("the fleet overhead is named", panel.querySelector("#tusken-orbit").textContent === "Spear of Ultramar",
+            panel.querySelector("#tusken-orbit").textContent);
+        ok("and reads as good news", /good/.test(panel.querySelector("#tusken-orbit-line").className));
 
-        console.log("\n== the colonies");
+        console.log("\n== the settlements");
 
         const cards = panel.querySelectorAll(".tusken-card");
-        ok("one card per colony", cards.length === 2, cards.length);
+        ok("one card per settlement", cards.length === 2, cards.length);
         ok("mine is marked", cards[0].classList.contains("mine"));
         ok("the other side's is not", !cards[1].classList.contains("mine"));
         ok("the name is there", cards[0].textContent.indexOf("Red Hollow") >= 0);
@@ -128,25 +151,31 @@ async function open(name, broken) {
         ok("the catch is stated", cards[0].textContent.indexOf("1,000 an hour") >= 0);
 
         const upButtons = cards[0].querySelectorAll("[data-up]");
-        ok("three tracks to buy on a colony of ours", upButtons.length === 3, upButtons.length);
+        ok("three tracks to buy on a settlement of ours", upButtons.length === 3, upButtons.length);
         ok("size costs its price", upButtons[0].dataset.up === "size" && /800 CR/.test(upButtons[0].textContent));
         ok("catch is its own work", upButtons[1].dataset.up === "catch" && /300 CR/.test(upButtons[1].textContent));
         ok("hold is its own work", upButtons[2].dataset.up === "hold" && /600 CR/.test(upButtons[2].textContent));
-        ok("nothing is sold on a colony we do not own", cards[1].querySelectorAll("[data-up]").length === 0);
+        ok("nothing is sold on a settlement we do not own", cards[1].querySelectorAll("[data-up]").length === 0);
 
         console.log("\n== the markers on the globe");
 
         const markers = doc.querySelectorAll("#cities .city.tusken");
-        ok("one marker per colony", markers.length === 2, markers.length);
-        ok("the marker names the colony", /Red Hollow/.test(markers[0].textContent));
+        ok("one marker per settlement", markers.length === 2, markers.length);
+        ok("the marker names the settlement", /Red Hollow/.test(markers[0].textContent));
         ok("the marker carries its pens", /1,200/.test(markers[0].textContent));
+        ok("the marker stands where the server puts it",
+            markers[0].style.left === "22%" && markers[0].style.top === "24%",
+            markers[0].style.left + "," + markers[0].style.top);
+        ok("the second one has its own place",
+            markers[1].style.left === "50%" && markers[1].style.top === "18%",
+            markers[1].style.left + "," + markers[1].style.top);
         ok("the marker takes its faction's colour", markers[0].classList.contains("combine") &&
             markers[1].classList.contains("freedom"));
 
         console.log("\n== founding");
 
         const found = panel.querySelector("#tusken-found");
-        ok("the next colony's price is on the button", /1,000 CR/.test(found.textContent), found.textContent);
+        ok("the next settlement's price is on the button", /1,000 CR/.test(found.textContent), found.textContent);
         ok("it is offered", found.disabled === false);
 
         found.click();
@@ -156,18 +185,39 @@ async function open(name, broken) {
         ok("founding asks the server", !!foundCall);
         ok("the answer is reported", /The Bone Yard/.test(panel.querySelector("#tusken-msg").textContent),
             panel.querySelector("#tusken-msg").textContent);
+        ok("and it names the fleet that holds the orbit",
+            /Spear of Ultramar/.test(panel.querySelector("#tusken-msg").textContent),
+            panel.querySelector("#tusken-msg").textContent);
 
-        console.log("\n== growing a colony");
+        console.log("\n== growing a settlement");
 
         panel.querySelectorAll("[data-up]")[1].click();
         await wait(30);
 
         const upCall = page.calls.filter(function(c) { return c.fn === "tusken_upgrade"; })[0];
-        ok("the upgrade names the colony and the track", upCall && upCall.args.p_colony === 7 && upCall.args.p_track === "catch",
+        ok("the upgrade names the settlement and the track", upCall && upCall.args.p_colony === 7 && upCall.args.p_track === "catch",
             upCall && upCall.args);
         ok("the work is reported", /CATCH/.test(panel.querySelector("#tusken-msg").textContent));
 
-        console.log("\n== loading a transport");
+        console.log("\n== the hulls");
+
+        ok("the price and the hull's size are stated",
+            /2,500 A HULL/.test(panel.querySelector("#tusken-ship-price").textContent),
+            panel.querySelector("#tusken-ship-price").textContent);
+        ok("the hull in port is listed",
+            /Transport 1/.test(panel.querySelector("#tusken-ships").textContent) &&
+            /DOCKED/.test(panel.querySelector("#tusken-ships").textContent),
+            panel.querySelector("#tusken-ships").textContent);
+
+        panel.querySelector("#tusken-buy-ship").click();
+        await wait(30);
+
+        const buyCall = page.calls.filter(function(c) { return c.fn === "tusken_buy_ship"; })[0];
+        ok("buying a hull asks the server", !!buyCall);
+        ok("the hull is reported", /Transport 2 is yours/.test(panel.querySelector("#tusken-msg").textContent),
+            panel.querySelector("#tusken-msg").textContent);
+
+        console.log("\n== sending a load");
 
         const from = panel.querySelector("#tusken-from");
         const to = panel.querySelector("#tusken-to");
@@ -177,8 +227,8 @@ async function open(name, broken) {
         ok("Tuskara is one of them", from.options[0].value === "Tuskara");
         ok("only worlds we hold whole are offered", to.options.length === 2 &&
             Array.from(to.options).every(function(o) { return o.value !== "Tuskara"; }), to.options.length);
-        ok("the load defaults to one ship", amount.value === "1850", amount.value);
-        ok("the most that can leave is stated", /1,850/.test(panel.querySelector("#tusken-available").textContent),
+        ok("the load defaults to one hull", amount.value === "1850", amount.value);
+        ok("the trip is stated as free", /trip is free/.test(panel.querySelector("#tusken-available").textContent),
             panel.querySelector("#tusken-available").textContent);
 
         to.value = "Krieg";
@@ -187,15 +237,18 @@ async function open(name, broken) {
         await wait(30);
 
         const shipCall = page.calls.filter(function(c) { return c.fn === "tusken_ship"; })[0];
-        ok("the ship is bought from the pens", shipCall && shipCall.args.p_from === "Tuskara" &&
+        ok("the load is sent from the pens", shipCall && shipCall.args.p_from === "Tuskara" &&
             shipCall.args.p_to === "Krieg" && shipCall.args.p_amount === 1850, shipCall && shipCall.args);
-        ok("the load is reported", /1,850 Tusken aboard for Krieg/.test(panel.querySelector("#tusken-msg").textContent),
+        ok("the load is reported on the hull that carried it",
+            /1,850 Tusken aboard the Transport 1 for Krieg/.test(panel.querySelector("#tusken-msg").textContent),
             panel.querySelector("#tusken-msg").textContent);
+        ok("and the trip is called free", /costs nothing/.test(panel.querySelector("#tusken-msg").textContent));
 
         console.log("\n== what the board already holds");
 
         ok("the work is listed with its money", /Krieg/.test(panel.querySelector("#tusken-workforce").textContent) &&
-            /\+2/.test(panel.querySelector("#tusken-workforce").textContent));
+            /\+25/.test(panel.querySelector("#tusken-workforce").textContent),
+            panel.querySelector("#tusken-workforce").textContent);
         ok("a convoy is listed with its clock", /Tuskara → Krieg/.test(panel.querySelector("#tusken-convoys").textContent) &&
             /2,500 · 3m 12s/.test(panel.querySelector("#tusken-convoys").textContent),
             panel.querySelector("#tusken-convoys").textContent);
@@ -204,6 +257,58 @@ async function open(name, broken) {
 
         page.dom.window.close();
 
+        console.log("\n== without a fleet in orbit");
+
+        const noFleet = await open("Tuskara", {
+            state: payload({ orbit: { here: false, fleet: null } })
+        });
+
+        const noFleetPanel = noFleet.doc.getElementById("tusken-panel");
+
+        ok("the orbit says so", noFleetPanel.querySelector("#tusken-orbit").textContent === "NO FLEET IN ORBIT",
+            noFleetPanel.querySelector("#tusken-orbit").textContent);
+        ok("and reads as bad news", /bad/.test(noFleetPanel.querySelector("#tusken-orbit-line").className));
+        ok("founding is refused locally",
+            noFleetPanel.querySelector("#tusken-found").disabled === true,
+            noFleetPanel.querySelector("#tusken-found").textContent);
+        ok("the reason is on the button", /NO FLEET IN ORBIT/.test(noFleetPanel.querySelector("#tusken-found").textContent),
+            noFleetPanel.querySelector("#tusken-found").textContent);
+        ok("no founding is asked of the server",
+            noFleet.calls.filter(function(c) { return c.fn === "tusken_found_colony"; }).length === 0);
+
+        noFleet.dom.window.close();
+
+        console.log("\n== while the bands rest");
+
+        const resting = await open("Tuskara", { state: payload({ cooldown: 132 }) });
+        const restPanel = resting.doc.getElementById("tusken-panel");
+
+        ok("founding is refused locally",
+            restPanel.querySelector("#tusken-found").disabled === true);
+        ok("the clock is on the button", /2m 12s/.test(restPanel.querySelector("#tusken-found").textContent),
+            restPanel.querySelector("#tusken-found").textContent);
+
+        resting.dom.window.close();
+
+        console.log("\n== without a transport");
+
+        const noShip = await open("Tuskara", {
+            state: payload({ ships: [], idle_ships: 0 })
+        });
+
+        const noShipPanel = noShip.doc.getElementById("tusken-panel");
+
+        ok("the board says there is no hull",
+            /No transports/.test(noShipPanel.querySelector("#tusken-ships").textContent),
+            noShipPanel.querySelector("#tusken-ships").textContent);
+        ok("sending is refused locally",
+            noShipPanel.querySelector("#tusken-ship").disabled === true);
+        ok("and the buying price is offered",
+            /350 CR/.test(noShipPanel.querySelector("#tusken-buy-ship").textContent),
+            noShipPanel.querySelector("#tusken-buy-ship").textContent);
+
+        noShip.dom.window.close();
+
         console.log("\n== everywhere else");
 
         const other = await open("Krieg");
@@ -211,12 +316,13 @@ async function open(name, broken) {
         ok("and nothing is asked of the server", other.calls.length === 0, other.calls.length);
         other.dom.window.close();
 
-        console.log("\n== when the patch has not been run");
+        console.log("\n== when the patches have not been run");
 
-        const broken = await open("Tuskara", true);
+        const broken = await open("Tuskara", { broken: true });
         await wait(30);
         ok("the board says what to run",
-            /2026-11-26_the_tusken_world/.test(broken.doc.getElementById("tusken-msg").textContent),
+            /2026-11-26_the_tusken_world/.test(broken.doc.getElementById("tusken-msg").textContent) &&
+            /2026-11-27_the_pens_and_the_transports/.test(broken.doc.getElementById("tusken-msg").textContent),
             broken.doc.getElementById("tusken-msg").textContent);
 
         broken.dom.window.close();

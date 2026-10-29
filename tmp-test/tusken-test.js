@@ -1,7 +1,8 @@
-/* Run sql/2026-11-26_the_tusken_world.sql against a real PostgreSQL (PGlite,
-   the WASM build) with stand-ins for the game's older tables, then work
-   Tuskara as the Combine: found colonies, grow them, watch the bands bring
-   the Tusken in, buy transports, land the loads and read the money.
+/* Run sql/2026-11-26_the_tusken_world.sql and sql/2026-11-27_the_pens_and_the_transports.sql
+   against a real PostgreSQL (PGlite, the WASM build) with stand-ins for the
+   game's older tables, then work Tuskara as the Combine: bring a fleet into
+   orbit, raise settlements one cooldown apart, grow them, watch the bands bring
+   the Tusken in, buy a hull once and keep using it, and read the money.
 
    Run: NODE_PATH=/tmp/pgtest/node_modules node tmp-test/tusken-test.js */
 
@@ -12,8 +13,12 @@ const { PGlite } = require("@electric-sql/pglite");
 const ROOT = path.join(__dirname, "..");
 
 const AUTH = "11111111-1111-4111-8111-111111111111";   // the Combine player
-const COMB = "22222222-2222-4222-8222-222222222222";   // a second Combine player
 const FREE = "33333333-3333-4333-8333-333333333333";   // a Freedom Authority player
+
+const PATCHES = [
+    "2026-11-26_the_tusken_world.sql",
+    "2026-11-27_the_pens_and_the_transports.sql"
+];
 
 let pass = 0;
 let fail = 0;
@@ -27,6 +32,34 @@ function near(a, b, slack) {
     return Math.abs(Number(a) - Number(b)) <= (slack === undefined ? 2 : slack);
 }
 
+async function applyAll(db) {
+    for (const file of PATCHES) {
+        await db.exec(fs.readFileSync(path.join(ROOT, "sql", file), "utf8"));
+    }
+}
+
+/* a fleets table and the reading of it the game has: a stationed fleet sits
+   on its origin world, an active one sits wherever it was left */
+const FLEETS = `
+create table public.fleets (
+    id uuid primary key default gen_random_uuid(),
+    player_id uuid, faction text, name text, status text default 'stationed',
+    origin text, destination text, departure_time timestamptz, arrival_time timestamptz,
+    space_x numeric, space_y numeric, heading numeric, squads jsonb default '[]'::jsonb
+);
+
+create or replace function public.fleet_positions()
+returns table (id uuid, faction text, name text, status text, origin text, x numeric, y numeric)
+language sql stable security definer set search_path to ''
+as $$
+    select f.id, f.faction, f.name, f.status::text, f.origin,
+           case when f.status::text = 'in_space' and f.space_x is not null then f.space_x else o.x end,
+           case when f.status::text = 'in_space' and f.space_y is not null then f.space_y else o.y end
+    from public.fleets as f
+    left join public.planet_positions as o on o.name = f.origin
+$$;
+`;
+
 const SCHEMA = `
 create schema if not exists auth;
 
@@ -36,7 +69,6 @@ as $$ select nullif(current_setting('test.me', true), '')::uuid $$;
 create table public.players (id uuid primary key, faction text);
 insert into public.players (id, faction) values
     ('${AUTH}', 'Combine'),
-    ('${COMB}', 'Combine'),
     ('${FREE}', 'Freedom Authority');
 
 create table public.game_control (id int primary key, started boolean not null default true,
@@ -47,8 +79,8 @@ values (1, true, false, '${AUTH}');
 create table public.faction_treasury (faction text primary key, credits numeric default 0,
     last_income_at timestamptz);
 insert into public.faction_treasury (faction, credits, last_income_at) values
-    ('Combine', 20000, now() - interval '5 minutes'),
-    ('Freedom Authority', 20000, now() - interval '5 minutes');
+    ('Combine', 40000, now() - interval '5 minutes'),
+    ('Freedom Authority', 40000, now() - interval '5 minutes');
 
 create table public.planets (id text primary key, name text unique, income int default 100);
 insert into public.planets (id, name, income) values
@@ -70,6 +102,8 @@ insert into public.cities (planet_id, faction, name) values
     ('Asteron', 'Independents', 'Aster');
 
 create table public.city_buildings (id serial primary key, city_id int, building_type text);
+
+${FLEETS}
 
 create or replace function public.planet_income(p_planet text) returns bigint
 language sql stable security definer set search_path to ''
@@ -164,6 +198,8 @@ select p.id,
 from public.planets as p
 where p.name in ('Ultramars', 'Free Earth');
 
+${FLEETS}
+
 create or replace function public.planet_income(p_planet text) returns bigint
 language sql stable security definer set search_path to ''
 as $$ select coalesce((select p.income from public.planets as p where p.name = p_planet), 0)::bigint $$;
@@ -194,7 +230,7 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
     try {
 
         await db.exec(SCHEMA);
-        await db.exec(fs.readFileSync(path.join(ROOT, "sql", "2026-11-26_the_tusken_world.sql"), "utf8"));
+        await applyAll(db);
 
         console.log("\n== the world itself");
 
@@ -204,8 +240,6 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         const pos = await one(db, "select x, y from public.planet_positions where name = 'Tuskara'");
         ok("Tuskara has a place on the map", pos && Number(pos.x) === 44 && Number(pos.y) === 92, pos);
 
-        /* the spot is far from both capitals: on this map each hop is about
-           nine points, so anything past 27 from a capital is three worlds */
         const gaps = await q(db, `
             select c.name as capital,
                    sqrt(power(t.x - c.x, 2) + power(t.y - c.y, 2)) as gap
@@ -216,48 +250,128 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
             gaps.length === 2 && gaps.every(function(g) { return Number(g.gap) >= 27; }),
             gaps.map(function(g) { return g.capital + " " + Number(g.gap).toFixed(1); }));
 
+        console.log("\n== the numbers");
+
+        ok("1,000 Tusken make a credit",
+            Number(await rpc(db, "select public.tusken_slaves_per_credit() as v")) === 1000);
+        ok("a faction may raise eight settlements",
+            Number(await rpc(db, "select public.tusken_max_colonies() as v")) === 8);
+        ok("the bands need five minutes between two of them",
+            Number(await rpc(db, "select public.tusken_colony_cooldown() as v")) === 300);
+        ok("the planet has sixteen places for them",
+            Number(await rpc(db, "select public.tusken_spot_count() as v")) === 16);
+
+        const places = await q(db, "select public.tusken_spot_x(i) as x, public.tusken_spot_y(i) as y from generate_series(1, 16) as s(i)");
+        ok("every place is on the globe",
+            places.every(function(p) { return Number(p.x) > 0 && Number(p.x) < 100 &&
+                                              Number(p.y) > 0 && Number(p.y) < 100; }), places);
+        ok("no two places are the same",
+            new Set(places.map(function(p) { return p.x + "," + p.y; })).size === 16);
+        ok("every place has its own name",
+            new Set(await Promise.all(Array.from({ length: 16 }, function(_, i) {
+                return rpc(db, "select public.tusken_colony_name(" + (i + 1) + ") as v");
+            }))).size === 16);
+
         console.log("\n== the screen before anything is built");
 
         await as(db, AUTH);
 
         let state = await rpc(db, "select public.tusken_world() as s");
         ok("an empty world reads", state && state.planet === "Tuskara", state);
-        ok("no colonies yet", state.my_colonies === 0);
+        ok("no settlements yet", state.my_colonies === 0);
         ok("no Tusken captured yet", Number(state.pool) === 0);
-        ok("the first colony costs 500", state.prices.colony === 500, state.prices);
-        ok("a transport takes 2500", Number(state.prices.capacity) === 2500);
-        ok("10,000 Tusken make a credit", Number(state.prices.per_credit) === 10000);
+        ok("the first settlement costs 500", state.prices.colony === 500, state.prices);
+        ok("a hull takes 2500", Number(state.prices.capacity) === 2500);
+        ok("the screen knows the new rate", Number(state.prices.per_credit) === 1000, state.prices);
+        ok("the screen knows the cooldown", Number(state.prices.cooldown) === 300, state.prices);
+        ok("no fleet is in orbit yet", state.orbit.here === false, state.orbit);
+        ok("and none is named", state.orbit.fleet === null, state.orbit);
+        ok("no transports are owned", state.ships.length === 0, state.ships);
+        ok("nothing is in port", Number(state.idle_ships) === 0);
         ok("Krieg is offered as a destination", state.destinations.some(function(d) { return d.planet === "Krieg"; }));
         ok("Asteron is not (we do not hold it)", !state.destinations.some(function(d) { return d.planet === "Asteron"; }));
         ok("the homeworld is not offered to itself", !state.destinations.some(function(d) { return d.planet === "Tuskara"; }));
-        ok("a level-one colony holds 1500", Number(await rpc(db, "select public.tusken_capacity(1,1) as v")) === 1500);
-        ok("a level-one colony takes 500 an hour", Number(await rpc(db, "select public.tusken_yield_per_hour(1,1) as v")) === 500);
+        ok("a level-one settlement holds 1500", Number(await rpc(db, "select public.tusken_capacity(1,1) as v")) === 1500);
+        ok("a level-one settlement takes 500 an hour", Number(await rpc(db, "select public.tusken_yield_per_hour(1,1) as v")) === 500);
 
-        console.log("\n== founding");
+        console.log("\n== settling needs a fleet in orbit");
 
         const credits = async function() {
             const row = await one(db, "select credits from public.faction_treasury where faction = 'Combine'");
             return Number(row.credits);
         };
 
-        const before = await credits();
-        let made = await rpc(db, "select public.tusken_found_colony() as s");
-        ok("the first colony is founded", made && made.ok === true, made);
-        ok("it took 500 credits", (await credits()) === before - 500);
-        ok("it is named", made.name === "Red Hollow", made.name);
+        let err = await expectError(db, "select public.tusken_found_colony()");
+        ok("without a fleet the bands stay in the desert",
+            err && /in orbit of Tuskara/.test(err), err);
+        ok("and nothing was paid for", (await credits()) === 40000, await credits());
+
+        /* a fleet travelling through is not a fleet in orbit */
+        await db.exec(`
+            insert into public.fleets (player_id, faction, name, status, origin, destination)
+            values ('${AUTH}', 'Combine', 'Wandering Spear', 'travelling', 'Krieg', 'Tuskara')`);
+        err = await expectError(db, "select public.tusken_found_colony()");
+        ok("a fleet on the road does not count", err && /in orbit of Tuskara/.test(err), err);
+        await db.exec("delete from public.fleets");
+
+        await db.exec(`
+            insert into public.fleets (player_id, faction, name, status, origin)
+            values ('${AUTH}', 'Combine', 'Spear of Ultramar', 'stationed', 'Tuskara')`);
 
         state = await rpc(db, "select public.tusken_world() as s");
-        ok("the screen shows one colony", state.colonies.length === 1);
+        ok("the fleet overhead is read", state.orbit.here === true, state.orbit);
+        ok("and named", state.orbit.fleet === "Spear of Ultramar", state.orbit.fleet);
+
+        console.log("\n== founding");
+
+        const before = await credits();
+        let made = await rpc(db, "select public.tusken_found_colony() as s");
+        ok("the first settlement is founded", made && made.ok === true, made);
+        ok("it took 500 credits", (await credits()) === before - 500);
+        ok("it is named", made.name === "Red Hollow", made.name);
+        ok("it has a place of its own", Number(made.spot) === 1 && Number(made.x) === 22 && Number(made.y) === 24, made);
+        ok("the fleet that held the orbit is reported", made.fleet === "Spear of Ultramar", made.fleet);
+
+        state = await rpc(db, "select public.tusken_world() as s");
+        ok("the screen shows one settlement", state.colonies.length === 1);
         ok("it is mine", state.colonies[0].mine === true);
-        ok("the next colony costs 750", state.prices.colony === 750, state.prices.colony);
+        ok("it carries its place", Number(state.colonies[0].x) === 22 && Number(state.colonies[0].y) === 24, state.colonies[0]);
+        ok("the next one costs 750", state.prices.colony === 750, state.prices.colony);
+        ok("the cooldown is running", Number(state.cooldown) > 200, state.cooldown);
 
-        await rpc(db, "select public.tusken_found_colony() as s");
-        await rpc(db, "select public.tusken_found_colony() as s");
-        let err = await expectError(db, "select public.tusken_found_colony()");
-        ok("a fourth colony is refused", err && /another colony/.test(err), err);
+        err = await expectError(db, "select public.tusken_found_colony()");
+        ok("a second settlement has to wait", err && /bands are still moving/.test(err), err);
 
-        const colonies = await q(db, "select id, name from public.tusken_colonies order by id");
-        ok("three colonies now stand", colonies.length === 3);
+        const settle = async function() {
+            await db.exec("update public.tusken_colonies set founded_at = now() - interval '10 minutes'");
+            return rpc(db, "select public.tusken_found_colony() as s");
+        };
+
+        await settle();
+        await settle();
+        state = await rpc(db, "select public.tusken_world() as s");
+        ok("three settlements stand", state.colonies.length === 3, state.colonies.length);
+        ok("each on its own place",
+            new Set(state.colonies.map(function(c) { return c.x + "," + c.y; })).size === 3,
+            state.colonies.map(function(c) { return c.x + "," + c.y; }));
+
+        while (state.my_colonies < 8) {
+            const got = await settle();
+            if (!got || got.ok !== true) { break; }
+            state = await rpc(db, "select public.tusken_world() as s");
+        }
+
+        ok("eight settlements can stand", state.my_colonies === 8, state.my_colonies);
+        ok("the dust has no more places for us", state.my_colonies === state.max_colonies);
+        err = await expectError(db, "select public.tusken_found_colony()");
+        ok("a ninth is refused", err && /another settlement/.test(err), err);
+
+        const colonies = await q(db, "select id, name, spot from public.tusken_colonies order by id");
+        ok("every settlement took a different place",
+            new Set(colonies.map(function(c) { return Number(c.spot); })).size === 8,
+            colonies.map(function(c) { return c.spot; }));
+        ok("all of them are inside the sixteen places",
+            colonies.every(function(c) { return Number(c.spot) >= 1 && Number(c.spot) <= 16; }));
 
         console.log("\n== the bands bring the Tusken in");
 
@@ -271,9 +385,9 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         await db.query("update public.tusken_colonies set slaves = 0, last_yield_at = now() - interval '10 hours' where id = $1", [colonies[0].id]);
         await rpc(db, "select public.tusken_tick() as s");
         stock = await one(db, "select slaves from public.tusken_colonies where id = $1", [colonies[0].id]);
-        ok("the pens stop a colony at its cap", Number(stock.slaves) === 1500, stock.slaves);
+        ok("the pens stop a settlement at its cap", Number(stock.slaves) === 1500, stock.slaves);
 
-        console.log("\n== growing a colony");
+        console.log("\n== growing a settlement");
 
         let c1 = await one(db, "select * from public.tusken_colonies where id = $1", [colonies[0].id]);
         let cash = await credits();
@@ -294,53 +408,94 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         err = await expectError(db, "select public.tusken_upgrade(" + c1.id + ", 'size')");
         ok("a finished track cannot be bought again", err && /already finished/.test(err), err);
 
-        /* the other side's colony is not ours to grow */
+        /* the other side needs an orbit of its own, and its settlement must not
+           be ours to grow */
         await as(db, FREE);
+        await db.exec(`
+            insert into public.fleets (player_id, faction, name, status, origin)
+            values ('${FREE}', 'Freedom Authority', 'Lantern of Earth', 'stationed', 'Tuskara')`);
         await rpc(db, "select public.tusken_found_colony() as s");
         const theirs = await one(db, "select id from public.tusken_colonies where faction = 'Freedom Authority'");
+        ok("the other side settles in the first free place", !!theirs);
         await as(db, AUTH);
         err = await expectError(db, "select public.tusken_upgrade(" + theirs.id + ", 'catch')");
-        ok("another faction's colony is refused", err && /answers to/.test(err), err);
+        ok("another faction's settlement is refused", err && /answers to/.test(err), err);
 
-        console.log("\n== buying a transport and landing it");
+        console.log("\n== a hull is bought once");
 
         await db.query("update public.tusken_colonies set slaves = 1500 where id = $1", [colonies[0].id]);
+
+        err = await expectError(db, "select public.tusken_ship('Tuskara', 'Krieg', 1000)");
+        ok("without a hull nothing sails", err && /Every transport is at sea/.test(err), err);
+
+        cash = await credits();
+        const bought = await rpc(db, "select public.tusken_buy_ship() as s");
+        ok("a transport is bought", bought && bought.ok === true, bought);
+        ok("it cost 350", (await credits()) === cash - 350);
+        ok("it is named in order", bought.name === "Transport 1", bought.name);
+        ok("it holds 2500", Number(bought.capacity) === 2500);
+
+        state = await rpc(db, "select public.tusken_world() as s");
+        ok("the hull is on the screen", state.ships.length === 1 && state.ships[0].at_sea === false, state.ships);
+        ok("it is in port", Number(state.idle_ships) === 1);
+
         cash = await credits();
         let ship = await rpc(db, "select public.tusken_ship('Tuskara', 'Krieg', 1000) as s");
-        ok("the ship left", ship && ship.ok === true && ship.amount === 1000, ship);
-        ok("it cost 350", (await credits()) === cash - 350);
-        ok("the pens were emptied by the load", Number((await one(db, "select slaves from public.tusken_colonies where id = $1", [colonies[0].id])).slaves) === 500);
+        ok("the load leaves", ship && ship.ok === true && ship.amount === 1000, ship);
+        ok("the trip costs nothing", (await credits()) === cash, await credits());
+        ok("it sails the hull we already own", ship.ship === "Transport 1", ship.ship);
+        ok("the pens were emptied by the load",
+            Number((await one(db, "select slaves from public.tusken_colonies where id = $1", [colonies[0].id])).slaves) === 500);
         ok("a load is in transit", Number((await one(db, "select count(*) as n from public.tusken_convoys")).n) === 1);
         ok("the road takes time", ship.seconds >= 60, ship.seconds);
 
-        await as(db, AUTH);
         state = await rpc(db, "select public.tusken_world() as s");
         ok("the convoy is on the screen", state.convoys.length === 1, state.convoys);
+        ok("the convoy names its hull", state.convoys[0].ship === "Transport 1", state.convoys[0]);
+        ok("the hull reads as at sea", state.ships[0].at_sea === true && state.ships[0].to === "Krieg", state.ships[0]);
+        ok("nothing is in port", Number(state.idle_ships) === 0);
 
-        /* land it */
+        err = await expectError(db, "select public.tusken_ship('Tuskara', 'Krieg', 500)");
+        ok("a hull at sea cannot take a second load", err && /Every transport is at sea/.test(err), err);
+
+        /* land it, and the same hull is free again */
         await db.query("update public.tusken_convoys set arrival_at = now() - interval '1 second'");
         await rpc(db, "select public.tusken_tick() as s");
         const landed = await one(db, "select amount from public.tusken_workforce where planet = 'Krieg' and faction = 'Combine'");
         ok("the load is at work on Krieg", landed && Number(landed.amount) === 1000, landed);
         ok("the convoy is gone", Number((await one(db, "select count(*) as n from public.tusken_convoys")).n) === 0);
 
+        state = await rpc(db, "select public.tusken_world() as s");
+        ok("the hull is back in port", state.ships[0].at_sea === false, state.ships[0]);
+        ok("and still the only one", state.ships.length === 1);
+        ok("nothing was bought for the second trip", Number(await rpc(db, "select count(*) as n from public.tusken_ships")) === 1);
+
+        cash = await credits();
+        await db.query("update public.tusken_colonies set slaves = 800 where id = $1", [colonies[0].id]);
+        ship = await rpc(db, "select public.tusken_ship('Tuskara', 'Krieg', 800) as s");
+        ok("the next load goes on the same hull", ship && ship.ok === true && ship.ship === "Transport 1", ship);
+        ok("and is free too", (await credits()) === cash);
+        await db.query("update public.tusken_convoys set arrival_at = now() - interval '1 second'");
+        await rpc(db, "select public.tusken_tick() as s");
+
         console.log("\n== the money the slaves make");
 
-        ok("1,000 Tusken pay nothing yet", Number(await rpc(db, "select public.tusken_income_bonus('Krieg', 'Combine') as v")) === 0);
+        ok("1,800 Tusken pay 1", Number(await rpc(db, "select public.tusken_income_bonus('Krieg', 'Combine') as v")) === 1,
+            await rpc(db, "select public.tusken_income_bonus('Krieg', 'Combine') as v"));
         ok("the homeworld never pays", Number(await rpc(db, "select public.tusken_income_bonus('Tuskara', 'Combine') as v")) === 0);
 
         await db.query("update public.tusken_workforce set amount = 25000 where planet = 'Krieg' and faction = 'Combine'");
-        ok("25,000 Tusken pay 2", Number(await rpc(db, "select public.tusken_income_bonus('Krieg', 'Combine') as v")) === 2);
+        ok("25,000 Tusken pay 25", Number(await rpc(db, "select public.tusken_income_bonus('Krieg', 'Combine') as v")) === 25);
 
         state = await rpc(db, "select public.tusken_world() as s");
-        ok("the screen reads the money", state.workforce.length === 1 && Number(state.workforce[0].bonus) === 2, state.workforce);
+        ok("the screen reads the money", state.workforce.length === 1 && Number(state.workforce[0].bonus) === 25, state.workforce);
 
         const net = await rpc(db, "select public.supply_network('Combine') as s");
         const krieg = net.worlds.filter(function(w) { return w.planet === "Krieg"; })[0];
         ok("Krieg is in the network", !!krieg, net.worlds);
-        ok("Krieg pays its base plus the slaves", krieg && Number(krieg.income) === 102, krieg);
+        ok("Krieg pays its base plus the slaves", krieg && Number(krieg.income) === 125, krieg);
         ok("the network reports the slaves", krieg && Number(krieg.slaves) === 25000, krieg);
-        ok("the network splits out the slave income", krieg && Number(krieg.slave_income) === 2, krieg);
+        ok("the network splits out the slave income", krieg && Number(krieg.slave_income) === 25, krieg);
 
         /* moving them off Krieg takes the income with them */
         await rpc(db, "select public.tusken_ship('Krieg', 'Ultramars', 2500) as s");
@@ -349,8 +504,8 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
 
         ok("Krieg has 22,500 left", Number((await one(db, "select amount from public.tusken_workforce where planet = 'Krieg' and faction = 'Combine'")).amount) === 22500);
         ok("Ultramars got the load", Number((await one(db, "select amount from public.tusken_workforce where planet = 'Ultramars' and faction = 'Combine'")).amount) === 2500);
-        await db.query("update public.tusken_workforce set amount = 5000 where planet = 'Krieg' and faction = 'Combine'");
-        ok("5,000 Tusken pay nothing: the income left with them", Number(await rpc(db, "select public.tusken_income_bonus('Krieg', 'Combine') as v")) === 0);
+        await db.query("update public.tusken_workforce set amount = 500 where planet = 'Krieg' and faction = 'Combine'");
+        ok("500 Tusken pay nothing", Number(await rpc(db, "select public.tusken_income_bonus('Krieg', 'Combine') as v")) === 0);
 
         console.log("\n== what a ship will not do");
 
@@ -364,7 +519,15 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
 
         await db.query("update public.tusken_colonies set slaves = 5000 where id = $1", [colonies[0].id]);
         ship = await rpc(db, "select public.tusken_ship('Tuskara', 'Krieg', 9000) as s");
-        ok("a bigger load is clamped to one ship", Number(ship.amount) === 2500, ship);
+        ok("a bigger load is clamped to one hull", Number(ship.amount) === 2500, ship);
+        await db.query("update public.tusken_convoys set arrival_at = now() - interval '1 second'");
+        await rpc(db, "select public.tusken_tick() as s");
+
+        /* a second hull, so two loads can be at sea at once */
+        await rpc(db, "select public.tusken_buy_ship() as s");
+        state = await rpc(db, "select public.tusken_world() as s");
+        ok("two hulls are owned", state.ships.length === 2, state.ships);
+        ok("the second is named in order", state.ships[1].name === "Transport 2", state.ships[1].name);
 
         console.log("\n== a frozen world");
 
@@ -383,9 +546,10 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
 
         await as(db, AUTH);
         await rpc(db, "select public.tusken_world_reset() as s");
-        ok("the colonies are gone", Number((await one(db, "select count(*) as n from public.tusken_colonies")).n) === 0);
+        ok("the settlements are gone", Number((await one(db, "select count(*) as n from public.tusken_colonies")).n) === 0);
         ok("the workforce is gone", Number((await one(db, "select count(*) as n from public.tusken_workforce")).n) === 0);
         ok("the convoys are gone", Number((await one(db, "select count(*) as n from public.tusken_convoys")).n) === 0);
+        ok("the hulls are gone", Number((await one(db, "select count(*) as n from public.tusken_ships")).n) === 0);
         ok("the world itself stays on the map", !!(await one(db, "select 1 as x from public.planets where name = 'Tuskara'")));
 
         await db.close();
@@ -398,7 +562,6 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         console.log("\n== an install that keys planets by a number");
 
         const serial = new PGlite();
-        const PATCH = fs.readFileSync(path.join(ROOT, "sql", "2026-11-26_the_tusken_world.sql"), "utf8");
 
         await serial.exec(`
             create schema if not exists auth;
@@ -425,12 +588,14 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
             create table public.cities (id serial primary key, planet_id integer, faction text);
             insert into public.cities (planet_id, faction) values (1, 'Combine'), (2, 'Freedom Authority');
 
+            ${FLEETS}
+
             create or replace function public.planet_income(p_planet text) returns bigint
             language sql stable security definer set search_path to ''
             as $$ select coalesce((select p.income from public.planets as p where p.name = p_planet), 0)::bigint $$;
         `);
 
-        await serial.exec(PATCH);
+        await applyAll(serial);
 
         const row = await one(serial, "select id, name, income from public.planets where name = 'Tuskara'");
         ok("the world is inserted on a numbered install", !!row, row);
@@ -438,20 +603,23 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
         ok("and its own income", row && Number(row.income) === 60, row);
         ok("its place on the map is written", !!(await one(serial, "select 1 as x from public.planet_positions where name = 'Tuskara'")));
 
-        /* this shape has no sequence at all, so the setval guard does nothing */
         const seq = await one(serial, "select pg_get_serial_sequence('public.planets', 'id') as s");
         ok("a hand-keyed table has no sequence to move", seq.s === null, seq);
 
-        /* running it again must not add a second Tuskara */
-        await serial.exec(PATCH);
-        ok("a second run adds nothing", Number((await one(serial, "select count(*) as n from public.planets where name = 'Tuskara'")).n) === 1);
+        await applyAll(serial);
+        ok("a second run adds nothing",
+            Number((await one(serial, "select count(*) as n from public.planets where name = 'Tuskara'")).n) === 1);
 
         await as(serial, AUTH);
+        await serial.exec(`
+            insert into public.fleets (player_id, faction, name, status, origin)
+            values ('${AUTH}', 'Combine', 'Hammer of Mars', 'stationed', 'Tuskara')`);
         const founded = await rpc(serial, "select public.tusken_found_colony() as s");
-        ok("the colonies still work on a numbered install", founded && founded.ok === true, founded);
+        ok("the settlements still work on a numbered install", founded && founded.ok === true, founded);
 
         const screen = await rpc(serial, "select public.tusken_world() as s");
         ok("and the screen reads", screen && screen.colonies.length === 1, screen && screen.colonies);
+        ok("with the fleet in orbit", screen && screen.orbit.here === true, screen && screen.orbit);
 
         await serial.close();
 
@@ -514,8 +682,8 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
 
             const alt = new PGlite();
             await alt.exec(mini(shape.planets, shape.cityKey));
-            await alt.exec(PATCH);
-            await alt.exec(PATCH);              /* a second run must not double it */
+            await applyAll(alt);
+            await applyAll(alt);              /* a second run must not double it */
 
             const world = await one(alt, "select * from public.planets where name = 'Tuskara'");
             ok("the world is inserted", !!world, world);
@@ -533,16 +701,17 @@ returns jsonb language sql stable as $$ select '[]'::jsonb $$;
                 Number((await one(alt, "select count(*) as n from public.planets where name = 'Tuskara'")).n) === 1);
 
             if (shape.cityKey === "integer") {
-                /* a serial column has its own default, but the patch keys it
-                   by hand: the sequence must agree with what was written */
                 const next = await one(alt,
                     "select nextval(pg_get_serial_sequence('public.planets', 'id')) as n");
                 ok("the sequence was moved past the new row", Number(next.n) === 2, next);
             }
 
             await as(alt, AUTH);
+            await alt.exec(`
+                insert into public.fleets (player_id, faction, name, status, origin)
+                values ('${AUTH}', 'Combine', 'Spear of Ultramar', 'stationed', 'Tuskara')`);
             const col = await rpc(alt, "select public.tusken_found_colony() as s");
-            ok("and the colonies work there too", col && col.ok === true, col);
+            ok("and the settlements work there too", col && col.ok === true, col);
 
             await alt.close();
         }
