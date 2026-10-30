@@ -1450,6 +1450,7 @@
         "militia company": "companhia de milícia",
         "militia companies": "companhias de milícia",
         "MILITIA CAMP": "ACAMPAMENTO DA MILÍCIA",
+        "BATTLE UNDER WAY": "COMBATE EM CURSO",
         "A new militia band has risen in the woods of": "Um novo bando de milícia se levantou na mata de",
         "No fleet of ours is in orbit: bring the troops before you go into the woods.": "Nenhuma frota nossa está em órbita: traga as tropas antes de entrar na mata.",
         "The militia is in the woods. Select your divisions.": "A milícia está na mata. Selecione as suas divisões.",

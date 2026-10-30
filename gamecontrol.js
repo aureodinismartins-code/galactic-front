@@ -318,6 +318,12 @@
 
         if (window.GC_NO_BANNER) { return; }
 
+        /* the menu is not a screen of the game: no battle banner over it */
+
+        const here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+
+        if (here === "index.html" || here === "") { return; }
+
         let result;
 
         try { result = await supabaseClient.rpc("my_space_battles"); } catch (e) { return; }

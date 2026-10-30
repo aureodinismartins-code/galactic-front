@@ -1620,7 +1620,10 @@ canvas.addEventListener("mousedown", function(ev) {
 
         if (!mine.length) { return; }
 
-        const foe = ships.find(o => o.side !== mySide && o.hull > 0 && Math.hypot(o.x - w.x, o.y - w.y) < o.radius + 20 / cam.z);
+        const foe = ships
+            .filter(o => o.side !== mySide && o.hull > 0)
+            .sort((a, b) => Math.hypot(a.x - w.x, a.y - w.y) - Math.hypot(b.x - w.x, b.y - w.y))
+            .find(o => Math.hypot(o.x - w.x, o.y - w.y) < o.radius + 40 / cam.z);
 
         if (foe) { orderAttack(mine, foe); return; }
 
@@ -1653,13 +1656,15 @@ window.addEventListener("mouseup", function(ev) {
 
         const x0 = Math.min(drag.x0, drag.x1), x1 = Math.max(drag.x0, drag.x1);
         const y0 = Math.min(drag.y0, drag.y1), y1 = Math.max(drag.y0, drag.y1);
-        const small = (x1 - x0) * cam.z < 6 && (y1 - y0) * cam.z < 6;
+        const small = (x1 - x0) * cam.z < 10 && (y1 - y0) * cam.z < 10;
         const mine = myShips();
 
         let pick;
 
         if (small) {
-            const hit = mine.filter(s => Math.hypot(s.x - drag.x0, s.y - drag.y0) < s.radius + 14 / cam.z)
+            /* a click counts anywhere near the hull: ships are small and they
+               move, so the pick is the nearest one inside a generous margin */
+            const hit = mine.filter(s => Math.hypot(s.x - drag.x0, s.y - drag.y0) < s.radius + 30 / cam.z)
                 .sort((a, b) => dist(a, { x: drag.x0, y: drag.y0 }) - dist(b, { x: drag.x0, y: drag.y0 }))[0];
             pick = hit ? [hit] : [];
         }

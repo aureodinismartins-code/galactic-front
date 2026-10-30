@@ -631,8 +631,46 @@
             font-size: 9px;
             color: #ffb9a8;
         }
-        .fleet-marker.engaged svg.fleet-ships { animation: engagedPulse 0.8s ease-in-out infinite alternate; }
-        @keyframes engagedPulse { from { filter: drop-shadow(0 0 3px #ff5a2a); } to { filter: drop-shadow(0 0 9px #ff2a00); } }
+        .fleet-marker.engaged svg.fleet-ships { animation: engagedPulse 2.4s ease-in-out infinite alternate; }
+        @keyframes engagedPulse { from { filter: drop-shadow(0 0 3px #ff5a2a); } to { filter: drop-shadow(0 0 10px #ff2a00); } }
+        /* a fleet in a battle is a bigger mark to press, and it breathes slowly
+           so it can be picked instead of strobing away from the pointer */
+        .fleet-marker.engaged { width: 34px; height: 34px; z-index: 620; }
+
+        /* where the fighting is, when the fleets themselves are off the map */
+        .battle-marker {
+            position: absolute;
+            width: 34px;
+            height: 34px;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        .battle-marker .battle-ring {
+            position: absolute;
+            inset: 0;
+            border: 2px solid #ff9a4a;
+            border-radius: 50%;
+            box-shadow: 0 0 14px rgba(255, 120, 40, 0.75);
+            animation: battleRing 2.4s ease-in-out infinite;
+        }
+        .battle-marker .battle-label {
+            position: absolute;
+            top: 38px;
+            white-space: nowrap;
+            color: #ffd0a8;
+            font: bold 9px Arial;
+            letter-spacing: 2px;
+            text-shadow: 0 1px 4px black;
+        }
+        .battle-marker:hover .battle-ring { border-color: #fff; }
+        @keyframes battleRing {
+            0%, 100% { transform: scale(0.85); opacity: 0.7; }
+            50% { transform: scale(1.15); opacity: 1; }
+        }
         /* fleets are sent with a right-click on the map, so the old destination picker is hidden */
         #fleet-destination, #move-fleet-button, label[for="fleet-destination"] { display: none !important; }
         #fleet-send-hint { color: #8fd0ff; font-size: 12px; letter-spacing: 1px; margin: 6px 0; }
@@ -1697,6 +1735,10 @@ function planetDrawBox(name) {
 
 function timeMs(t) { return t ? new Date(t).getTime() : NaN; }
 
+/* the map is drawn in percent of a wide box: one unit across is 1.78 units up
+   and down, and the server measures space distances exactly like this */
+const SPACE_X_SCALE = 1.78;
+
 /* two timestamps that mean the same moment, even if one column has no time zone (they then differ by
    a whole number of quarter hours): this stopped travelling fleets from jumping back to their start */
 function sameInstant(a, b) {
@@ -1709,10 +1751,11 @@ function sameInstant(a, b) {
 /* the point a travelling fleet started from (a planet, or a spot in deep space) */
 function getTripStart(fleet) {
 
-    if (
-        fleet.from_x != null && fleet.from_dep &&
-        sameInstant(fleet.from_dep, fleet.departure_time)
-    ) {
+    /* where this leg really began. Trusting the planet whenever the two stamps
+       do not line up is what put a redirected fleet back over the world it had
+       already left, so a stored point wins whenever the server sent one. */
+
+    if (fleet.from_x != null && fleet.from_y != null && Number.isFinite(Number(fleet.from_x))) {
         return [Number(fleet.from_x), Number(fleet.from_y)];
     }
 
@@ -1824,44 +1867,19 @@ function getFleetTurn(fleet) {
 ========================================= */
 
 
-function calculateTravelSeconds(
-    origin,
-    destination
-) {
+function calculateTravelSeconds(origin, destination) {
 
-    const a =
-        getPlanetPosition(
-            origin
-        );
+    const a = getPlanetPosition(origin);
+    const b = getPlanetPosition(destination);
 
+    /* the map is wider than it is tall, and the server measures space exactly
+       like this in the battle scan. The old estimate treated percent as if the
+       map were square, so a fleet always arrived sooner than the panel said. */
 
-    const b =
-        getPlanetPosition(
-            destination
-        );
+    const dx = (b[0] - a[0]) * SPACE_X_SCALE;
+    const dy = b[1] - a[1];
 
-
-    const dx =
-        b[0] - a[0];
-
-
-    const dy =
-        b[1] - a[1];
-
-
-    const distance =
-        Math.sqrt(
-            dx * dx +
-            dy * dy
-        );
-
-
-    return Math.max(
-        60,
-        Math.round(
-            distance * 6
-        )
-    );
+    return Math.max(60, Math.round(Math.sqrt(dx * dx + dy * dy) * 6));
 
 }
 
@@ -2379,6 +2397,7 @@ function renderFleets() {
 
     let activeCount = 0;
 const orbitSlots = {};
+const battleSlots = {};
 
 
     for (
@@ -2479,6 +2498,17 @@ const orbitSlots = {};
 
 
         marker.style.top = position[1] + "%";
+
+        /* two fleets in one battle stand at the same point: fan them out so
+           either of them can be pressed */
+
+        if (fleet.status === "engaged" && fleet.space_x != null) {
+            const key = Math.round(Number(fleet.space_x)) + ":" + Math.round(Number(fleet.space_y));
+            const slot = battleSlots[key] = (battleSlots[key] ?? -1) + 1;
+            const angle = (210 + slot * 60) * Math.PI / 180;
+            marker.style.marginLeft = Math.cos(angle) * 22 + "px";
+            marker.style.marginTop = Math.sin(angle) * 22 + "px";
+        }
 
                 if (fleet.status === "stationed" || (fleet.status === "engaged" && fleet.space_x == null)) {
             const slot = orbitSlots[fleet.origin] = (orbitSlots[fleet.origin] ?? -1) + 1;
@@ -3873,6 +3903,81 @@ function showSpaceBattle(b) {
 
 }
 
+/* =========================================
+   WHERE THE FIGHTING IS
+   A battle takes its fleets off the map while it is being fought, so the map
+   keeps a ring where each one is: the fleets are gone, the place is not.
+========================================= */
+async function drawBattles() {
+
+    const host = document.getElementById("planet-layer") || document.getElementById("galaxy-map");
+
+    if (!host) { return; }
+
+    let layer = document.getElementById("battle-layer");
+
+    if (!layer) {
+        layer = document.createElement("div");
+        layer.id = "battle-layer";
+        layer.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:640;";
+        host.appendChild(layer);
+    }
+
+    layer.innerHTML = "";
+
+    let fights = [];
+
+    try {
+        const { data } = await supabaseClient.rpc("my_space_battles");
+        fights = Array.isArray(data) ? data : [];
+    }
+    catch (e) { fights = []; }
+
+    if (!fights.length) { return; }
+
+    /* the map's own book has the exact spot of a fight in deep space */
+
+    const spots = {};
+
+    try {
+        const { data } = await supabaseClient.from("space_battles").select("id,x,y,kind,planet").eq("status", "pending");
+        (data || []).forEach(function(b) { spots[String(b.id)] = b; });
+    }
+    catch (e) { /* not ours to read: the orbit fights still have a place */ }
+
+    for (const b of fights) {
+
+        const row = spots[String(b.id)] || {};
+        let where = null;
+
+        if (row.kind === "orbit" && row.planet) { where = getPlanetPosition(row.planet); }
+        else if (row.x != null && row.y != null) { where = [Number(row.x), Number(row.y)]; }
+        else if (b.kind === "orbit" && b.planet) { where = getPlanetPosition(b.planet); }
+
+        if (!where || !Number.isFinite(Number(where[0]))) { continue; }
+
+        const marker = document.createElement("div");
+
+        marker.className = "battle-marker";
+        marker.style.left = Number(where[0]) + "%";
+        marker.style.top = Number(where[1]) + "%";
+        marker.dataset.battle = String(b.id);
+        marker.title = T("SPACE BATTLE");
+        marker.innerHTML = '<span class="battle-ring"></span><span class="battle-label">' +
+            escapeHTML(T("BATTLE UNDER WAY")) + '</span>';
+
+        marker.addEventListener("click", function(event) {
+            event.stopPropagation();
+            window.location.href = "space.html?battle=" + encodeURIComponent(b.id);
+        });
+
+        layer.appendChild(marker);
+
+    }
+
+}
+
+
 async function pollSpaceBattles() {
 
     if (window.gameStatus && !window.gameStatus.started) { return; }
@@ -3890,6 +3995,8 @@ async function pollSpaceBattles() {
         opened += orbits.data.length;
         (orbits.data || []).forEach(function(o) { announceOrbitBattle(o); });
     }
+
+    await drawBattles();
 
     if (opened) { await loadFleets(); }
 
@@ -4044,7 +4151,7 @@ setTimeout(pollSpaceBattles, 2500);
         const start = getFleetPosition(fleet);
         const end = planet ? getPlanetPosition(planet) : [x, y];
 
-        const dist = Math.hypot(end[0] - start[0], end[1] - start[1]);
+        const dist = Math.hypot((end[0] - start[0]) * SPACE_X_SCALE, end[1] - start[1]);
         const seconds = Math.max(planet ? 60 : 20, Math.round(dist * 6));
 
         const heading = Math.atan2(
