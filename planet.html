@@ -242,6 +242,71 @@
 
 
         /* =====================================================
+           MILITIA CAMPS (2026-11-39)
+           A world in revolt camps in the open country, never in
+           a city: a fire on the ground, and its band beneath it.
+        ===================================================== */
+
+        .militia-camp {
+
+            position: absolute;
+
+            z-index: 12;
+
+            text-align: center;
+
+            cursor: pointer;
+
+            transform: translate(-50%, -50%);
+        }
+
+        .militia-camp .camp-fire {
+
+            width: 18px;
+            height: 18px;
+
+            margin: auto;
+
+            border-radius: 50%;
+            border: 1px dashed #ff9a3c;
+
+            background: radial-gradient(circle, rgba(255, 168, 84, 0.95) 0 3px, rgba(255, 122, 40, 0.10) 4px 100%);
+
+            box-shadow: 0 0 12px rgba(255, 122, 40, 0.55);
+
+            animation: campFlicker 2.6s ease-in-out infinite;
+        }
+
+        .militia-camp span {
+
+            display: block;
+
+            margin-top: 7px;
+
+            white-space: nowrap;
+
+            color: #ffc48a;
+
+            font-size: 10px;
+            letter-spacing: 2px;
+
+            text-shadow: 0 1px 5px black;
+        }
+
+        .militia-camp:hover .camp-fire {
+
+            transform: scale(1.3);
+            border-color: #ffd7a8;
+        }
+
+        @keyframes campFlicker {
+
+            0%, 100% { opacity: 0.7; box-shadow: 0 0 7px rgba(255, 122, 40, 0.4); }
+            50% { opacity: 1; box-shadow: 0 0 17px rgba(255, 166, 62, 0.85); }
+        }
+
+
+        /* =====================================================
            FLEET LIST
         ===================================================== */
 
@@ -1024,6 +1089,7 @@ async function loadCities() {
 
     await loadBuildings();
     await loadWar();
+    await loadRebelCamps();
 
     return true;
 
@@ -1155,6 +1221,189 @@ function renderPlanet() {
 
         }
     );
+
+
+    renderMilitiaCamps();
+
+}
+
+
+/* =========================================================
+   THE MILITIA CAMPS (2026-11-39)
+
+   A world in revolt does not hide its rebels in the cities: the
+   militia camps in the open country, and the woods around the
+   towns belong to them until they are broken. unrest_state()
+   (2026-11-38) says how many bands stand and how many men; the
+   globe draws one camp for every band, as far from the cities
+   as the ground allows.
+========================================================= */
+
+let rebelCamps = { bands: 0, men: 0 };
+
+
+function tr(s) {
+
+    return typeof window.t === "function" ? window.t(s) : s;
+
+}
+
+
+async function loadRebelCamps() {
+
+    rebelCamps = { bands: 0, men: 0 };
+
+    try {
+
+        const { data, error } = await supabaseClient.rpc("unrest_state");
+
+        if (error || !data) { return; }
+
+        const worlds = Array.isArray(data.worlds) ? data.worlds : [];
+
+        const world = worlds.find(function(w) {
+
+            return String(w && w.planet).toLowerCase() === String(planetName).toLowerCase();
+
+        });
+
+        if (!world) { return; }
+
+        const fight = world.fight || {};
+        const bands = Number(fight.bands != null ? fight.bands : (fight.rebels ? 1 : 0));
+
+        rebelCamps = {
+            bands: Math.max(0, bands | 0),
+            men: Math.max(0, Number(fight.men) || 0)
+        };
+
+    }
+    catch (e) {
+
+        /* no unrest book on this deployment: the world simply has no camps */
+
+        rebelCamps = { bands: 0, men: 0 };
+
+    }
+
+}
+
+
+/* where a camp stands: open country, as far as the ring allows from the
+   cities and from the other camps. The globe is a circle of positions in
+   percent, and the ring is seeded by the world's name, so a world always
+   camps in the same places for a given number of bands. */
+function campPositions(count, cityPoints) {
+
+    const spots = [];
+    let seed = 0;
+
+    for (let i = 0; i < String(planetName).length; i++) {
+
+        seed = (seed * 31 + String(planetName).charCodeAt(i)) % 360;
+
+    }
+
+    for (let n = 0; n < count; n++) {
+
+        let best = [50, 50];
+        let bestScore = -1;
+
+        for (let k = 0; k < 36; k++) {
+
+            const angle = ((seed + n * 53 + k * 10) % 360) * Math.PI / 180;
+
+            /* three rings, so the camps do not sit on one circle */
+
+            const radius = 33 + (k % 3) * 3.5;
+
+            const x = 50 + Math.cos(angle) * radius;
+            const y = 50 + Math.sin(angle) * radius * 0.85;
+
+            function away(point) {
+
+                const dx = point[0] - x;
+                const dy = point[1] - y;
+
+                return Math.sqrt(dx * dx + dy * dy) || 0;
+
+            }
+
+            const score = Math.min.apply(null, cityPoints.map(away).concat(spots.map(away), [120]));
+
+            if (score > bestScore) {
+
+                bestScore = score;
+                best = [Math.round(x), Math.round(y)];
+
+            }
+
+        }
+
+        spots.push(best);
+
+    }
+
+    return spots;
+
+}
+
+
+function renderMilitiaCamps() {
+
+    if (!cityContainer) { return; }
+
+    Array.prototype.forEach.call(
+        cityContainer.querySelectorAll(".militia-camp"),
+        function(el) { el.remove(); }
+    );
+
+    if (!rebelCamps.bands) { return; }
+
+    /* the cities as they actually stand on this globe */
+
+    const cityPoints = Array.prototype.map.call(
+        cityContainer.querySelectorAll(".city"),
+        function(el) {
+            return [parseFloat(el.style.left) || 0, parseFloat(el.style.top) || 0];
+        }
+    );
+
+    const companies = Math.ceil(rebelCamps.men / 500);
+    const each = Math.round(rebelCamps.men / Math.max(1, rebelCamps.bands));
+
+    const spots = campPositions(Math.min(rebelCamps.bands, 4), cityPoints);
+
+    spots.forEach(function(spot) {
+
+        const camp = document.createElement("div");
+
+        camp.className = "militia-camp";
+        camp.style.left = spot[0] + "%";
+        camp.style.top = spot[1] + "%";
+        camp.title = each + " " + tr("men");
+
+        camp.innerHTML =
+            '<div class="camp-fire"></div>' +
+            '<span>' + escapeText(tr("MILITIA CAMP")) + '</span>';
+
+        camp.addEventListener("click", function() {
+
+            gameNotice(
+                rebelCamps.bands + " " + tr(rebelCamps.bands === 1 ? "band" : "bands") + " &middot; " +
+                Number(rebelCamps.men).toLocaleString("en-US") + " " + tr("men") +
+                (companies ? " &middot; " + companies + " " +
+                    tr(companies === 1 ? "militia company" : "militia companies") : "") + ". " +
+                tr("A band of militia camps in the woods outside the towns, out of the cities' reach.") + " " +
+                tr("The halls decide the assault: the Congress holds the order to fight them."),
+                tr("MILITIA CAMP")
+            );
+
+        });
+
+        cityContainer.appendChild(camp);
+
+    });
 
 }
 
@@ -2966,7 +3215,7 @@ async function refreshPlanetData() {
 
     if (!playerID) { return; }
 
-    const before = JSON.stringify([planetCities, planetBuildings]);
+    const before = JSON.stringify([planetCities, planetBuildings, rebelCamps]);
 
     await loadCities();
 
