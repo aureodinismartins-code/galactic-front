@@ -84,6 +84,7 @@ function page(options) {
     });
     w.supabaseClient = {
         rpc: async function (fn) {
+            if (fn === "rebel_band_size") { return { data: 1500, error: null }; }
             if (fn !== "unrest_state") { return { data: null, error: { message: "unknown call" } }; }
             if (options.broken) { return { data: null, error: { message: "function public.unrest_state() does not exist" } }; }
             return { data: { worlds: options.worlds || [] }, error: null };
@@ -92,7 +93,7 @@ function page(options) {
 
     /* the page's own camp state, declarations and all, so the cut-out
        functions never find a variable missing */
-    const declStart = PAGE.indexOf("let rebelCamps = { bands: 0, men: 0 };");
+    const declStart = PAGE.indexOf("let rebelCamps = {");
     const declTail = "let campRise = 0;";
     const declEnd = PAGE.indexOf(declTail, declStart) + declTail.length;
 
@@ -126,8 +127,9 @@ function dist(a, b) {
 
 const CITIES = [[25, 35], [55, 55], [75, 30]];
 
-function world(bands, men) {
+function world(bands, men, garrison) {
     return { planet: "Krieg", faction: "Combine", unrest: 62, mood: "RIOTING", revolts: 0, mine: true,
+             garrison: garrison || { fleets: 1, soldiers: 9500 },
              fight: { bands: bands, men: men, garrison: true, ready_in: 0 } };
 }
 
@@ -176,7 +178,46 @@ function world(bands, men) {
         }), camps.map(function (c) { return at(c); }));
         ok("and the two camps stand apart", dist(at(camps[0]), at(camps[1])) > 8, dist(at(camps[0]), at(camps[1])));
 
-        console.log("\n== the same world camps in the same places");
+        console.log("\n== the camps show what they took");
+
+        const took = page({ worlds: [world(2, 3500)] });
+
+        await took.w.loadRebelCamps();
+        took.w.renderMilitiaCamps();
+
+        const tookCamps = took.camps();
+        const details = tookCamps.map(function (c) {
+            const d = c.querySelector(".camp-detail");
+            return d ? d.textContent : "";
+        });
+
+        ok("every camp counts its own men", details.every(function (d) { return /1,750 men/.test(d); }), details);
+        ok("and the recruits it holds", details.every(function (d) { return /250 recruits/.test(d); }), details);
+        ok("the recruits add up to what the garrison lost",
+            details.reduce(function (n, d) {
+                const m = /(\d[\d,]*) recruits/.exec(d);
+                return n + (m ? Number(m[1].replace(/,/g, "")) : 0);
+            }, 0) === 500, details);
+        ok("the garrison the men came out of is on the camp", /9,500/.test(tookCamps[0].title), tookCamps[0].title);
+
+        took.dom.window.close();
+
+        const clean = page({ worlds: [world(2, 3000)] });
+
+        await clean.w.loadRebelCamps();
+        clean.w.renderMilitiaCamps();
+
+        const cleanDetails = clean.camps().map(function (c) {
+            const d = c.querySelector(".camp-detail");
+            return d ? d.textContent : "";
+        });
+
+        ok("a world whose bands took nobody shows no recruits",
+            cleanDetails.every(function (d) { return /1,500 men/.test(d) && d.indexOf("recruits") === -1; }), cleanDetails);
+
+        clean.dom.window.close();
+
+                console.log("\n== the same world camps in the same places");
 
         p.w.renderMilitiaCamps();
 
@@ -344,6 +385,8 @@ function world(bands, men) {
         ok("and who sends the troops", /"The halls decide the assault: the Congress holds the order to fight them\.": "As casas decidem o assalto: o Congresso tem a ordem de combat\u00ea-los\."/.test(I18N));
         ok("the rise is announced", /"A new militia band has risen in the woods of": "Um novo bando de mil\u00edcia se levantou na mata de"/.test(I18N));
         ok("and several rises too", /"New militia bands have risen in the woods of": "Novos bandos de mil\u00edcia se levantaram na mata de"/.test(I18N));
+        ok("the camp shows recruits", /"recruits": "recrutas"/.test(I18N));
+        ok("and the garrison it bleeds", /"garrison": "guarnição"/.test(I18N));
 
         await wait(10);
 
