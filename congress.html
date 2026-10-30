@@ -1355,23 +1355,30 @@ function rebelsLine(u) {
 
     const calm = u.calm || {};
     const fight = u.fight || {};
+    const bands = Number(fight.bands != null ? fight.bands : (fight.rebels ? 1 : 0));
+    const men = Number(fight.men || 0);
     const calmWait = Number(calm.ready_in) || 0;
     const fightWait = Number(fight.ready_in) || 0;
-    const canFight = !!fight.rebels && !!fight.garrison;
+    const armed = bands > 0;
+    const canFight = armed && !!fight.garrison && fightWait <= 0;
 
     let why;
 
-    if (!fight.rebels) { why = T("No rebels have risen here yet: that takes unrest 55."); }
-    else if (!fight.garrison) { why = T("The rebels are up, but no fleet of ours is in orbit to send against them."); }
+    if (!armed) { why = T("No rebel band has risen here yet: that takes unrest 60."); }
+    else if (!fight.garrison) { why = T("The rebels are under arms, and no fleet of ours is in orbit to send against them."); }
     else if (fightWait > 0) { why = T("The troops are regrouping: ready in") + " " + fightWait + " s."; }
-    else { why = T("Send the troops in: the bar comes down, and so does the garrison."); }
+    else { why = T("Send the troops in: they will break a band, at a price in soldiers."); }
 
-    return '<div style="margin-top:8px"><button class="btn small calm-world" data-p="' + esc(u.planet) + '"' +
-        (calmWait > 0 ? " disabled" : "") + '>' + T("CALM THE WORLD") + ' (' + Number(calm.price || 0) + ')</button> ' +
-        '<button class="btn small fight-rebels" data-p="' + esc(u.planet) + '"' + (canFight && fightWait <= 0 ? "" : " disabled") + '>' +
+    return '<div class="sub" style="margin-top:6px"><b>' + T("REBEL FORCES") + ':</b> ' +
+        (armed ? bands + ' ' + T(bands === 1 ? "band" : "bands") + ' &middot; ' + Number(men).toLocaleString() + ' ' + T("men")
+               : T("none")) + '</div>' +
+        '<div style="margin-top:6px"><button class="btn small calm-world" data-p="' + esc(u.planet) + '"' +
+        (calmWait > 0 || armed ? " disabled" : "") + '>' + T("CALM THE WORLD") + ' (' + Number(calm.price || 0) + ')</button> ' +
+        '<button class="btn small fight-rebels" data-p="' + esc(u.planet) + '"' + (canFight ? "" : " disabled") + '>' +
         T("FIGHT THE REBELS") + '</button></div>' +
         '<div class="sub">' + why +
-        (calmWait > 0 ? " " + T("The ringleaders will take money again in") + " " + calmWait + " s." : "") + '</div>';
+        (armed ? " " + T("They must be broken before the world can be calmed.") : "") +
+        (calmWait > 0 && !armed ? " " + T("The ringleaders will take money again in") + " " + calmWait + " s." : "") + '</div>';
 
 }
 
@@ -1622,11 +1629,12 @@ function wireOccupied() {
     }));
     $("tabbody").querySelectorAll(".fight-rebels").forEach(el => el.addEventListener("click", async function() {
         const planet = el.dataset.p;
-        if (!window.confirm(T("Fight the rebels in ") + planet + T("? The troops will take losses and the unrest will come down."))) { return; }
+        if (!window.confirm(T("Send the troops against the rebels in ") + planet + T("? The band will lose men, and so will the fleet."))) { return; }
         el.disabled = true;
         const { data, error } = await supabaseClient.rpc("unrest_fight", { p_planet: planet });
         if (error) { toast(error.message, true); await load(); return; }
-        toast(planet + ": " + T("The rebels are beaten down: unrest -25.") + " " + data.lost + " " + T("soldiers lost."));
+        toast(planet + ": " + T("The rebels are beaten down.") + " " + data.killed + " " + T("rebels dead,") + " " +
+            data.lost + " " + T("soldiers lost,") + " " + T("bands left:") + " " + data.bands + ".");
         await load();
     }));
     $("tabbody").querySelectorAll(".policy").forEach(el => el.addEventListener("click", async function() {

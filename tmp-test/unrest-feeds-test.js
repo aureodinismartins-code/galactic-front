@@ -45,7 +45,8 @@ const FIXTURE = {
         {
             planet: "Krieg", faction: "Combine", unrest: 62, mood: "RIOTING", revolts: 0, mine: true,
             policy: "reprisals", garrison: { fleets: 0, soldiers: 0 }, tax: 2, delta: 8,
-            calm: { price: 600, ready_in: 0 }, fight: { ready_in: 0, rebels: true, garrison: true },
+            calm: { price: 600, ready_in: 0, armed: true }, bands: 2, band_men: 3000,
+            fight: { ready_in: 0, rebels: true, bands: 2, men: 3000, garrison: true },
             feeds: [
                 { key: "occupation", value: 4 },
                 { key: "relief", value: -2 },
@@ -56,9 +57,24 @@ const FIXTURE = {
             ]
         },
         {
+            planet: "Veyra", faction: "Combine", unrest: 40, mood: "RESTLESS", revolts: 0, mine: true,
+            policy: "civil", garrison: { fleets: 1, soldiers: 600 }, tax: 1, delta: 2,
+            calm: { price: 600, ready_in: 0, armed: false }, bands: 0, band_men: 0,
+            fight: { ready_in: 0, rebels: false, bands: 0, men: 0, garrison: true },
+            feeds: [
+                { key: "occupation", value: 4 },
+                { key: "relief", value: -2 },
+                { key: "policy", value: 0 },
+                { key: "fleet", value: 0 },
+                { key: "tax", value: 0 },
+                { key: "planted", value: 0 }
+            ]
+        },
+        {
             planet: "Ithaca", faction: "Combine", unrest: 18, mood: "CALM", revolts: 2, mine: true,
             policy: "amnesty", garrison: { fleets: 1, soldiers: 900 }, tax: 1, delta: 2,
-            calm: { price: 600, ready_in: 120 }, fight: { ready_in: 0, rebels: false, garrison: false },
+            calm: { price: 600, ready_in: 120, armed: false }, bands: 0, band_men: 0,
+            fight: { ready_in: 0, rebels: false, bands: 0, men: 0, garrison: true },
             feeds: [
                 { key: "occupation", value: 4 },
                 { key: "relief", value: -2 },
@@ -156,15 +172,22 @@ async function build(page, lang) {
 
     const rioting = cg.unrestLine("Krieg");
     const fightBtn = /<button class="btn small fight-rebels"[^>]*>/.exec(rioting);
-    const calmBtn = /<button class="btn small calm-world"[^>]*>/.exec(rioting);
+    const calmArmed = /<button class="btn small calm-world"[^>]*>/.exec(rioting);
 
-    check("the world can be calmed for money, and the price is on the button",
-        rioting.indexOf("CALM THE WORLD (600)") !== -1, rioting.slice(0, 200));
-    check("the money is on offer when nothing is on a cooldown", !!calmBtn && calmBtn[0].indexOf("disabled") === -1,
-        calmBtn && calmBtn[0]);
-    check("and the rebels can be fought while they are up and a fleet is there",
-        !!fightBtn && fightBtn[0].indexOf("disabled") === -1 && rioting.indexOf("Send the troops in") !== -1,
-        fightBtn && fightBtn[0]);
+    check("the men in the streets are counted",
+        /REBEL FORCES\s*:\s*2 bands &middot; 3,000 men/.test(flat(rioting)), flat(rioting));
+    check("while a band is armed, money cannot buy the world",
+        !!calmArmed && calmArmed[0].indexOf("disabled") !== -1 &&
+        flat(rioting).indexOf("They must be broken before the world can be calmed.") !== -1, flat(rioting));
+    check("but the troops can go in",
+        !!fightBtn && fightBtn[0].indexOf("disabled") === -1 &&
+        flat(rioting).indexOf("Send the troops in") !== -1, fightBtn && fightBtn[0]);
+
+    const picket = flat(cg.unrestLine("Veyra"));
+    const calmFree = /<button class="btn small calm-world"[^>]*>/.exec(cg.unrestLine("Veyra"));
+
+    check("a world with no band says so", /REBEL FORCES\s*:\s*none/.test(picket), picket);
+    check("and its ringleaders can be paid", !!calmFree && calmFree[0].indexOf("disabled") === -1, calmFree && calmFree[0]);
 
     const quiet = flat(cg.unrestLine("Ithaca"));
     const calmQuiet = /<button class="btn small calm-world"[^>]*>/.exec(cg.unrestLine("Ithaca"));
@@ -173,9 +196,9 @@ async function build(page, lang) {
     check("a world whose ringleaders will not take money has the button dark",
         !!calmQuiet && calmQuiet[0].indexOf("disabled") !== -1, calmQuiet && calmQuiet[0]);
     check("and says how long they will wait", quiet.indexOf("take money again in 120 s") !== -1, quiet);
-    check("with no rebels up, no fight is offered",
+    check("with no band up, no fight is offered",
         !!fightQuiet && fightQuiet[0].indexOf("disabled") !== -1 &&
-        quiet.indexOf("No rebels have risen here yet") !== -1, quiet);
+        quiet.indexOf("No rebel band has risen here yet") !== -1, quiet);
 
     cg.unrest.worlds[0].fight.garrison = false;
     const noFleet = flat(cg.unrestLine("Krieg"));
@@ -200,6 +223,9 @@ async function build(page, lang) {
 
     const ptcs = await build("combine.html", "pt");
     const traducaoSoviet = flat(ptcs.unrestLine("Krieg"));
+
+    check("the bands are translated",
+        traducao.indexOf("FORÇAS REBELDES") !== -1 && traducao.indexOf("bandos") !== -1, traducao);
 
     check("the Soviet speaks Portuguese too",
         traducaoSoviet.indexOf("O QUE A ALIMENTA") !== -1 &&
