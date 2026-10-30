@@ -1450,6 +1450,8 @@
         "militia company": "companhia de milícia",
         "militia companies": "companhias de milícia",
         "MILITIA CAMP": "ACAMPAMENTO DA MILÍCIA",
+        "A new militia band has risen in the woods of": "Um novo bando de milícia se levantou na mata de",
+        "New militia bands have risen in the woods of": "Novos bandos de milícia se levantaram na mata de",
         "A band of militia camps in the woods outside the towns, out of the cities' reach.": "Um bando de milícia acampa na mata fora das cidades, longe do alcance delas.",
         "The halls decide the assault: the Congress holds the order to fight them.": "As casas decidem o assalto: o Congresso tem a ordem de combatê-los.",
         "FIGHT THE MILITIA": "COMBATER A MILÍCIA",

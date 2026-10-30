@@ -305,6 +305,67 @@
             50% { opacity: 1; box-shadow: 0 0 17px rgba(255, 166, 62, 0.85); }
         }
 
+        /* a band that has just risen: its camp comes up out of the ground */
+        .militia-camp.camp-new {
+
+            animation: campIn 0.8s ease-out;
+        }
+
+        /* and the camps already standing flare as the woods fill up */
+        .militia-camp .camp-fire.flare {
+
+            animation: campFlare 1.6s ease-out;
+        }
+
+        @keyframes campIn {
+
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+            60% { opacity: 1; transform: translate(-50%, -50%) scale(1.35); }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        @keyframes campFlare {
+
+            0% { box-shadow: 0 0 8px rgba(255, 122, 40, 0.4); }
+            35% { box-shadow: 0 0 26px rgba(255, 186, 92, 1); border-color: #ffe0b0; }
+            100% { box-shadow: 0 0 12px rgba(255, 122, 40, 0.55); }
+        }
+
+
+        /* a brief word, not a modal: it fades on its own */
+
+        #camp-notice {
+
+            position: fixed;
+            left: 50%;
+            top: 92px;
+            z-index: 60;
+
+            transform: translate(-50%, -12px);
+
+            padding: 10px 18px;
+
+            background: rgba(14, 9, 4, 0.95);
+            border: 1px solid #ff9a3c;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+
+            color: #ffd7a8;
+            font: 12px Arial, sans-serif;
+            letter-spacing: 1px;
+
+            opacity: 0;
+            pointer-events: none;
+
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+
+        #camp-notice.show { opacity: 1; transform: translate(-50%, 0); }
+
+        @media (max-width: 780px) {
+
+            #camp-notice { top: 66px; font-size: 11px; width: 86vw; text-align: center; }
+        }
+
 
         /* =====================================================
            FLEET LIST
@@ -1241,6 +1302,11 @@ function renderPlanet() {
 
 let rebelCamps = { bands: 0, men: 0 };
 
+/* the last read of the book, so a band more is news the page can act on */
+
+let campRead = false;
+let campRise = 0;
+
 
 function tr(s) {
 
@@ -1250,6 +1316,10 @@ function tr(s) {
 
 
 async function loadRebelCamps() {
+
+    const before = rebelCamps.bands;
+
+    campRise = 0;
 
     rebelCamps = { bands: 0, men: 0 };
 
@@ -1270,12 +1340,18 @@ async function loadRebelCamps() {
         if (!world) { return; }
 
         const fight = world.fight || {};
-        const bands = Number(fight.bands != null ? fight.bands : (fight.rebels ? 1 : 0));
+        const bands = Math.max(0, Number(fight.bands != null ? fight.bands : (fight.rebels ? 1 : 0)) | 0);
 
         rebelCamps = {
-            bands: Math.max(0, bands | 0),
+            bands: bands,
             men: Math.max(0, Number(fight.men) || 0)
         };
+
+        /* the book has been read once already: one band more is news, and the
+           first look at a world is not (its bands rose long before you came) */
+
+        campRise = campRead && bands > before ? bands - before : 0;
+        campRead = true;
 
     }
     catch (e) {
@@ -1349,6 +1425,38 @@ function campPositions(count, cityPoints) {
 }
 
 
+/* a brief word on the planet page, not a modal: it fades on its own */
+let campNoticeTimer = null;
+
+function campNotice(message) {
+
+    if (!document.body) { return; }
+
+    let bar = document.getElementById("camp-notice");
+
+    if (!bar) {
+
+        bar = document.createElement("div");
+        bar.id = "camp-notice";
+        document.body.appendChild(bar);
+
+    }
+
+    bar.textContent = message;
+    bar.classList.add("show");
+
+    if (campNoticeTimer) { clearTimeout(campNoticeTimer); }
+
+    campNoticeTimer = setTimeout(function() {
+
+        bar.classList.remove("show");
+        campNoticeTimer = null;
+
+    }, 7000);
+
+}
+
+
 function renderMilitiaCamps() {
 
     if (!cityContainer) { return; }
@@ -1358,7 +1466,7 @@ function renderMilitiaCamps() {
         function(el) { el.remove(); }
     );
 
-    if (!rebelCamps.bands) { return; }
+    if (!rebelCamps.bands) { campRise = 0; return; }
 
     /* the cities as they actually stand on this globe */
 
@@ -1371,21 +1479,48 @@ function renderMilitiaCamps() {
 
     const companies = Math.ceil(rebelCamps.men / 500);
     const each = Math.round(rebelCamps.men / Math.max(1, rebelCamps.bands));
+    const bands = Math.min(rebelCamps.bands, 4);
 
-    const spots = campPositions(Math.min(rebelCamps.bands, 4), cityPoints);
+    /* the woods fill as the bands come: every band feeds the fires a step */
 
-    spots.forEach(function(spot) {
+    const fire = 12 + bands * 2;
+
+    const spots = campPositions(bands, cityPoints);
+
+    /* the camps standing before this rise flare, and the newest come up out
+       of the ground; a rise of two bands lights two new camps */
+
+    const fresh = Math.max(0, Math.min(campRise, spots.length));
+    const firstNew = spots.length - fresh;
+
+    spots.forEach(function(spot, index) {
 
         const camp = document.createElement("div");
 
-        camp.className = "militia-camp";
+        camp.className = "militia-camp" + (index >= firstNew && fresh ? " camp-new" : "");
         camp.style.left = spot[0] + "%";
         camp.style.top = spot[1] + "%";
         camp.title = each + " " + tr("men");
+        camp.dataset.band = String(index + 1);
 
-        camp.innerHTML =
-            '<div class="camp-fire"></div>' +
-            '<span>' + escapeText(tr("MILITIA CAMP")) + '</span>';
+        const fireElement = document.createElement("div");
+
+        fireElement.className = "camp-fire" + (index < firstNew && fresh ? " flare" : "");
+        fireElement.style.width = fire + "px";
+        fireElement.style.height = fire + "px";
+
+        if (index < firstNew && fresh) {
+
+            setTimeout(function() { fireElement.classList.remove("flare"); }, 1700);
+
+        }
+
+        const label = document.createElement("span");
+
+        label.textContent = tr("MILITIA CAMP");
+
+        camp.appendChild(fireElement);
+        camp.appendChild(label);
 
         camp.addEventListener("click", function() {
 
@@ -1404,6 +1539,21 @@ function renderMilitiaCamps() {
         cityContainer.appendChild(camp);
 
     });
+
+
+    if (fresh) {
+
+        campNotice(
+            tr(fresh === 1
+                ? "A new militia band has risen in the woods of"
+                : "New militia bands have risen in the woods of") + " " + planetName + ". " +
+            rebelCamps.bands + " " + tr(rebelCamps.bands === 1 ? "band" : "bands") + " · " +
+            Number(rebelCamps.men).toLocaleString("en-US") + " " + tr("men")
+        );
+
+    }
+
+    campRise = 0;
 
 }
 

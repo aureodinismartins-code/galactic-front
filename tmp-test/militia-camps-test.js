@@ -88,11 +88,21 @@ function page(options) {
         }
     };
 
+    /* the page's own camp state, declarations and all, so the cut-out
+       functions never find a variable missing */
+    const declStart = PAGE.indexOf("let rebelCamps = { bands: 0, men: 0 };");
+    const declTail = "let campRise = 0;";
+    const declEnd = PAGE.indexOf(declTail, declStart) + declTail.length;
+
+    if (declStart < 0 || declEnd < declTail.length) { throw new Error("the camp state is not in planet.html"); }
+
     const code = [
-        "let rebelCamps = { bands: 0, men: 0 };",
+        PAGE.slice(declStart, declEnd),
         grab(PAGE, "tr"),
         grab(PAGE, "loadRebelCamps"),
         grab(PAGE, "campPositions"),
+        "let campNoticeTimer = null;",
+        grab(PAGE, "campNotice"),
         grab(PAGE, "renderMilitiaCamps")
     ].join("\n\n");
 
@@ -194,6 +204,67 @@ function world(bands, men) {
 
         many.dom.window.close();
 
+        console.log("\n== a new band is news");
+
+        const rise = page({ worlds: [world(1, 500)] });
+
+        await rise.w.loadRebelCamps();
+        rise.w.renderMilitiaCamps();
+
+        ok("one band, one camp", rise.camps().length === 1, rise.camps().length);
+        ok("the first look at a world is not news", !rise.doc.getElementById("camp-notice"));
+
+        const fireBefore = parseFloat(rise.camps()[0].querySelector(".camp-fire").style.width);
+
+        ok("the fire has a size of its own", fireBefore > 0, fireBefore);
+
+        rise.w.supabaseClient = {
+            rpc: async function () { return { data: { worlds: [world(2, 1000)] }, error: null }; }
+        };
+
+        await rise.w.loadRebelCamps();
+        rise.w.renderMilitiaCamps();
+
+        const after = rise.camps();
+        const fireAfter = parseFloat(after[0].querySelector(".camp-fire").style.width);
+
+        ok("the second band raises a second camp", after.length === 2, after.length);
+        ok("the fires have grown", fireAfter > fireBefore, fireBefore + " -> " + fireAfter);
+        ok("the camp that has just risen comes up out of the ground",
+            after[after.length - 1].classList.contains("camp-new"),
+            after.map(function (c) { return c.className; }));
+        ok("the camp already standing flares", after[0].querySelector(".camp-fire").classList.contains("flare"),
+            after[0].querySelector(".camp-fire").className);
+
+        const bar = rise.doc.getElementById("camp-notice");
+
+        ok("a brief notice appears", !!bar && bar.classList.contains("show"), bar && bar.className);
+        ok("it says a band has risen", /A new militia band has risen in the woods of/.test(bar.textContent), bar.textContent);
+        ok("on this world", /Krieg/.test(bar.textContent), bar.textContent);
+        ok("with the count", /2 bands/.test(bar.textContent) && /1,000 men/.test(bar.textContent), bar.textContent);
+
+        rise.w.renderMilitiaCamps();
+
+        ok("it is said once, not on every redraw",
+            rise.camps().every(function (c) { return !c.classList.contains("camp-new"); }),
+            rise.camps().map(function (c) { return c.className; }));
+
+        console.log("\n== a rise of two bands lights two camps");
+
+        rise.w.supabaseClient = {
+            rpc: async function () { return { data: { worlds: [world(4, 2000)] }, error: null }; }
+        };
+
+        await rise.w.loadRebelCamps();
+        rise.w.renderMilitiaCamps();
+
+        ok("two new camps come up",
+            rise.camps().filter(function (c) { return c.classList.contains("camp-new"); }).length === 2,
+            rise.camps().map(function (c) { return c.className; }));
+        ok("and the notice counts them", /New militia bands have risen/.test(bar.textContent), bar.textContent);
+
+        rise.dom.window.close();
+
         console.log("\n== and when the bands are broken");
 
         p.w.supabaseClient = {
@@ -241,6 +312,8 @@ function world(bands, men) {
         ok("the camp is named", /"MILITIA CAMP": "ACAMPAMENTO DA MIL\u00cdCIA"/.test(I18N));
         ok("where they camp is said", /"A band of militia camps in the woods outside the towns, out of the cities' reach\.": "Um bando de mil\u00edcia acampa na mata fora das cidades, longe do alcance delas\."/.test(I18N));
         ok("and who sends the troops", /"The halls decide the assault: the Congress holds the order to fight them\.": "As casas decidem o assalto: o Congresso tem a ordem de combat\u00ea-los\."/.test(I18N));
+        ok("the rise is announced", /"A new militia band has risen in the woods of": "Um novo bando de mil\u00edcia se levantou na mata de"/.test(I18N));
+        ok("and several rises too", /"New militia bands have risen in the woods of": "Novos bandos de mil\u00edcia se levantaram na mata de"/.test(I18N));
 
         await wait(10);
 
