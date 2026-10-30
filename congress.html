@@ -1348,6 +1348,33 @@ function feedsLine(u) {
 
 }
 
+/* the two answers to a world that is climbing: money, and the troops */
+function rebelsLine(u) {
+
+    if (!u) { return ""; }
+
+    const calm = u.calm || {};
+    const fight = u.fight || {};
+    const calmWait = Number(calm.ready_in) || 0;
+    const fightWait = Number(fight.ready_in) || 0;
+    const canFight = !!fight.rebels && !!fight.garrison;
+
+    let why;
+
+    if (!fight.rebels) { why = T("No rebels have risen here yet: that takes unrest 55."); }
+    else if (!fight.garrison) { why = T("The rebels are up, but no fleet of ours is in orbit to send against them."); }
+    else if (fightWait > 0) { why = T("The troops are regrouping: ready in") + " " + fightWait + " s."; }
+    else { why = T("Send the troops in: the bar comes down, and so does the garrison."); }
+
+    return '<div style="margin-top:8px"><button class="btn small calm-world" data-p="' + esc(u.planet) + '"' +
+        (calmWait > 0 ? " disabled" : "") + '>' + T("CALM THE WORLD") + ' (' + Number(calm.price || 0) + ')</button> ' +
+        '<button class="btn small fight-rebels" data-p="' + esc(u.planet) + '"' + (canFight && fightWait <= 0 ? "" : " disabled") + '>' +
+        T("FIGHT THE REBELS") + '</button></div>' +
+        '<div class="sub">' + why +
+        (calmWait > 0 ? " " + T("The ringleaders will take money again in") + " " + calmWait + " s." : "") + '</div>';
+
+}
+
 function unrestLine(planet) {
 
     const u = unrestFor(planet);
@@ -1362,6 +1389,7 @@ function unrestLine(planet) {
         '<div class="bar"><i style="width:' + value + '%;background:' + colour + '"></i></div>' +
         feedsLine(u) +
         '<div class="sub">' + T("Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.") + '</div>' +
+        rebelsLine(u) +
         policyLine(planet);
 
 }
@@ -1583,6 +1611,23 @@ function wireOccupied() {
     }));
     $("tabbody").querySelectorAll(".relief").forEach(el => el.addEventListener("click", function() {
         draft.type = "resource_allocation"; draft.planet = el.dataset.p; tab = "new"; renderTabs();
+    }));
+    $("tabbody").querySelectorAll(".calm-world").forEach(el => el.addEventListener("click", async function() {
+        const planet = el.dataset.p;
+        el.disabled = true;
+        const { data, error } = await supabaseClient.rpc("unrest_calm", { p_planet: planet });
+        if (error) { toast(error.message, true); await load(); return; }
+        toast(planet + ": " + T("The world is calmer: unrest -20.") + " " + fmt(data.credits) + " " + T("credits left."));
+        await load();
+    }));
+    $("tabbody").querySelectorAll(".fight-rebels").forEach(el => el.addEventListener("click", async function() {
+        const planet = el.dataset.p;
+        if (!window.confirm(T("Fight the rebels in ") + planet + T("? The troops will take losses and the unrest will come down."))) { return; }
+        el.disabled = true;
+        const { data, error } = await supabaseClient.rpc("unrest_fight", { p_planet: planet });
+        if (error) { toast(error.message, true); await load(); return; }
+        toast(planet + ": " + T("The rebels are beaten down: unrest -25.") + " " + data.lost + " " + T("soldiers lost."));
+        await load();
     }));
     $("tabbody").querySelectorAll(".policy").forEach(el => el.addEventListener("click", async function() {
         el.disabled = true;

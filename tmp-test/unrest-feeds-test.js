@@ -45,6 +45,7 @@ const FIXTURE = {
         {
             planet: "Krieg", faction: "Combine", unrest: 62, mood: "RIOTING", revolts: 0, mine: true,
             policy: "reprisals", garrison: { fleets: 0, soldiers: 0 }, tax: 2, delta: 8,
+            calm: { price: 600, ready_in: 0 }, fight: { ready_in: 0, rebels: true, garrison: true },
             feeds: [
                 { key: "occupation", value: 4 },
                 { key: "relief", value: -2 },
@@ -57,6 +58,7 @@ const FIXTURE = {
         {
             planet: "Ithaca", faction: "Combine", unrest: 18, mood: "CALM", revolts: 2, mine: true,
             policy: "amnesty", garrison: { fleets: 1, soldiers: 900 }, tax: 1, delta: 2,
+            calm: { price: 600, ready_in: 120 }, fight: { ready_in: 0, rebels: false, garrison: false },
             feeds: [
                 { key: "occupation", value: 4 },
                 { key: "relief", value: -2 },
@@ -92,6 +94,7 @@ async function build(page, lang) {
         grabConst(HTML, "POLICY_LABELS"),
         grab(HTML, "unrestFor"),
         grab(HTML, "feedsLine"),
+        grab(HTML, "rebelsLine"),
         grab(HTML, "unrestLine"),
         grab(HTML, "policyLine")
     ];
@@ -148,6 +151,40 @@ async function build(page, lang) {
         soviet.indexOf("the tax +2") !== -1, soviet);
     check("and its planted trouble", soviet.indexOf("planted trouble +20") !== -1, soviet);
     check("and it leaves out the calm terms", flat(cs.unrestLine("Ithaca")).indexOf("the policy in force") === -1);
+
+    console.log("\n== the two answers under the bar");
+
+    const rioting = cg.unrestLine("Krieg");
+    const fightBtn = /<button class="btn small fight-rebels"[^>]*>/.exec(rioting);
+    const calmBtn = /<button class="btn small calm-world"[^>]*>/.exec(rioting);
+
+    check("the world can be calmed for money, and the price is on the button",
+        rioting.indexOf("CALM THE WORLD (600)") !== -1, rioting.slice(0, 200));
+    check("the money is on offer when nothing is on a cooldown", !!calmBtn && calmBtn[0].indexOf("disabled") === -1,
+        calmBtn && calmBtn[0]);
+    check("and the rebels can be fought while they are up and a fleet is there",
+        !!fightBtn && fightBtn[0].indexOf("disabled") === -1 && rioting.indexOf("Send the troops in") !== -1,
+        fightBtn && fightBtn[0]);
+
+    const quiet = flat(cg.unrestLine("Ithaca"));
+    const calmQuiet = /<button class="btn small calm-world"[^>]*>/.exec(cg.unrestLine("Ithaca"));
+    const fightQuiet = /<button class="btn small fight-rebels"[^>]*>/.exec(cg.unrestLine("Ithaca"));
+
+    check("a world whose ringleaders will not take money has the button dark",
+        !!calmQuiet && calmQuiet[0].indexOf("disabled") !== -1, calmQuiet && calmQuiet[0]);
+    check("and says how long they will wait", quiet.indexOf("take money again in 120 s") !== -1, quiet);
+    check("with no rebels up, no fight is offered",
+        !!fightQuiet && fightQuiet[0].indexOf("disabled") !== -1 &&
+        quiet.indexOf("No rebels have risen here yet") !== -1, quiet);
+
+    cg.unrest.worlds[0].fight.garrison = false;
+    const noFleet = flat(cg.unrestLine("Krieg"));
+    const noFleetBtn = /<button class="btn small fight-rebels"[^>]*>/.exec(cg.unrestLine("Krieg"));
+
+    check("the rebels are up but there is nobody to send",
+        !!noFleetBtn && noFleetBtn[0].indexOf("disabled") !== -1 &&
+        noFleet.indexOf("no fleet of ours is in orbit to send") !== -1, noFleet);
+    cg.unrest.worlds[0].fight.garrison = true;
 
     console.log("\n== in Portuguese");
 
