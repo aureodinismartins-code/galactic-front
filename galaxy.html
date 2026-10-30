@@ -671,6 +671,49 @@
             0%, 100% { transform: scale(0.85); opacity: 0.7; }
             50% { transform: scale(1.15); opacity: 1; }
         }
+        /* what is at stake there: the hull and squads of our fleet in the
+           fight, and the way into it, read off the ring itself */
+        .battle-card {
+            position: absolute;
+            left: 40px;
+            top: -4px;
+            width: 132px;
+            padding: 5px 7px 6px;
+            background: rgba(18,8,4,.92);
+            border: 1px solid #ff9a4a;
+            border-radius: 3px;
+            color: #ffe2cc;
+            font: bold 9px/1.4 Arial, sans-serif;
+            letter-spacing: 1px;
+            text-align: center;
+            pointer-events: auto;
+            box-shadow: 0 0 10px rgba(255,90,42,.35);
+        }
+        .battle-marker.battle-flip .battle-card { left: auto; right: 40px; }
+        .battle-card b { display: block; color: #fff; font-size: 10px; letter-spacing: 1px; }
+        .battle-card .battle-bar {
+            display: block;
+            height: 3px;
+            margin: 4px 0 3px;
+            background: rgba(255,255,255,.15);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .battle-card .battle-bar > i { display: block; height: 3px; }
+        .battle-card .battle-stat, .battle-card .battle-foe { display: block; color: #ffd0a8; }
+        .battle-card .battle-foe { color: #ff9a9a; }
+        .battle-card button {
+            width: 100%;
+            margin-top: 5px;
+            padding: 4px 0;
+            background: #3a1208;
+            color: #fff;
+            border: 1px solid #ff5a2a;
+            cursor: pointer;
+            font: bold 9px Arial, sans-serif;
+            letter-spacing: 2px;
+        }
+        .battle-card button:hover { background: #ff5a2a; color: #180502; }
         /* fleets are sent with a right-click on the map, so the old destination picker is hidden */
         #fleet-destination, #move-fleet-button, label[for="fleet-destination"] { display: none !important; }
         #fleet-send-hint { color: #8fd0ff; font-size: 12px; letter-spacing: 1px; margin: 6px 0; }
@@ -3908,6 +3951,28 @@ function showSpaceBattle(b) {
    A battle takes its fleets off the map while it is being fought, so the map
    keeps a ring where each one is: the fleets are gone, the place is not.
 ========================================= */
+/* which of our fleets is standing in this fight: the server names it, and
+   when the name does not come through, its place in the battle says it */
+function myFleetInBattle(b, where) {
+
+    const named = b && b.mine ? String(b.mine) : "";
+
+    if (named) {
+        const hit = fleets.find(function(f) { return String(f.name || "") === named; });
+        if (hit) { return hit; }
+    }
+
+    if (!where) { return null; }
+
+    return fleets.find(function(f) {
+        if (f.status !== "engaged") { return false; }
+        const at = getFleetPosition(f);
+        return Math.abs(Number(at[0]) - Number(where[0])) < 6 &&
+            Math.abs(Number(at[1]) - Number(where[1])) < 6;
+    }) || null;
+
+}
+
 async function drawBattles() {
 
     const host = document.getElementById("planet-layer") || document.getElementById("galaxy-map");
@@ -3963,13 +4028,54 @@ async function drawBattles() {
         marker.style.top = Number(where[1]) + "%";
         marker.dataset.battle = String(b.id);
         marker.title = T("SPACE BATTLE");
+
+        /* the fleets are off the map: their hull and squads are read here, and
+           the battle is entered from here, without hunting the fleet panel */
+        const mine = myFleetInBattle(b, where);
+        const fit = mine ? fleetStrength(mine.squads) : null;
+        const squads = mine
+            ? (mine.squads || []).filter(function(e) { return (Number(e.amount) || 0) > 0; }).length
+            : 0;
+        const hull = fit ? Math.round(fit.fraction * 100) : null;
+
+        let card = '<b>' + escapeHTML((mine && mine.name) || T("YOUR FLEET")) + '</b>';
+
+        if (hull !== null) {
+            const tone = hull <= 35 ? "#ff5a2a" : hull <= 70 ? "#ffb04a" : "#7fd46a";
+            card += '<span class="battle-bar"><i style="width:' + hull + '%;background:' + tone + '"></i></span>' +
+                '<span class="battle-stat">' + T("HULL:") + " " + hull + '% &middot; ' +
+                squads + " " + T(squads === 1 ? "SQUAD" : "SQUADS") + '</span>';
+        }
+
+        if (b.against) {
+            card += '<span class="battle-foe">vs ' + escapeHTML(String(b.against)) + '</span>';
+        }
+
+        card += '<button type="button">' + T("GO TO BATTLE") + '</button>';
+
         marker.innerHTML = '<span class="battle-ring"></span><span class="battle-label">' +
-            escapeHTML(T("BATTLE UNDER WAY")) + '</span>';
+            escapeHTML(T("BATTLE UNDER WAY")) + '</span><div class="battle-card">' + card + '</div>';
+
+        /* the card is part of the ring, not the map: pressing it must not send
+           a selected fleet or drop the selection underneath it */
+        const cardEl = marker.querySelector(".battle-card");
+        if (cardEl) { cardEl.addEventListener("click", function(event) { event.stopPropagation(); }); }
+
+        const enter = marker.querySelector(".battle-card button");
+        if (enter) {
+            enter.addEventListener("click", function(event) {
+                event.stopPropagation();
+                window.location.href = "space.html?battle=" + encodeURIComponent(b.id);
+            });
+        }
 
         marker.addEventListener("click", function(event) {
             event.stopPropagation();
             window.location.href = "space.html?battle=" + encodeURIComponent(b.id);
         });
+
+        /* a fight at the far right of the map opens its card to the left */
+        if (Number(where[0]) > 68) { marker.classList.add("battle-flip"); }
 
         layer.appendChild(marker);
 

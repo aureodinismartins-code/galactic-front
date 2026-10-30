@@ -159,6 +159,18 @@ async function one(db, sql) {
         ok("and picks the nearest enemy for an attack",
             /sort\(\(a, b\) => Math\.hypot\(a\.x - w\.x, a\.y - w\.y\)/.test(fs.readFileSync(path.join(ROOT, "space.html"), "utf8")));
 
+        ok("the ring reads out our hull and squads",
+            /\.battle-card \{/.test(PAGE) && /fleetStrength\(mine\.squads\)/.test(PAGE) &&
+            /function myFleetInBattle\(/.test(PAGE) && /battle-stat/.test(PAGE));
+        ok("and the card carries the way into the battle",
+            /battle-card button/.test(PAGE) && /<button type="button">' \+ T\("GO TO BATTLE"\)/.test(PAGE));
+        ok("the card does not pass its presses to the map",
+            /cardEl\.addEventListener\("click", function\(event\) \{ event\.stopPropagation\(\); \}\)/.test(PAGE));
+        ok("a fight at the map edge opens its card inwards", /battle-flip/.test(PAGE));
+        ok("the card is written in Portuguese too",
+            /"GO TO BATTLE": "IR PARA O COMBATE"/.test(fs.readFileSync(path.join(ROOT, "i18n.js"), "utf8")) &&
+            /"SQUADS": "ESQUADRÕES"/.test(fs.readFileSync(path.join(ROOT, "i18n.js"), "utf8")));
+
         ok("the banner is on every screen but the menu",
             /window\.GC_NO_BANNER/.test(CONTROL) && /here === "index\.html"/.test(CONTROL));
 
