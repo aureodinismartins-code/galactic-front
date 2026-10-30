@@ -57,7 +57,7 @@ function page(options) {
         '<span>THE LEDGER OF THE TUSKEN</span><button id="slaves-close" type="button">x</button>' +
         '</div><div id="slaves-body"></div></div>' +
         '</body></html>',
-        { url: "http://localhost/planet.html?name=Krieg", runScripts: "dangerously", pretendToBeVisual: true }
+        { url: "http://localhost/planet.html?name=" + (options.planet || "Tuskara"), runScripts: "dangerously", pretendToBeVisual: true }
     );
 
     const calls = [];
@@ -147,6 +147,16 @@ function page(options) {
         ok("and still opens", broken.doc.getElementById("slaves-panel").classList.contains("open"));
 
         broken.dom.window.close();
+
+        console.log("\n== the ledger belongs to Tuskara alone");
+
+        const elsewhere = page({ planet: "Krieg" });
+
+        ok("no ledger button on another world", !elsewhere.doc.getElementById("slaves-tab"));
+        ok("and no panel either", !elsewhere.doc.getElementById("slaves-panel"));
+        ok("nothing is asked of the server there", elsewhere.calls.length === 0, elsewhere.calls.length);
+
+        elsewhere.dom.window.close();
 
     } catch (e) {
 

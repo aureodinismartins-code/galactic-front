@@ -105,7 +105,8 @@
 
             position: fixed;
             left: 30px;
-            bottom: 26px;
+            /* above the way back to the map, not on top of it */
+            bottom: 92px;
             z-index: 45;
 
             padding: 9px 16px;
@@ -133,7 +134,7 @@
 
             position: fixed;
             left: 30px;
-            bottom: 72px;
+            bottom: 138px;
 
             width: 340px;
             max-height: 55vh;
@@ -4708,6 +4709,16 @@ initialize();
     const body = document.getElementById("slaves-body");
 
     if (!tab || !panel || !body) { return; }
+
+    /* Tuskara is where the Tusken are: on every other world the
+       button only crowded the way back to the map */
+    const here = new URLSearchParams(window.location.search).get("name") || "Veyrona";
+
+    if (here !== "Tuskara") {
+        tab.remove();
+        panel.remove();
+        return;
+    }
 
     let shown = false;
     let busy = false;

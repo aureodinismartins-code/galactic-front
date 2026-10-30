@@ -175,7 +175,7 @@ async function build(page, lang) {
     const calmArmed = /<button class="btn small calm-world"[^>]*>/.exec(rioting);
 
     check("the men in the streets are counted",
-        /REBEL FORCES\s*:\s*2 bands &middot; 3,000 men/.test(flat(rioting)), flat(rioting));
+        /REBEL MILITIA\s*:\s*2 bands &middot; 6 militia companies &middot; 3,000 men/.test(flat(rioting)), flat(rioting));
     check("while a band is armed, money cannot buy the world",
         !!calmArmed && calmArmed[0].indexOf("disabled") !== -1 &&
         flat(rioting).indexOf("They must be broken before the world can be calmed.") !== -1, flat(rioting));
@@ -186,7 +186,7 @@ async function build(page, lang) {
     const picket = flat(cg.unrestLine("Veyra"));
     const calmFree = /<button class="btn small calm-world"[^>]*>/.exec(cg.unrestLine("Veyra"));
 
-    check("a world with no band says so", /REBEL FORCES\s*:\s*none/.test(picket), picket);
+    check("a world with no band says so", /REBEL MILITIA\s*:\s*none/.test(picket), picket);
     check("and its ringleaders can be paid", !!calmFree && calmFree[0].indexOf("disabled") === -1, calmFree && calmFree[0]);
 
     const quiet = flat(cg.unrestLine("Ithaca"));
@@ -224,8 +224,10 @@ async function build(page, lang) {
     const ptcs = await build("combine.html", "pt");
     const traducaoSoviet = flat(ptcs.unrestLine("Krieg"));
 
-    check("the bands are translated",
-        traducao.indexOf("FORÇAS REBELDES") !== -1 && traducao.indexOf("bandos") !== -1, traducao);
+    check("the militia is translated",
+        traducao.indexOf("MILÍCIA REBELDE") !== -1 &&
+        traducao.indexOf("bandos") !== -1 &&
+        traducao.indexOf("companhias de milícia") !== -1, traducao);
 
     check("the Soviet speaks Portuguese too",
         traducaoSoviet.indexOf("O QUE A ALIMENTA") !== -1 &&

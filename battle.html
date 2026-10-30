@@ -171,7 +171,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; background: #2
 
 const params = new URLSearchParams(window.location.search);
 const fleetID = params.get("fleet");
-const cityName = params.get("city") || "Unknown City";
+
+/* a rebel world has no city to fight in: the militia holds the treeline and
+   the farm, so ?rebel=1 (or a camp for a name) puts the battle in the woods */
+const rebelFight = params.get("rebel") === "1" || /militia|rebel/i.test(params.get("city") || "");
+
+const cityName = params.get("city") || (rebelFight ? "Militia Camp" : "Unknown City");
 const planetName = params.get("planet") || "Unknown Planet";
 const cityID = (planetName + "-" + cityName).replace(/ /g, "-");
 const playerFaction = params.get("attacker") || "Independents";
@@ -230,6 +235,9 @@ const garrisonComposition = {
 
 async function loadGarrisonLevel() {
 
+    /* there is no garrison level in a wood */
+    if (rebelFight) { return 1; }
+
     const { data, error } = await supabaseClient
         .from("cities")
         .select("garrison_level")
@@ -263,7 +271,13 @@ let gotSnap = false;
 let guestEnded = false;
 let joinRetry = null;
 
-const soldiersPerDivision = { Rifle: 1000, MG: 750, Assault: 1000, AT: 600, Sniper: 400, Tank: 200, Artillery: 250, Knightmare: 3 };
+/* Militia is the rebel unit (2026-11-39): a company of five hundred armed
+   villagers, the same size the dock reads from public.fleet_squad_size */
+const soldiersPerDivision = { Rifle: 1000, MG: 750, Assault: 1000, AT: 600, Sniper: 400, Tank: 200, Artillery: 250, Militia: 500, Knightmare: 3 };
+
+/* what a militia camp puts in the field: men with hunting rifles, and one
+   squad of deserters who brought their service rifle with them */
+const rebelMilitiaComposition = { Militia: 8, Rifle: 3 };
 
 let isDraggingSelection = false;
 let dragStartX = 0, dragStartY = 0, dragCurrentX = 0, dragCurrentY = 0;
@@ -309,6 +323,9 @@ const unitStats = {
     Tank:    { health: 220, damage: 40, range: 210, fireRate: 1800, speed: 36, accuracy: 0.75 },
     /* indirect fire: shoots over buildings, no line of sight needed */
     Artillery: { health: 70, damage: 55, range: 420, fireRate: 3500, speed: 22, accuracy: 0.60, indirect: true },
+    /* militia company: no uniform, no support weapons, a hunting rifle and the
+       ground they grew up on */
+    Militia: { health: 85, damage: 9, range: 145, fireRate: 1000, speed: 50, accuracy: 0.62 },
     /* Knightmare squad: 3 mechs. Per mech: 250 hp (+15% frame), armor 4 (+1 frame), rifle 18 dmg / 1 s (+10% controls),
        speed 2.2 (+10% wheel). health here is the whole squad (3 x 287.5). */
     Knightmare: { health: 862.5, damage: 18, range: 285, fireRate: 909, speed: 100, accuracy: 0.80, armor: 5 }
@@ -333,6 +350,7 @@ const movementProfiles = {
     Sniper:  { separation: 24, repath: 1500, goalDrift: 65, stuckMs: 1400 },
     Tank:    { separation: 26, repath: 1200, goalDrift: 55, stuckMs: 1200 },
     Artillery: { separation: 24, repath: 1500, goalDrift: 65, stuckMs: 1400 },
+    Militia: { separation: 25, repath: 1100, goalDrift: 60, stuckMs: 1100 },
     Knightmare: { separation: 30, repath: 700, goalDrift: 35, stuckMs: 900 }
 };
 
@@ -400,7 +418,27 @@ const mapLayouts = [
     }
 ];
 
-const battleLayout = mapLayouts[hashString(cityID) % mapLayouts.length];
+/*
+   THE WOODS (2026-11-39): the rebel battlefield. No streets and no blocks —
+   a track through old forest, two farm buildings, a pond, fences and
+   earthworks. The militia fights from the trees, so cover is everywhere and
+   the open ground in the middle is the killing ground.
+*/
+const woodsLayout = {
+    name: "THE WOODS", ground: "#39452f", road: "#5e5540", bld: "#4a3f33", roof: "#5a4c3b",
+    roads: [[0,208,620,36],[300,0,30,440]],
+    buildings: [[250,52,120,80],[430,330,110,72]],
+    cover: [["wall",205,140,10,130],["wall",420,110,10,110],["wall",350,340,110,10],
+            ["sandbags",300,192,64,12],["rubble",470,250,24,20],["rubble",110,120,22,22],
+            ["container",150,362,36,14],["water",40,286,110,62]],
+    decor: [["tree",30,40],["tree",90,70],["tree",150,35],["tree",200,90],["tree",250,20],
+            ["tree",480,40],["tree",540,80],["tree",590,35],["tree",610,140],["tree",600,220],
+            ["tree",590,300],["tree",610,390],["tree",560,420],["tree",500,400],["tree",380,410],
+            ["tree",250,420],["tree",180,430],["tree",90,400],["tree",30,350],["tree",20,250],
+            ["tree",25,160],["tree",70,210],["tree",140,250],["tree",180,300]]
+};
+
+const battleLayout = rebelFight ? woodsLayout : mapLayouts[hashString(cityID) % mapLayouts.length];
 
 function getBuildings() {
     const city = getCityBounds();
@@ -1253,11 +1291,13 @@ function createEnemyUnits() {
     enemyUnits.length = 0;
 
     const city = getCityBounds();
-    const comp = garrisonComposition[garrisonLevel] || garrisonComposition[1];
+    const comp = rebelFight
+        ? rebelMilitiaComposition
+        : (garrisonComposition[garrisonLevel] || garrisonComposition[1]);
 
     /* heavy units spawn at the back, riflemen in front */
     const types = [];
-    for (const t of ["Sniper", "AT", "MG", "Rifle"]) {
+    for (const t of ["Sniper", "AT", "MG", "Rifle", "Militia"]) {
         for (let i = 0; i < (comp[t] || 0); i++) { types.push(t); }
     }
 
@@ -1457,6 +1497,15 @@ function drawUnitShape(unit) {
         ctx.fill();
         ctx.stroke();
     }
+    else if (unit.type === "Militia") {
+        /* a loose ring, not a formed squad: villagers with rifles */
+        ctx.beginPath();
+        ctx.arc(unit.x, unit.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.35)";
+        ctx.fillRect(unit.x - 1.5, unit.y - 1.5, 3, 3);
+    }
     else if (unit.type === "MG") {
         ctx.fillRect(unit.x - 7, unit.y - 7, 14, 14);
         ctx.strokeRect(unit.x - 7, unit.y - 7, 14, 14);
@@ -1524,7 +1573,7 @@ function drawUnit(unit) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    const symbols = { Rifle: "R", MG: "M", Assault: "A", AT: "T", Sniper: "S", Tank: "K", Artillery: "G" };
+    const symbols = { Rifle: "R", MG: "M", Assault: "A", AT: "T", Sniper: "S", Tank: "K", Artillery: "G", Militia: "L" };
 
     ctx.fillText(symbols[unit.type] || "?", unit.x, unit.y);
 
