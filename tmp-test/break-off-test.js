@@ -11,6 +11,7 @@ const { PGlite } = require("@electric-sql/pglite");
 const ROOT = path.join(__dirname, "..");
 const PAGE = fs.readFileSync(path.join(ROOT, "galaxy.html"), "utf8");
 const I18N = fs.readFileSync(path.join(ROOT, "i18n.js"), "utf8");
+const BATTLE = fs.readFileSync(path.join(ROOT, "space.html"), "utf8");
 const PATCH = fs.readFileSync(path.join(ROOT, "sql/2026-11-42_a_fleet_can_break_off.sql"), "utf8");
 
 const ME = "11111111-1111-4111-8111-111111111111";
@@ -219,6 +220,31 @@ async function main() {
     ok("the words are in Portuguese",
         /"WITHDRAW": "RETIRAR"/.test(I18N) && /"BREAKING OFF": "RETIRANDO"/.test(I18N) &&
         /"The fleet broke off\.": "A frota se retirou\."/.test(I18N));
+
+    console.log("\n== the battle page offers the way out");
+
+    ok("the fight itself carries a withdraw button",
+        /<button id="withdraw" type="button">WITHDRAW<\/button>/.test(BATTLE));
+    ok("it is only shown to a fleet that is in the fight",
+        /#withdraw\.visible/.test(BATTLE) && /ownsFleetInBattle/.test(BATTLE) &&
+        /if \(ownsFleetInBattle\(\)\) \{ withdrawBtn\.classList\.add\("visible"\); \}/.test(BATTLE));
+    ok("it asks before it spends the men",
+        /Break off from this battle\? Every squad leaves a fifth/.test(BATTLE) && /window\.confirm/.test(BATTLE));
+    ok("it calls the patch", /rpc\("space_break_off", \{ p_battle: battleId \}\)/.test(BATTLE));
+    ok("it says what it cost",
+        /showBreakOff/.test(BATTLE) && /soldiers were left behind; the rest is back in space\./.test(BATTLE));
+    ok("a failure says why, in the player language",
+        /not_in_battle/.test(BATTLE) && /already_over/.test(BATTLE) && /frozen/.test(BATTLE));
+    ok("the figure stops when the fleet is out",
+        /function showBreakOff\(name, lost, mine\) \{[\s\S]{0,40}ended = true;/.test(BATTLE));
+    ok("the button goes away with the fight",
+        /function showEnd\(winner, results\) \{[\s\S]{0,60}hideWithdraw\(\);/.test(BATTLE));
+    ok("the other side is told the fight is over",
+        (BATTLE.match(/event: "break"/g) || []).length === 2 && /FIGHT OVER/.test(BATTLE));
+    ok("it does not linger after a withdrawal", /function hideWithdraw\(\)[\s\S]{0,120}remove\("visible"\)/.test(BATTLE));
+    ok("the words are in Portuguese",
+        /"WITHDRAWN": "RETIRADA"/.test(I18N) && /"FIGHT OVER": "COMBATE ENCERRADO"/.test(I18N) &&
+        /"Your fleet broke off\.": "Sua frota se retirou\."/.test(I18N));
 
     console.log("\n" + pass + " passed, " + fail + " failed");
     process.exit(fail ? 1 : 0);

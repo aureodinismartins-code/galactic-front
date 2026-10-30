@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=35"></script>
+<script src="i18n.js?v=36"></script>
 <script>window.GC_NO_BANNER = true;</script>
 <script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
@@ -22,6 +22,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crossh
 #end-text { color: #b8c6d4; letter-spacing: 1px; text-align: center; max-width: 560px; }
 .btn { padding: 12px 30px; background: #101820; color: #fff; border: 1px solid #6a8; font-weight: bold; letter-spacing: 2px; cursor: pointer; }
 .btn:hover { background: #1c2a36; }
+
+/* turning away is always one press away, without leaving the fight */
+#withdraw { position: absolute; top: 12px; right: 12px; z-index: 30; display: none;
+    padding: 8px 14px; background: rgba(40,8,4,.9); color: #ffd9c6; border: 1px solid #a8543a;
+    font: bold 11px Arial, sans-serif; letter-spacing: 1px; cursor: pointer; }
+#withdraw.visible { display: block; }
+#withdraw:hover { background: #7a3320; color: #fff; }
+#withdraw:disabled { opacity: .55; cursor: progress; }
 #lost { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #000c; text-align: center; }
 #lost.visible { display: flex; }
 
@@ -40,6 +48,7 @@ html.gf-phone #touch-orders { display: flex; }
 <body>
 <canvas id="c"></canvas>
 <div id="msg">Connecting to the battle...</div>
+<button id="withdraw" type="button">WITHDRAW</button>
 
 <div id="end-screen">
     <div id="end-title"></div>
@@ -1519,6 +1528,7 @@ async function finishBattle(winner) {
 function showEnd(winner, results) {
 
     ended = true;
+    hideWithdraw();
 
     const won = winner === mySide;
     const title = document.getElementById("end-title");
@@ -1548,6 +1558,111 @@ function showEnd(winner, results) {
 
     document.getElementById("end-screen").classList.add("visible");
 
+}
+
+/* ---------------------------------------------------------
+   BREAKING OFF
+   A fleet in a fight is not a hostage. It can turn away, at the
+   price the patch sets, without going back to the map for it.
+   A battle is fought by both sides, so when one leaves it the
+   fight is over for the other as well.
+--------------------------------------------------------- */
+
+const withdrawBtn = document.getElementById("withdraw");
+
+function tr(text) {
+    try { return typeof T === "function" ? T(text) : text; } catch (e) { return text; }
+}
+
+function myFleetName() {
+    const f = (fleetsInfo || []).find(function(x) { return String(x.player_id) === String(me); });
+    return f && f.name ? String(f.name) : "";
+}
+
+function ownsFleetInBattle() {
+    return (fleetsInfo || []).some(function(f) { return String(f.player_id) === String(me); });
+}
+
+function hideWithdraw() {
+    if (!withdrawBtn) { return; }
+    withdrawBtn.classList.remove("visible");
+    withdrawBtn.disabled = true;
+}
+
+function showBreakOff(name, lost, mine) {
+
+    ended = true;
+    hideWithdraw();
+
+    const title = document.getElementById("end-title");
+    const text = document.getElementById("end-text");
+
+    title.style.color = "#ffb04a";
+
+    if (mine) {
+        title.textContent = tr("WITHDRAWN");
+        text.textContent = tr("Your fleet broke off.") + " " + Math.round(Number(lost) || 0).toLocaleString() + " " +
+            tr("soldiers were left behind; the rest is back in space.");
+    }
+    else {
+        title.textContent = tr("FIGHT OVER");
+        text.textContent = (name ? name + " " : tr("The other fleet") + " ") +
+            tr("broke off from the battle. Both fleets are back in space.");
+    }
+
+    document.getElementById("end-screen").classList.add("visible");
+
+}
+
+async function breakOff() {
+
+    if (ended || !battleId) { return; }
+
+    if (!window.confirm(tr("Break off from this battle? Every squad leaves a fifth of its men behind, and the fight disperses."))) { return; }
+
+    withdrawBtn.disabled = true;
+    withdrawBtn.textContent = tr("BREAKING OFF");
+
+    const { data, error } = await supabaseClient.rpc("space_break_off", { p_battle: battleId });
+
+    const why = {
+        not_authenticated: "You are not signed in.",
+        no_battle: "That battle is gone.",
+        already_over: "That battle is already over.",
+        not_in_battle: "Your fleet is not in that battle.",
+        frozen: "The game is frozen."
+    };
+
+    if (error || !data || data.ok === false) {
+
+        withdrawBtn.disabled = false;
+        withdrawBtn.textContent = tr("WITHDRAW");
+
+        const code = data && data.code;
+        const msg = document.getElementById("msg");
+        setMsg(tr(code && why[code] ? why[code] : (error ? error.message : "The fleet could not break off.")));
+        msg.style.display = "";
+        setTimeout(function() { msg.style.display = "none"; }, 8000);
+
+        return;
+
+    }
+
+    const lost = Math.round(Number(data.lost) || 0);
+    const name = myFleetName();
+
+    showBreakOff(name, lost, true);
+
+    send("break", { name: name, lost: lost });
+    setTimeout(function() { send("break", { name: name, lost: lost }); }, 800);
+
+}
+
+if (withdrawBtn) {
+    withdrawBtn.addEventListener("click", function(event) {
+        event.stopPropagation();
+        breakOff();
+    });
 }
 
 document.getElementById("end-return").addEventListener("click", function() {
@@ -2663,6 +2778,8 @@ async function start() {
     mySide = data.side;
     fleetsInfo = data.fleets || [];
 
+    if (ownsFleetInBattle()) { withdrawBtn.classList.add("visible"); }
+
     buildTerrain();
 
     channel = supabaseClient.channel("sb-" + battleId, { config: { broadcast: { self: false } } });
@@ -2678,6 +2795,7 @@ async function start() {
         channel
             .on("broadcast", { event: "join" }, m => hostHandleJoin(m.payload))
             .on("broadcast", { event: "cmd" }, m => hostHandleCmd(m.payload))
+            .on("broadcast", { event: "break" }, m => { if (!ended) { showBreakOff(m.payload.name, m.payload.lost, false); } })
             .subscribe();
 
         setInterval(broadcastSnapshot, 100);
@@ -2693,6 +2811,7 @@ async function start() {
         channel
             .on("broadcast", { event: "snap" }, m => applySnapshot(m.payload))
             .on("broadcast", { event: "end" }, m => { if (!ended) { showEnd(m.payload.winner, m.payload.results || []); } })
+            .on("broadcast", { event: "break" }, m => { if (!ended) { showBreakOff(m.payload.name, m.payload.lost, false); } })
             .subscribe(function(status) {
 
                 if (status !== "SUBSCRIBED") { return; }
