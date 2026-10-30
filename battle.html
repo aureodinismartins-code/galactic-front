@@ -275,9 +275,35 @@ let joinRetry = null;
    villagers, the same size the dock reads from public.fleet_squad_size */
 const soldiersPerDivision = { Rifle: 1000, MG: 750, Assault: 1000, AT: 600, Sniper: 400, Tank: 200, Artillery: 250, Militia: 500, Knightmare: 3 };
 
-/* what a militia camp puts in the field: men with hunting rifles, and one
-   squad of deserters who brought their service rifle with them */
-const rebelMilitiaComposition = { Militia: 8, Rifle: 3 };
+/* what a militia camp puts in the field when the server cannot say how many
+   men stand in the woods: the old fixed camp */
+const rebelMilitiaBase = { Militia: 8, Rifle: 3 };
+
+/* how many men the rebel band actually has, read from unrest_state() before
+   the battle begins (2026-11-41) */
+let rebelBandMen = 0;
+let rebelBandBands = 0;
+
+/* the band makes the wood: a company is five hundred men, as the dock and
+   the halls count them, so a band that has recruited fields more companies.
+   Every fourth company is the deserters who kept their service rifles, and
+   they are paid for out of the same men, so the total matches the band.
+   Past twenty-four companies the trees hold only so many: the rest wait. */
+function rebelWoodsComposition(men) {
+
+    const count = Math.ceil(Number(men) || 0);
+
+    if (count <= 0) {
+        return { Militia: rebelMilitiaBase.Militia, Rifle: rebelMilitiaBase.Rifle };
+    }
+
+    const companies = Math.min(24, Math.max(1, Math.ceil(count / 500)));
+    const rifles = Math.min(4, Math.floor(companies / 4));
+    const militia = Math.max(1, companies - rifles * 2);
+
+    return { Militia: militia, Rifle: rifles };
+
+}
 
 let isDraggingSelection = false;
 let dragStartX = 0, dragStartY = 0, dragCurrentX = 0, dragCurrentY = 0;
@@ -1126,6 +1152,44 @@ function expandFleetDivisions(squads) {
 
 
 /* =========================================
+   THE MEN IN THE WOODS
+========================================= */
+
+async function loadRebelBand() {
+
+    if (!rebelFight) { return; }
+
+    try {
+
+        const { data, error } = await supabaseClient.rpc("unrest_state");
+
+        if (error || !data) { return; }
+
+        const worlds = Array.isArray(data.worlds) ? data.worlds : [];
+
+        const world = worlds.find(function(w) {
+            return String(w && w.planet).toLowerCase() === String(planetName).toLowerCase();
+        });
+
+        if (!world) { return; }
+
+        const fight = world.fight || {};
+
+        rebelBandMen = Math.max(0, Number(fight.men) || 0);
+        rebelBandBands = Math.max(0, Number(fight.bands) || 0);
+
+    }
+    catch (e) {
+
+        rebelBandMen = 0;
+        rebelBandBands = 0;
+
+    }
+
+}
+
+
+/* =========================================
    LOAD FLEET / START BATTLE
 ========================================= */
 
@@ -1223,6 +1287,8 @@ async function loadFleet() {
     myUid = userData.user.id;
     mySide = "A";
 
+    await loadRebelBand();
+
     createPlayerUnits(divisions);
     garrisonLevel = await loadGarrisonLevel();
     createEnemyUnits();
@@ -1235,7 +1301,8 @@ async function loadFleet() {
         battleID = null;
         battleActive = true;
 
-        setBattleMessage("The militia is in the woods. Select your divisions.");
+        setBattleMessage("The militia is in the woods: " + Number(rebelBandMen).toLocaleString("en-US") +
+            " men in " + rebelBandBands + (rebelBandBands === 1 ? " band" : " bands") + ". Select your divisions.");
         return;
 
     }
@@ -1305,7 +1372,7 @@ function createEnemyUnits() {
 
     const city = getCityBounds();
     const comp = rebelFight
-        ? rebelMilitiaComposition
+        ? rebelWoodsComposition(rebelBandMen)
         : (garrisonComposition[garrisonLevel] || garrisonComposition[1]);
 
     /* heavy units spawn at the back, riflemen in front */
