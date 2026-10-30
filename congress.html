@@ -132,8 +132,7 @@ const TYPES = {
     military_action: { name: "Declaration of War on Planet", votes: "majority", cost: 0, desc: "Authorize a military strike on a specific planet. Without it Freedom Authority fleets cannot attack." },
     fleet_construction: { name: "Authorize New Fleet Construction", votes: "supermajority", cost: 0, desc: "Approve one new military fleet (build it from the galaxy map afterwards)." },
     knightmare_construction: { name: "Authorize Knightmare Squad Formation", votes: "supermajority", cost: 0, desc: "Approve one elite Knightmare squad (the Knightmare Facility chain is still needed)." },
-    resource_allocation: { name: "Emergency Economic Relief", votes: "majority", cost: 0, desc: "Civilian relief for occupied worlds: stability +10." },
-    diplomacy: { name: "Diplomatic Mission Proposal", votes: "majority", cost: 0, desc: "Send envoys to another faction: relations +10." },
+    resource_allocation: { name: "Emergency Economic Relief", votes: "majority", cost: 0, desc: "Civilian relief for occupied worlds: stability +10, paid for by the treasury when it passes (400 credits)." },
     taxation: { name: "Taxation Increase Proposal", votes: "supermajority", cost: 0, desc: "Raise taxes on the member worlds: 300-500 credits every 15 minutes per level (max 2), popularity -5." },
     fleet_revocation: { name: "Military Asset Recall and Decommission", votes: "supermajority", cost: 0, desc: "Recall and dismantle one of your fleets for 500 credits of salvage." }
 };
@@ -1173,13 +1172,9 @@ function newHtml() {
         h += '<label class="row">WHICH WORLD?</label><select id="n-planet" style="width:100%"><option value="">all occupied worlds</option>' +
             ov.occupations.map(o => '<option value="' + esc(o.planet) + '"' + (draft.planet === o.planet ? " selected" : "") + '>' + esc(o.planet) + ' (stability ' + o.stability + ')</option>').join("") + '</select>';
     }
-    else if (draft.type === "diplomacy") {
-        h += '<label class="row">ENVOYS TO</label><select id="n-target" style="width:100%"><option' + (draft.target === "Combine" ? " selected" : "") + '>Combine</option></select>' +
-            '<div class="sub" style="margin-top:4px">The independents are not a bloc any more: their worlds are dealt with one by one in the DIPLOMACY tab of the galactic map.</div>';
-    }
     else if (draft.type === "fleet_revocation") {
         h += '<label class="row">FLEET TO DECOMMISSION</label><select id="n-fleet" style="width:100%">' +
-            (ov.my_fleets.map(f => '<option value="' + esc(f.id) + '"' + (draft.fleet === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>').join("") || '<option value="">you have no fleets</option>') + '</select>';
+            (ov.my_fleets.filter(f => f.transport_fleet !== true).map(f => '<option value="' + esc(f.id) + '"' + (draft.fleet === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>').join("") || '<option value="">you have no fleets</option>') + '</select>';
     }
 
     h += '<label class="row">WHICH FACTION SPEAKS FOR IT?</label><div class="spons">' +
@@ -1591,7 +1586,10 @@ function authorityHtml() {
         T("(it shifts every vote by up to \u00b110 points: a popular Authority gets its way more often)") + '</div>' +
         '<div class="bar"><i style="width:' + ov.state.popularity + '%;background:#4cc2ff"></i></div>' +
         '<div class="sub" style="margin-top:8px">' + T("TAX LEVEL") + ' ' + ov.state.tax_level + ' ' + T("of") + ' 2 &middot; ' + T("relations:") +
-        ' Combine ' + (rel.Combine || 0) + ' / 100</div></div>';
+        ' Combine ' + (rel.Combine || 0) + ' / 100</div>' +
+        '<div class="sub" style="margin-top:4px">' + T("Every world we hold resents the top tax level: two more points of unrest a turn.") + '</div>' +
+        '<div style="margin-top:8px"><button class="btn small" id="tax-down"' + (Number(ov.state.tax_level) > 0 ? "" : " disabled") + '>' +
+        T("LOWER THE TAX — 1 LEVEL") + '</button> <span class="sub">' + T("it costs nothing and the people are grateful (+5 popularity).") + '</span></div></div>';
 
     h += '<div class="card"><h3>The four factions</h3>' + ov.factions.map(f =>
         '<div class="sub" style="padding:4px 0"><span class="dot" style="background:' + esc(f.color) + '"></span> <b style="color:#fff">' + esc(f.name) + '</b> (' + f.seats + ' ' + T("seats") + '): ' + esc(f.description) + '</div>').join("") + '</div>';
@@ -1607,6 +1605,16 @@ function wireAuthority() {
     }));
 
     $("tabbody").querySelectorAll(".spons .opt").forEach(el => el.addEventListener("click", function() { draft.sponsor = el.dataset.k; renderTabs(); }));
+
+    if ($("tax-down")) {
+        $("tax-down").addEventListener("click", async function() {
+            $("tax-down").disabled = true;
+            const { error } = await supabaseClient.rpc("cg_tax_cut");
+            if (error) { toast(error.message, true); return; }
+            toast(T("The tax is one level lower."));
+            await load();
+        });
+    }
 
     if ($("war-go")) {
         $("war-go").addEventListener("click", async function() {

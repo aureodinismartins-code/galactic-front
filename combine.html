@@ -92,7 +92,7 @@ hr.rule { border: 0; border-top: 1px solid #5a1d20; margin: 10px 0; }
     <div class="stat">HIGH COMMISSAR<br><b id="st-pres">-</b></div>
     <div class="stat">CREDITS<br><b id="st-credits">-</b></div>
     <div class="stat">CONFIDENCE<br><b id="st-pop">-</b></div>
-    <div class="stat">QUOTA<br><b id="st-quota">-</b></div>
+    <div class="stat">QUOTA<br><b id="st-quota">-</b><br><button id="quota-down" type="button" title="Lower the plan by one level">LOWER &minus;1</button></div>
     <div class="stat">FLEETS<br><b id="st-fleets">-</b></div>
     <div class="stat">SEATS<br><b id="st-seats">-</b></div>
     <div class="stat">NEEDED<br><b id="st-need">-</b></div>
@@ -133,7 +133,6 @@ const TYPES = {
     fleet_construction: { name: "New Fleet Quota", votes: "qualified", desc: "Raise the maximum by one fleet (build it from the galaxy map afterwards; it is still paid for there)." },
     knightmare_construction: { name: "Armoured Detachment", votes: "qualified", desc: "Approve one elite armoured detachment (the Knightmare Facility chain is still needed)." },
     production_quota: { name: "Five-Year Plan: Raise the Quota", votes: "qualified", desc: "Raise the production quota: 300-500 credits every 15 minutes per level (max 2), confidence -5." },
-    diplomacy: { name: "Fraternal Pact", votes: "majority", desc: "Send envoys to another faction: relations +10." },
     fleet_revocation: { name: "Reassign and Dismantle a Fleet", votes: "qualified", desc: "Break up one Combine fleet for 500 credits of salvage." }
 };
 
@@ -227,6 +226,22 @@ function render() {
     $("st-credits").textContent = fmt(ov.credits);
     $("st-pop").textContent = Math.round(ov.state.popularity) + "%";
     $("st-quota").textContent = ov.state.tax_level + " / 2";
+
+    /* the plan can come down as well as up: the plenum is always glad of it */
+    const down = $("quota-down");
+
+    if (down && !down.dataset.wired) {
+        down.dataset.wired = "1";
+        down.addEventListener("click", async function() {
+            down.disabled = true;
+            const { error } = await supabaseClient.rpc("cs_quota_cut");
+            if (error) { toast(error.message, true); return; }
+            toast(T("The plan is one level lower."));
+            await load();
+        });
+    }
+
+    if (down) { down.disabled = Number(ov.state.tax_level) <= 1; }
 
     const fl = ov.fleets || { total: 0, max: 0, quotas: 0 };
     $("st-fleets").textContent = fl.total + " / " + fl.max;
@@ -1571,11 +1586,7 @@ function newHtml() {
     }
     else if (draft.type === "fleet_revocation") {
         h += '<label class="row">' + esc(T("FLEET TO DISMANTLE")) + '</label><select id="n-fleet" style="width:100%">' +
-            (ov.my_fleets.map(f => '<option value="' + esc(f.id) + '"' + (draft.fleet === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>').join("") || '<option value="">' + esc(T("you have no fleets")) + '</option>') + '</select>';
-    }
-    else if (draft.type === "diplomacy") {
-        h += '<label class="row">' + esc(T("ENVOYS TO")) + '</label><select id="n-target" style="width:100%"><option' + (draft.target === "Freedom Authority" ? " selected" : "") + '>Freedom Authority</option></select>' +
-            '<div class="sub" style="margin-top:4px">' + esc(T("The independents are not a bloc any more: their worlds are dealt with one by one in the DIPLOMACY tab of the galactic map.")) + '</div>';
+            (ov.my_fleets.filter(f => f.transport_fleet !== true).map(f => '<option value="' + esc(f.id) + '"' + (draft.fleet === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>').join("") || '<option value="">' + esc(T("you have no fleets")) + '</option>') + '</select>';
     }
 
     h += '<label class="row">' + esc(T("WHICH CURRENT SPEAKS FOR IT?")) + '</label><div class="spons">' +

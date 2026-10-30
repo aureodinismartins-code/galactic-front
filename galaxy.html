@@ -4987,13 +4987,15 @@ supabaseClient
 
         if (trick && !locked) {
 
+            const slipping = p.gate === true;
+
             acts += '<button class="dip-btn dip-arm" type="button" data-p="' + esc(p.planet) + '"' +
-                (Number(p.armed) > 0 || mine < Number(minimums().rebel) ? " disabled" : "") + '>' +
-                esc(T("ARM THE REBELS")) + ' (' + trick.rebel + ' &middot; ' + p.rebel_odds + '%)</button>';
+                (Number(p.armed) > 0 || !slipping ? " disabled" : "") + '>' +
+                esc(T("ARM THE REBELS")) + ' (' + trick.rebel + ')</button>';
 
             acts += '<button class="dip-btn dip-coup" type="button" data-p="' + esc(p.planet) + '"' +
-                (Number(p.couped) > 0 || mine < Number(minimums().coup) ? " disabled" : "") + '>' +
-                esc(T("OVERTHROW THE GOVERNMENT")) + ' (' + trick.coup + ' &middot; ' + p.coup_odds + '%)</button>';
+                (Number(p.couped) > 0 || !slipping ? " disabled" : "") + '>' +
+                esc(T("OVERTHROW THE GOVERNMENT")) + ' (' + trick.coup + ')</button>';
 
         }
 
@@ -5021,6 +5023,13 @@ supabaseClient
             esc(T("envoys sent")) + ' ' + p.envoys + ' &middot; ' +
             esc(T("one send per world every five minutes")) + '</div>' +
             '<div class="dip-sub dip-lean" style="color:rgba(' + theirs + ',0.95)">' + esc(lean) + '</div>' +
+            (Number(p.tinder) > 0
+                ? '<div class="dip-sub">' + esc(T("trouble already planted:")) + ' <b>' + Number(p.tinder) + '</b> ' +
+                  esc(T("(it lands on the bar the moment the world is taken)")) + '</div>'
+                : "") +
+            '<div class="dip-sub">' + esc(T(p.gate === true
+                ? "It is turning to the other side: their hands are in this world, and unrest is all you can add to it now."
+                : "It is not turning to the other side yet: nobody there would take your rifles or your coup.")) + '</div>' +
             '<div class="dip-row">' + acts + '</div>' +
             (timer ? '<div class="dip-sub">' + timer + '</div>' : "") +
             '</div>';
@@ -5036,8 +5045,8 @@ supabaseClient
         }
 
         let body = '<div class="dip-sub">' + esc(T(playerFaction === "Combine"
-            ? "The Independents are not a faction any more: every independent world is its own partner. Envoys raise its standing with you, stage by stage — friendly at 25, allied at 50, a satellite at 75 — until at 100 it is integrated and joins the Union. Or you can lean on it: arm its rebels, or throw its government out."
-            : "The Independents are not a faction any more: every independent world is its own partner. Envoys raise its standing with you, stage by stage — friendly at 25, allied at 50, a satellite at 75 — until at 100 it is integrated and joins the Freedom Authority. Or you can lean on it: arm its rebels, or throw its government out.")) + '</div>';
+            ? "The Independents are not a faction any more: every independent world is its own partner. Envoys raise its standing with you, stage by stage — friendly at 25, allied at 50, a satellite at 75 — until at 100 it is integrated and joins the Union. Once a world starts turning to the other side, the only answer left is trouble: arm its rebels or stir a coup, and the unrest you plant will be waiting for whoever takes it."
+            : "The Independents are not a faction any more: every independent world is its own partner. Envoys raise its standing with you, stage by stage — friendly at 25, allied at 50, a satellite at 75 — until at 100 it is integrated and joins the Freedom Authority. Once a world starts turning to the other side, the only answer left is trouble: arm its rebels or stir a coup, and the unrest you plant will be waiting for whoever takes it.")) + '</div>';
 
         body += '<div class="dip-sub">' + esc(T("Treasury:")) + ' <b>' + Number(ov.credits || 0).toLocaleString() + '</b> &middot; ' +
             esc(T("an embassy costs")) + ' <b>' + ov.cost + '</b> ' + esc(T("CREDITS")) + ' &middot; ' +
@@ -5046,7 +5055,7 @@ supabaseClient
         if (prices()) {
             body += '<div class="dip-sub">' + esc(T("ARM THE REBELS")) + ' <b>' + prices().rebel + '</b> &middot; ' +
                 esc(T("OVERTHROW THE GOVERNMENT")) + ' <b>' + prices().coup + '</b> &middot; ' +
-                esc(T("both can fail, and a failed coup hands the world to the other side")) + '</div>';
+                esc(T("neither rolls dice any more: both plant unrest, and unrest is what makes a world rise")) + '</div>';
         }
 
         body += (ov.planets || []).map(worldRow).join("") ||
@@ -5131,11 +5140,8 @@ supabaseClient
                 act(function () {
                     return supabaseClient.rpc("arm_rebels", { p_planet: planet });
                 }, function (data) {
-                    return planet + " — " + T(data.success
-                        ? "the rebels are armed"
-                        : "the arms were intercepted") + " · " +
-                        T("yours") + " " + data.relation + "/100 (" + T(LEVELS[data.level] || "NEUTRAL") + ")" +
-                        " · " + T("theirs") + " " + data.theirs + "/100.";
+                    return planet + " — " + T("the rebels are armed") + " · " +
+                        T("unrest") + " " + data.tinder + " " + T("planted") + ".";
                 });
             });
         });
@@ -5143,8 +5149,8 @@ supabaseClient
         tab.querySelectorAll(".dip-coup").forEach(function (el) {
             el.addEventListener("click", function () {
 
-                /* a coup is the whole world in one throw: make them mean it */
-                if (!window.confirm(T("Throw the government of ") + el.dataset.p + T(" out? If it fails, the world swings to the other side."))) {
+                /* a coup shuts the world's doors and lights a fire: make them mean it */
+                if (!window.confirm(T("Stir a coup in ") + el.dataset.p + T("? Its government will shut its doors to envoys and the unrest will rise."))) {
                     return;
                 }
 
@@ -5154,11 +5160,8 @@ supabaseClient
                 act(function () {
                     return supabaseClient.rpc("overthrow_government", { p_planet: planet });
                 }, function (data) {
-                    return planet + " — " + T(data.success
-                        ? "the government has fallen: the world is integrated"
-                        : "the coup failed: the world swings to the other side") + " · " +
-                        T("yours") + " " + data.relation + "/100 · " +
-                        T("theirs") + " " + data.theirs + "/100.";
+                    return planet + " — " + T("the government is tottering") + " · " +
+                        T("unrest") + " " + data.tinder + " " + T("planted") + ".";
                 });
             });
         });

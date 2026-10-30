@@ -56,10 +56,10 @@ const OPTS = {
         planets: [
             { planet: "Veyrona", cities: 2, relation: 40, level: "friendly", tint: 0.25, next: 50,
               envoys: 4, wait: 0, theirs: 10, theirs_level: "neutral", patron: "me", leaned: 0.25,
-              locked: 0, armed: 0, couped: 0, rebel_odds: 55, coup_odds: 33 },
+              locked: 0, armed: 0, couped: 0, tinder: 0, gate: false },
             { planet: "Kharos", cities: 1, relation: 10, level: "neutral", tint: 0, next: 25,
-              envoys: 1, wait: 180, theirs: 0, theirs_level: "neutral", patron: "", leaned: 0,
-              locked: 0, armed: 120, couped: 0, rebel_odds: 45, coup_odds: 28 }
+              envoys: 1, wait: 180, theirs: 35, theirs_level: "friendly", patron: "them", leaned: 0.25,
+              locked: 0, armed: 120, couped: 0, tinder: 15, gate: true }
         ]
     },
     ceasefire_none: {
@@ -118,8 +118,8 @@ async function mount(faction, ceasefireKey, options) {
             if (name === "ceasefire_offer") { return Promise.resolve({ data: OPTS.ceasefire_offer_mine, error: null }); }
             if (name === "ceasefire_answer") { return Promise.resolve({ data: OPTS.ceasefire_active, error: null }); }
             if (name === "send_envoy") { return Promise.resolve({ data: { planet: args.p_planet, relation: 50, level: "allied", annexed: false }, error: null }); }
-            if (name === "arm_rebels") { return Promise.resolve({ data: { planet: args.p_planet, success: true, relation: 55, level: "allied", theirs: 0 }, error: null }); }
-            if (name === "overthrow_government") { return Promise.resolve({ data: { planet: args.p_planet, success: false, relation: 0, level: "neutral", theirs: 85, annexed: false }, error: null }); }
+            if (name === "arm_rebels") { return Promise.resolve({ data: { planet: args.p_planet, action: "arm_rebels", tinder: 15, relation: 10, theirs: 35, cost: 800 }, error: null }); }
+            if (name === "overthrow_government") { return Promise.resolve({ data: { planet: args.p_planet, action: "overthrow_government", tinder: 50, relation: 10, theirs: 35, cost: 1500, locked: 1800 }, error: null }); }
             return Promise.resolve({ data: null, error: null });
         }
     };
@@ -216,15 +216,19 @@ async function run() {
         const coups = Array.from(tab.querySelectorAll(".dip-coup"));
 
         check("every world offers its rebels", arms.length === 2, arms.length);
-        check("a world with friends in it may also be overthrown",
-            coups.find(el => el.dataset.p === "Veyrona").disabled === false);
-        check("but not one with too few friends",
-            coups.find(el => el.dataset.p === "Kharos").disabled === true);
-        check("the odds are shown before you spend the money", /ARM THE REBELS \(800 · 55%\)/.test(text),
+        check("a world already turning to the other side may be overthrown",
+            coups.find(el => el.dataset.p === "Kharos").disabled === false);
+        check("but one that is not turning yet may not",
+            coups.find(el => el.dataset.p === "Veyrona").disabled === true);
+        check("the price is shown, and no odds are rolled any more",
+            /ARM THE REBELS \(800\)/.test(text) && !/%\)/.test(text),
             text.slice(text.indexOf("ARM THE REBELS") - 20, text.indexOf("ARM THE REBELS") + 60));
+        check("the trouble already planted is named", /trouble already planted: 15/.test(text),
+            text.slice(0, 260));
         check("a world whose rebels were armed an hour ago is on cooldown",
             arms.find(el => el.dataset.p === "Kharos").disabled === true);
-        check("and the one that is free is not", arms.find(el => el.dataset.p === "Veyrona").disabled === false);
+        check("and a world that is not turning has its rifles turned down",
+            arms.find(el => el.dataset.p === "Veyrona").disabled === true);
 
         calls.length = 0;
         tab.querySelector('.dip-arm[data-p="Veyrona"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
@@ -235,12 +239,13 @@ async function run() {
         check("and the result is reported", /the rebels are armed/.test(msgText(tab)), msgText(tab));
 
         calls.length = 0;
-        tab.querySelector('.dip-coup[data-p="Veyrona"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+        tab.querySelector('.dip-coup[data-p="Kharos"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
         await new Promise(r => setTimeout(r, 40));
         const coup = calls.find(c => c.name === "overthrow_government");
-        check("a coup asks first, then calls overthrow_government", !!coup && coup.args.p_planet === "Veyrona",
+        check("a coup asks first, then calls overthrow_government", !!coup && coup.args.p_planet === "Kharos",
             coup ? JSON.stringify(coup.args) : "not called");
-        check("and says the world swung to the other side", /swings to the other side/.test(msgText(tab)), msgText(tab));
+        check("and says the government is tottering and unrest was planted",
+            /the government is tottering/.test(msgText(tab)) && /unrest 50/.test(msgText(tab)), msgText(tab));
 
         w.close();
     }
@@ -318,7 +323,7 @@ async function run() {
     {
         const { w, tab, calls } = await mount("Freedom Authority", "ceasefire_none", { confirm: false });
         calls.length = 0;
-        tab.querySelector('.dip-coup[data-p="Veyrona"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+        tab.querySelector('.dip-coup[data-p="Kharos"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
         await new Promise(r => setTimeout(r, 40));
         check("nothing is sent when the player says no", !calls.some(c => c.name === "overthrow_government"),
             calls.map(c => c.name).join(","));
