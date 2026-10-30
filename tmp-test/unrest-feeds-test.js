@@ -57,6 +57,20 @@ const FIXTURE = {
             ]
         },
         {
+            planet: "Kara", faction: "Combine", unrest: 71, mood: "RIOTING", revolts: 0, mine: true,
+            policy: "reprisals", garrison: { fleets: 1, soldiers: 800 }, tax: 1, delta: 8,
+            calm: { price: 600, ready_in: 0, armed: true }, bands: 2, band_men: 3500,
+            fight: { ready_in: 0, rebels: true, bands: 2, men: 3500, garrison: true },
+            feeds: [
+                { key: "occupation", value: 4 },
+                { key: "relief", value: -2 },
+                { key: "policy", value: 2 },
+                { key: "fleet", value: 0 },
+                { key: "tax", value: 0 },
+                { key: "planted", value: 0 }
+            ]
+        },
+        {
             planet: "Veyra", faction: "Combine", unrest: 40, mood: "RESTLESS", revolts: 0, mine: true,
             policy: "civil", garrison: { fleets: 1, soldiers: 600 }, tax: 1, delta: 2,
             calm: { price: 600, ready_in: 0, armed: false }, bands: 0, band_men: 0,
@@ -121,6 +135,7 @@ async function build(page, lang) {
 
     w.eval(parts.join("\n"));
     w.unrest = FIXTURE;
+    w.rebelBase = 1500;    /* what rebel_band_size() answers */
 
     return w;
 
@@ -176,6 +191,26 @@ async function build(page, lang) {
 
     check("the men in the streets are counted",
         /REBEL MILITIA\s*:\s*2 bands &middot; 6 militia companies &middot; 3,000 men/.test(flat(rioting)), flat(rioting));
+    const recruited = flat(cg.unrestLine("Kara"));
+
+    check("the men over the bands' own size are named as recruits",
+        /3,500 men &middot; 500 recruits from the garrison/.test(recruited), recruited);
+    check("a world whose bands have taken nothing says nothing about recruits",
+        flat(cg.unrestLine("Krieg")).indexOf("recruits from the garrison") === -1, flat(cg.unrestLine("Krieg")));
+
+    cg.rebelBase = 0;
+
+    check("without the band size from the server the line stays as it was",
+        /3,500 men/.test(flat(cg.unrestLine("Kara"))) &&
+        flat(cg.unrestLine("Kara")).indexOf("recruits from the garrison") === -1, flat(cg.unrestLine("Kara")));
+
+    cg.rebelBase = 1500;
+
+    const sovietRecruits = flat(cs.unrestLine("Kara"));
+
+    check("the Soviet counts them too",
+        /500 recruits from the garrison/.test(sovietRecruits), sovietRecruits);
+
     check("while a band is armed, money cannot buy the world",
         !!calmArmed && calmArmed[0].indexOf("disabled") !== -1 &&
         flat(rioting).indexOf("They must be broken before the world can be calmed.") !== -1, flat(rioting));

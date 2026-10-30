@@ -1468,6 +1468,7 @@
         "band": "bando",
         "bands": "bandos",
         "men": "homens",
+        "recruits from the garrison": "recrutas da guarnição",
         "none": "nenhuma",
         "No rebel band has risen here yet: that takes unrest 60.": "Nenhum bando rebelde se levantou aqui ainda: é preciso inquietação 60.",
         "The rebels are under arms, and no fleet of ours is in orbit to send against them.": "Os rebeldes estão em armas, e nenhuma frota nossa está em órbita para enviar contra eles.",

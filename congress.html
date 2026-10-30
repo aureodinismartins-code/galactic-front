@@ -154,6 +154,11 @@ let debate = null;        /* the sides every live bill's delegates are on */
 let debateError = null;
 
 let unrest = null;        /* how much every occupied world resents it */
+
+
+/* how many men a band is before it takes recruits (2026-11-40) */
+
+let rebelBase = 0;
 let speaker = null;       /* the Congress's own president and its election */
 
 const $ = id => document.getElementById(id);
@@ -276,6 +281,11 @@ async function load() {
     govError = gv.error ? gv.error.message : null;
     const us = await supabaseClient.rpc("unrest_state");
     unrest = us.error ? null : us.data;
+
+    /* the men a band holds before it recruits: what stands over that
+       is blood the garrison has lost to the militia */
+    const bandBase = await supabaseClient.rpc("rebel_band_size");
+    rebelBase = bandBase && !bandBase.error && bandBase.data != null ? Number(bandBase.data) : 0;
 
     /* the chamber's president: its own book, its own election */
     const spk = await supabaseClient.rpc("cg_speaker_state");
@@ -1365,6 +1375,11 @@ function rebelsLine(u) {
     const armed = bands > 0;
     const canFight = armed && !!fight.garrison && fightWait <= 0;
 
+    /* the recruits the camps took out of the garrison: men over the bands' own
+       size, which an ignored revolt keeps adding to */
+    const bandBase = Number(typeof rebelBase === "undefined" ? 0 : rebelBase) || 0;
+    const recruits = armed && bandBase > 0 ? Math.max(0, men - bands * bandBase) : 0;
+
     let why;
 
     if (!armed) { why = T("No rebel band has risen here yet: that takes unrest 60."); }
@@ -1375,7 +1390,9 @@ function rebelsLine(u) {
     return '<div class="sub" style="margin-top:6px"><b>' + T("REBEL MILITIA") + ':</b> ' +
         (armed ? bands + ' ' + T(bands === 1 ? "band" : "bands") + ' &middot; ' +
                  companies + ' ' + T(companies === 1 ? "militia company" : "militia companies") + ' &middot; ' +
-                 Number(men).toLocaleString() + ' ' + T("men")
+                 Number(men).toLocaleString() + ' ' + T("men") +
+                 (recruits > 0 ? ' &middot; ' + Number(recruits).toLocaleString() + ' ' +
+                     T("recruits from the garrison") : "")
                : T("none")) + '</div>' +
         '<div style="margin-top:6px"><button class="btn small calm-world" data-p="' + esc(u.planet) + '"' +
         (calmWait > 0 || armed ? " disabled" : "") + '>' + T("CALM THE WORLD") + ' (' + Number(calm.price || 0) + ')</button> ' +
