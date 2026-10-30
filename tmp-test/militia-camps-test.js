@@ -77,6 +77,8 @@ function page(options) {
     w.gameNotice = function (message, title) { notices.push({ message: message, title: title }); };
     w.cityContainer = doc.getElementById("cities");
     w.planetName = options.planet || "Krieg";
+    w.playerFaction = "Combine";
+    w.planetFleets = options.fleets || [];
     w.planetCities = [1, 2, 3].map(function (n) {
         return { id: n, name: "C" + n, faction: "Combine", garrison_level: 1 };
     });
@@ -101,6 +103,8 @@ function page(options) {
         grab(PAGE, "tr"),
         grab(PAGE, "loadRebelCamps"),
         grab(PAGE, "campPositions"),
+        grab(PAGE, "fleetForTheWoods"),
+        grab(PAGE, "militiaBattleUrl"),
         "let campNoticeTimer = null;",
         grab(PAGE, "campNotice"),
         grab(PAGE, "renderMilitiaCamps")
@@ -182,16 +186,42 @@ function world(bands, men) {
         ok("and they have not moved", again.every(function (c, i) { return c.style.left === camps[i].style.left; }),
             again.map(function (c) { return c.style.left; }));
 
-        console.log("\n== pressing a camp says what stands in the woods");
+        console.log("\n== pressing a camp sends the troops into the woods");
+
+        const moved = [];
+
+        p.w.goToWoods = function (url) { moved.push(url); };
 
         camps[0].dispatchEvent(new p.w.Event("click"));
 
-        ok("a notice opens", p.notices.length === 1, p.notices.length);
-        ok("it counts the bands", /2 bands/.test(p.notices[0].message), p.notices[0].message);
-        ok("and the men", /1,000 men/.test(p.notices[0].message), p.notices[0].message);
-        ok("and the companies", /2 militia companies/.test(p.notices[0].message), p.notices[0].message);
-        ok("it says where they camp", /woods outside the towns/.test(p.notices[0].message), p.notices[0].message);
-        ok("and who sends the troops", /Congress/.test(p.notices[0].message), p.notices[0].message);
+        ok("with no fleet in orbit nothing moves", moved.length === 0, moved);
+
+        const why = p.doc.getElementById("camp-notice");
+
+        ok("and a brief notice says why", !!why && /No fleet of ours is in orbit/.test(why.textContent),
+            why && why.textContent);
+        ok("it still counts the bands and the men",
+            /2 bands/.test(why.textContent) && /1,000 men/.test(why.textContent), why.textContent);
+
+        console.log("\n== with a fleet in orbit the camp opens the battle");
+
+        p.w.planetFleets = [
+            { id: "elsewhere", status: "stationed", origin: "Kara", squads: [{ type: "Rifle", amount: 3 }] },
+            { id: "f1", status: "stationed", origin: "Krieg", squads: [{ type: "Rifle", amount: 3 }] }
+        ];
+
+        p.w.renderMilitiaCamps();
+
+        p.camps()[0].dispatchEvent(new p.w.Event("click"));
+
+        ok("one press, one march", moved.length === 1, moved);
+        ok("the woods open", /^battle\.html\?rebel=1/.test(moved[0]), moved[0]);
+        ok("on this world", /planet=Krieg/.test(moved[0]), moved[0]);
+        ok("named as the militia camp", /city=Militia%20Camp/.test(moved[0]), moved[0]);
+        ok("with the militia as the enemy", /defender=Militia/.test(moved[0]), moved[0]);
+        ok("and our own side as the attacker", /attacker=Combine/.test(moved[0]), moved[0]);
+        ok("carrying the fleet of ours at the planet, not another world's",
+            /fleet=f1/.test(moved[0]) && !/fleet=elsewhere/.test(moved[0]), moved[0]);
 
         console.log("\n== four camps are as many as a world shows");
 

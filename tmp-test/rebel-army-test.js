@@ -18,6 +18,7 @@ const { PGlite } = require("@electric-sql/pglite");
 
 const ROOT = path.join(__dirname, "..");
 const PATCH = "sql/2026-11-38_the_rebels_have_an_army.sql";
+const PATCH_WOODS = "sql/2026-11-40_the_woods_decide.sql";
 
 const HOST = "11111111-1111-4111-8111-111111111111";
 const COMB = "22222222-2222-4222-8222-222222222222";
@@ -153,6 +154,8 @@ create or replace function public.tinder_apply() returns void language plpgsql a
         await db.exec(SCHEMA);
         await db.exec(fs.readFileSync(path.join(ROOT, "sql/2026-11-37_the_crowd_has_to_be_faced.sql"), "utf8"));
         await db.exec(fs.readFileSync(path.join(ROOT, PATCH), "utf8"));
+        await db.exec(fs.readFileSync(path.join(ROOT, PATCH_WOODS), "utf8"));
+        await db.exec(fs.readFileSync(path.join(ROOT, PATCH_WOODS), "utf8"));
 
         await as(db, COMB);
 
@@ -300,6 +303,75 @@ create or replace function public.tinder_apply() returns void language plpgsql a
         ok("and that it is under arms", kara.calm && kara.calm.armed === true, kara.calm);
         ok("the state raises them itself", Number(kara.fight && kara.fight.bands) >= 1, kara.fight);
         ok("and says whether anyone is playing", (st || {}).online === true, st && st.online);
+
+        /* ---------- the woods decide, and the camps take recruits ---------- */
+
+        console.log("\n== a band recruits itself out of the garrison");
+
+        await db.exec("delete from public.planet_rebels");
+        await db.exec("delete from public.fleets");
+        await db.exec("delete from public.planet_unrest");
+        await db.exec("insert into public.planet_unrest (planet, faction, unrest) values ('Krieg', 'Combine', 70)");
+        await db.exec("insert into public.fleets (faction, origin, status, squads) values " +
+                      "('Combine', 'Krieg', 'stationed', '[{\"type\":\"Rifle\",\"amount\":10}]'::jsonb)");
+
+        ok("the share a band takes is five per cent",
+            Number((await one(db, "select public.rebel_recruit_share() as n")).n) === 0.05);
+
+        await rpc(db, "select public.rebel_raise() as r");
+
+        const garrisonLeft = Number((await one(db,
+            "select (public.planet_garrison('Combine', 'Krieg') ->> 'soldiers')::numeric as n")).n);
+        const bandMen = Number((await one(db,
+            "select soldiers from public.planet_rebels where planet = 'Krieg'")).soldiers);
+
+        ok("the band has taken men out of the garrison", garrisonLeft < 10000, garrisonLeft);
+        ok("and put them in its own ranks", Math.round(bandMen) === 1500 + Math.round(10000 - garrisonLeft),
+            bandMen + " vs " + (1500 + Math.round(10000 - garrisonLeft)));
+
+        console.log("\n== winning in the woods breaks a band");
+
+        const won = await rpc(db, "select public.rebel_assault_result('Krieg', true) as r");
+
+        ok("one band is broken", won && Number(won.broken) === 1, won);
+        ok("and none are left", won && Number(won.bands) === 0, won);
+        ok("the bar falls with the last band", won && Number(won.delta) === -15, won);
+        ok("and the woods cost blood even in victory", won && Number(won.lost) > 0, won);
+
+        const noBand = await expectError(db, "select public.rebel_assault_result('Krieg', true)");
+
+        ok("with no militia left there is nothing to fight", !!noBand, noBand);
+
+        console.log("\n== losing in the woods breaks nothing");
+
+        await db.exec("update public.planet_unrest set unrest = 70, last_band_at = null where planet = 'Krieg'");
+        await db.exec("insert into public.fleets (faction, origin, status, squads) values " +
+                      "('Combine', 'Krieg', 'stationed', '[{\"type\":\"Rifle\",\"amount\":10}]'::jsonb)");
+
+        await rpc(db, "select public.rebel_raise() as r");
+        await db.exec("update public.planet_unrest set last_band_at = now() - interval '11 minutes' where planet = 'Krieg'");
+        await rpc(db, "select public.rebel_raise() as r");
+
+        const twoBands = Number((await one(db,
+            "select count(*)::int as n from public.planet_rebels where planet = 'Krieg'")).n);
+
+        ok("two bands stand in the woods", twoBands === 2, twoBands);
+
+        const lost = await rpc(db, "select public.rebel_assault_result('Krieg', false) as r");
+        const stillThere = Number((await one(db,
+            "select count(*)::int as n from public.planet_rebels where planet = 'Krieg'")).n);
+
+        ok("a loss breaks no band", lost && Number(lost.broken) === 0 && stillThere === 2, lost);
+        ok("but the troops pay for it", lost && Number(lost.lost) > 0, lost);
+        ok("and the bar does not fall", lost && Number(lost.delta) === 0, lost);
+
+        console.log("\n== without troops in orbit there is no fight");
+
+        await db.exec("delete from public.fleets");
+
+        const noFleet = await expectError(db, "select public.rebel_assault_result('Krieg', true)");
+
+        ok("the woods cannot be entered", !!noFleet && /No troops of ours stand in orbit/.test(noFleet), noFleet);
 
         await db.close();
 

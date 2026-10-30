@@ -1227,6 +1227,19 @@ async function loadFleet() {
     garrisonLevel = await loadGarrisonLevel();
     createEnemyUnits();
 
+    /* a rebel world has no city to take: the fight in the woods is settled
+       by rebel_assault_result() when the shooting stops, not by a battle row */
+
+    if (rebelFight) {
+
+        battleID = null;
+        battleActive = true;
+
+        setBattleMessage("The militia is in the woods. Select your divisions.");
+        return;
+
+    }
+
     const { data: newBattle, error: battleError } = await supabaseClient
         .rpc("start_city_battle", {
             battle_fleet_id: fleetID,
@@ -3164,10 +3177,51 @@ function getEnemyRemainingSoldiers() {
    SAVE RESULT
 ========================================= */
 
+/* what the woods cost, and what they broke */
+async function saveWoodsResult() {
+
+    battleResolved = true;
+
+    const playerLosses = Math.max(0, getInitialFleetSoldiers() - getRemainingFleetSoldiers());
+    const enemyLosses = Math.max(0, getEnemyInitialSoldiers() - getEnemyRemainingSoldiers());
+
+    setBattleMessage("Saving the fight in the woods...");
+
+    const { data, error } = await supabaseClient.rpc("rebel_assault_result", {
+        p_planet: planetName,
+        p_won: battleResult === "victory"
+    });
+
+    if (error) {
+        console.error("Woods save error:", error);
+        battleResolved = false;
+        setBattleMessage("Could not save the fight: " + error.message);
+        return false;
+    }
+
+    const bands = Number(data && data.bands) || 0;
+    const summary = document.getElementById("battle-loss-summary");
+
+    if (summary) {
+        summary.innerHTML =
+            "<strong>Your losses: " + formatSoldiers(playerLosses) + " soldiers</strong>" +
+            "<br>Enemy losses: " + formatSoldiers(enemyLosses) + " soldiers" +
+            "<br>" + bands + " militia band" + (bands === 1 ? "" : "s") + " left in the woods";
+    }
+
+    return true;
+
+}
+
+
 async function saveBattleResult() {
 
     if (battleResolved) {
         return true;
+    }
+
+    if (rebelFight) {
+        return await saveWoodsResult();
     }
 
     if (!battleID) {
@@ -3259,6 +3313,41 @@ async function finishBattle(result) {
         description.textContent = "The battle ended, but the result could not be saved.";
         screen.classList.add("visible");
         return;
+    }
+
+    if (rebelFight) {
+
+        const woodsScreen = document.getElementById("victory-screen");
+        const woodsTitle = document.getElementById("victory-title");
+        const woodsDescription = document.getElementById("victory-description");
+
+        woodsTitle.textContent = result === "victory" ? "THE MILITIA IS BROKEN" : "DRIVEN OUT OF THE WOODS";
+        woodsTitle.style.color = result === "victory" ? "#c8f0a0" : "#ff4c4c";
+        woodsDescription.textContent = result === "victory"
+            ? "The woods are ours: one band of militia is broken and the rest are still out there."
+            : "The militia holds the trees. The troops fell back, and every band is still standing.";
+
+        let woodsBack = document.getElementById("woods-back");
+
+        if (!woodsBack) {
+
+            woodsBack = document.createElement("button");
+            woodsBack.id = "woods-back";
+            woodsBack.type = "button";
+            woodsBack.textContent = "RETURN TO THE PLANET";
+            woodsBack.style.cssText = "margin-top:18px;padding:12px 28px;background:#121212;color:#fff;border:1px solid #777;font-weight:bold;letter-spacing:2px;cursor:pointer;";
+            woodsBack.addEventListener("click", function() {
+                window.location.href = "planet.html?name=" + encodeURIComponent(planetName);
+            });
+
+            woodsScreen.appendChild(woodsBack);
+
+        }
+
+        woodsScreen.classList.add("visible");
+        setBattleMessage("Battle result saved.");
+        return;
+
     }
 
     if (result === "victory") {
@@ -4126,6 +4215,9 @@ function broadcastSnapshot(force) {
 }
 
 function endLiveBattle(result) {
+
+    /* a fight in the woods has no battle row to close */
+    if (!battleID) { return; }
 
     if (!liveChannel) { return; }
 

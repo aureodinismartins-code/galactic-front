@@ -1425,6 +1425,45 @@ function campPositions(count, cityPoints) {
 }
 
 
+/* the woods are fought, not resolved in a hall: a camp opens the battle
+   page, which needs a fleet of ours in orbit to send into the trees */
+function fleetForTheWoods() {
+
+    const fleets = Array.isArray(planetFleets) ? planetFleets : [];
+
+    const ready = fleets.filter(function(f) {
+
+        return f && f.status === "stationed" &&
+            f.origin === planetName &&
+            Array.isArray(f.squads) && f.squads.length > 0;
+
+    });
+
+    return ready[0] || null;
+
+}
+
+
+function militiaBattleUrl(fleet) {
+
+    return "battle.html?rebel=1" +
+        "&planet=" + encodeURIComponent(planetName) +
+        "&city=" + encodeURIComponent("Militia Camp") +
+        "&attacker=" + encodeURIComponent(playerFaction) +
+        "&defender=" + encodeURIComponent("Militia") +
+        "&fleet=" + encodeURIComponent(fleet.id);
+
+}
+
+
+/* its own step, so a test can watch where a camp sends the player */
+function goToWoods(url) {
+
+    window.location.href = url;
+
+}
+
+
 /* a brief word on the planet page, not a modal: it fades on its own */
 let campNoticeTimer = null;
 
@@ -1477,7 +1516,6 @@ function renderMilitiaCamps() {
         }
     );
 
-    const companies = Math.ceil(rebelCamps.men / 500);
     const each = Math.round(rebelCamps.men / Math.max(1, rebelCamps.bands));
     const bands = Math.min(rebelCamps.bands, 4);
 
@@ -1524,15 +1562,21 @@ function renderMilitiaCamps() {
 
         camp.addEventListener("click", function() {
 
-            gameNotice(
-                rebelCamps.bands + " " + tr(rebelCamps.bands === 1 ? "band" : "bands") + " &middot; " +
-                Number(rebelCamps.men).toLocaleString("en-US") + " " + tr("men") +
-                (companies ? " &middot; " + companies + " " +
-                    tr(companies === 1 ? "militia company" : "militia companies") : "") + ". " +
-                tr("A band of militia camps in the woods outside the towns, out of the cities' reach.") + " " +
-                tr("The halls decide the assault: the Congress holds the order to fight them."),
-                tr("MILITIA CAMP")
-            );
+            const fleet = fleetForTheWoods();
+
+            if (!fleet) {
+
+                campNotice(
+                    rebelCamps.bands + " " + tr(rebelCamps.bands === 1 ? "band" : "bands") + " · " +
+                    Number(rebelCamps.men).toLocaleString("en-US") + " " + tr("men") + ". " +
+                    tr("No fleet of ours is in orbit: bring the troops before you go into the woods.")
+                );
+
+                return;
+
+            }
+
+            goToWoods(militiaBattleUrl(fleet));
 
         });
 
