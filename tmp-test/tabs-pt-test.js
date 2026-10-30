@@ -146,7 +146,8 @@ check("the war room's rule", authority.indexOf("Só os jogadores apresentam uma 
 check("the war map legend", authority.indexOf("guerra declarada · azul = Freedom Authority") !== -1);
 
 console.log("the new-proposal tab in Portuguese");
-check("the kinds of bill", proposal.indexOf("Missão diplomática") !== -1 && proposal.indexOf("Recolhimento e desativação") !== -1, proposal.slice(0, 300));
+check("the kinds of bill", proposal.indexOf("Recolhimento e desativação") !== -1, proposal.slice(0, 300));
+check("and no diplomatic mission between two sides at war", proposal.indexOf("Missão diplomática") === -1, proposal.slice(0, 300));
 check("the description of the chosen kind", proposal.indexOf("Aprova uma nova frota militar") !== -1, proposal.slice(0, 400));
 check("a priority of the sponsor", proposal.indexOf("esta é uma das prioridades deles") !== -1);
 check("a bill is free", proposal.indexOf("CUSTO: grátis") !== -1 && !/CUSTO:[^·]*[0-9]/.test(proposal), proposal.slice(-300));

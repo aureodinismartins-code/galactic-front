@@ -1161,6 +1161,47 @@ function wireAgitprop() {
 }
 
 /* ---- unrest: how much a taken world resents it ---- */
+
+/* how much a taken world resents it, read the same way the Authority's
+   Congress reads it (policyLine and the bar both go through here) */
+function unrestFor(planet) {
+    const list = (typeof unrest !== "undefined" && unrest && unrest.worlds) ? unrest.worlds : [];
+    return list.find(w => w.planet === planet) || null;
+}
+
+/* the terms the clock adds to the bar every turn, in the order it adds them,
+   and the one-off a saboteur left behind before the world was even taken */
+const FEED_LABELS = {
+    occupation: "the occupation itself",
+    relief: "stability bought with relief",
+    policy: "the policy in force",
+    fleet: "no fleet of ours in orbit",
+    tax: "the tax"
+};
+
+function feedsLine(u) {
+
+    const feeds = (u && u.feeds) || [];
+    const live = feeds.filter(f => f.key !== "planted" && Number(f.value));
+    const planted = feeds.find(f => f.key === "planted");
+
+    if (!live.length && !(planted && Number(planted.value))) { return ""; }
+
+    const parts = live.map(function(f) {
+        const v = Number(f.value);
+        return '<span>' + esc(T(FEED_LABELS[f.key] || f.key)) + '</span> <b style="color:' + (v > 0 ? "#ff5a4a" : "#4cc2ff") + '">' +
+            (v > 0 ? "+" : "\u2212") + Math.abs(v) + '</b>';
+    });
+
+    if (planted && Number(planted.value)) {
+        parts.push('<span>' + esc(T("planted trouble")) + '</span> <b style="color:#ff9a3c">+' + Number(planted.value) + '</b> ' +
+            '<span>' + esc(T("(already in the bar)")) + '</span>');
+    }
+
+    return '<div class="sub" style="margin-top:4px"><b>' + esc(T("WHAT FEEDS IT")) + ':</b> ' + parts.join(" &middot; ") + '</div>';
+
+}
+
 function unrestLine(planet) {
 
     const list = (typeof unrest !== "undefined" && unrest && unrest.worlds) ? unrest.worlds : [];
@@ -1174,6 +1215,7 @@ function unrestLine(planet) {
     return '<div class="sub" style="margin-top:6px">' + esc(T("UNREST")) + ' ' + value + ' / 100 &middot; <b style="color:' + colour + '">' +
         esc(T(u.mood)) + '</b>' + (Number(u.revolts) ? ' &middot; ' + esc(T("revolts")) + ' ' + u.revolts : '') + '</div>' +
         '<div class="bar"><i style="width:' + value + '%;background:' + colour + '"></i></div>' +
+        feedsLine(u) +
         '<div class="sub">' + esc(T("Unrest climbs on a world that was taken by force. It eats the world's stability, and at a hundred the world rises and throws the occupation off.")) + '</div>' +
         policyLine(planet);
 

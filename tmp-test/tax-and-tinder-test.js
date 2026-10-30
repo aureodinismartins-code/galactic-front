@@ -184,6 +184,7 @@ as $$ select '{}'::jsonb $$;
         const db = new PGlite();
         await db.exec(SCHEMA);
         await db.exec(fs.readFileSync(path.join(ROOT, PATCH), "utf8"));
+        await db.exec(fs.readFileSync(path.join(ROOT, "sql/2026-11-36_the_bar_says_what_feeds_it.sql"), "utf8"));
 
         await as(db, HOST);
 
@@ -298,6 +299,25 @@ as $$ select '{}'::jsonb $$;
         ok("the top level adds two points a turn", krieg && Number(krieg.delta) === 4, krieg && krieg.delta);
         ok("and the tax itself is reported", krieg && Number(krieg.tax) === 2, krieg && krieg.tax);
 
+        /* the bar now says which part is which */
+        const fed = (await rpc(db, "select public.unrest_state() as r") || {}).worlds || [];
+        const fedKrieg = fed.find(function (w) { return w.planet === "Krieg"; }) || {};
+        const feed = function (k) {
+            const f = (fedKrieg.feeds || []).find(function (x) { return x.key === k; });
+            return f ? Number(f.value) : null;
+        };
+
+        ok("the bar hands back the parts that feed it",
+            ["occupation", "relief", "policy", "fleet", "tax", "planted"].every(function (k) { return feed(k) !== null; }),
+            fedKrieg.feeds);
+        ok("the occupation alone is worth four", feed("occupation") === 4, feed("occupation"));
+        ok("the relief holds it down", feed("relief") === -2, feed("relief"));
+        ok("the tax is the part that grew at the top level", feed("tax") === 2, feed("tax"));
+        ok("nothing was planted in this world", feed("planted") === 0, feed("planted"));
+        ok("and the parts add up to the delta the world runs at",
+            feed("occupation") + feed("relief") + feed("policy") + feed("fleet") + feed("tax") === Number(fedKrieg.delta),
+            { delta: fedKrieg.delta, feeds: fedKrieg.feeds });
+
         await db.exec("update public.cs_state set quota = 1 where id = 1");
         await db.exec("update public.planet_unrest set unrest = 40, last_turn_at = now() - interval '10 minutes' where planet = 'Krieg'");
 
@@ -378,6 +398,13 @@ as $$ select '{}'::jsonb $$;
             Number((await one(db, "select unrest from public.planet_unrest where planet = 'Krieg'")).unrest) === 45);
         ok("and the trouble is spent",
             (await one(db, "select applied_at from public.planet_tinder where planet = 'Krieg'")).applied_at !== null);
+
+        const fedAfter = ((await rpc(db, "select public.unrest_state() as r") || {}).worlds || [])
+            .find(function (w) { return w.planet === "Krieg"; }) || {};
+        const plantedFeed = (fedAfter.feeds || []).find(function (x) { return x.key === "planted"; });
+
+        ok("and the bar says the trouble was planted in it",
+            plantedFeed && Number(plantedFeed.value) === 20, fedAfter.feeds);
 
         /* ---------- the reset ---------- */
 

@@ -297,7 +297,8 @@ const deadline = setTimeout(function() { console.log("TIMEOUT: the page test did
     const neu = await open("new");
     check("the directive form", neu.indexOf("O QUE O SOVIETE DEVE DECIDIR?") !== -1, neu.slice(0, 200));
     const options = [...doc.querySelectorAll("#n-type option")].map(o => o.textContent);
-    check("the kinds of directive", options.indexOf("Campanha militar contra um planeta") !== -1 && options.indexOf("Cota de nova frota") !== -1 && options.indexOf("Pacto fraterno") !== -1, options.join(" | "));
+    check("the kinds of directive", options.indexOf("Campanha militar contra um planeta") !== -1 && options.indexOf("Cota de nova frota") !== -1, options.join(" | "));
+    check("and no pact between two sides at war", options.indexOf("Pacto fraterno") === -1, options.join(" | "));
     check("the description of the chosen kind", neu.indexOf("Eleva o máximo em uma frota") !== -1, neu.slice(0, 300));
     check("a quota directive says what the ceiling becomes",
         neu.indexOf("FROTAS AGORA: 2 / 3") !== -1 && neu.indexOf("eleva o máximo para 4") !== -1, neu.slice(0, 400));
@@ -389,7 +390,8 @@ const deadline = setTimeout(function() { console.log("TIMEOUT: the page test did
     await open("new");
     const typeOptions = [...doc.querySelectorAll("#n-type option")].map(o => o.value);
     check("consolidation is gone from the directives the Soviet votes on",
-        typeOptions.indexOf("consolidation") === -1 && typeOptions.length === 6, typeOptions.join(","));
+        typeOptions.indexOf("consolidation") === -1 && typeOptions.indexOf("diplomacy") === -1 && typeOptions.length === 5,
+        typeOptions.join(","));
 
     const authority = await open("authority");
     check("the Soviet's authority tab", authority.indexOf("FROTAS EM SERVIÇO") !== -1 &&
