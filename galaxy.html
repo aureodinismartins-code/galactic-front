@@ -714,6 +714,14 @@
             letter-spacing: 2px;
         }
         .battle-card button:hover { background: #ff5a2a; color: #180502; }
+        .battle-card button.battle-withdraw {
+            margin-top: 3px;
+            background: #241010;
+            border-color: #7a3320;
+            color: #ffb9a8;
+        }
+        .battle-card button.battle-withdraw:hover { background: #7a3320; color: #fff; }
+        .battle-card button.battle-withdraw:disabled { opacity: .55; cursor: progress; }
         /* fleets are sent with a right-click on the map, so the old destination picker is hidden */
         #fleet-destination, #move-fleet-button, label[for="fleet-destination"] { display: none !important; }
         #fleet-send-hint { color: #8fd0ff; font-size: 12px; letter-spacing: 1px; margin: 6px 0; }
@@ -3953,6 +3961,28 @@ function showSpaceBattle(b) {
 ========================================= */
 /* which of our fleets is standing in this fight: the server names it, and
    when the name does not come through, its place in the battle says it */
+/* a short notice over the map: the fleet is out, and what it cost */
+function announceBreakOff(text) {
+
+    let box = document.getElementById("space-battle-feed");
+
+    if (!box) {
+        box = document.createElement("div");
+        box.id = "space-battle-feed";
+        box.style.cssText =
+            "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:900;display:flex;flex-direction:column;gap:6px;align-items:center;";
+        document.body.appendChild(box);
+    }
+
+    const row = document.createElement("div");
+    row.style.cssText =
+        "padding:8px 16px;background:rgba(40,8,4,.95);border:1px solid #ff9a4a;color:#ffe2cc;font:bold 12px Arial;letter-spacing:1px;";
+    row.textContent = text;
+    box.appendChild(row);
+    setTimeout(function() { row.remove(); }, 14000);
+
+}
+
 function myFleetInBattle(b, where) {
 
     const named = b && b.mine ? String(b.mine) : "";
@@ -4051,7 +4081,8 @@ async function drawBattles() {
             card += '<span class="battle-foe">vs ' + escapeHTML(String(b.against)) + '</span>';
         }
 
-        card += '<button type="button">' + T("GO TO BATTLE") + '</button>';
+        card += '<button type="button">' + T("GO TO BATTLE") + '</button>' +
+            '<button type="button" class="battle-withdraw">' + T("WITHDRAW") + '</button>';
 
         marker.innerHTML = '<span class="battle-ring"></span><span class="battle-label">' +
             escapeHTML(T("BATTLE UNDER WAY")) + '</span><div class="battle-card">' + card + '</div>';
@@ -4061,11 +4092,52 @@ async function drawBattles() {
         const cardEl = marker.querySelector(".battle-card");
         if (cardEl) { cardEl.addEventListener("click", function(event) { event.stopPropagation(); }); }
 
-        const enter = marker.querySelector(".battle-card button");
+        const enter = marker.querySelector(".battle-card button:not(.battle-withdraw)");
         if (enter) {
             enter.addEventListener("click", function(event) {
                 event.stopPropagation();
                 window.location.href = "space.html?battle=" + encodeURIComponent(b.id);
+            });
+        }
+
+        /* a locked fleet is not a lost one: it can turn away, at a price */
+        const withdraw = marker.querySelector(".battle-card .battle-withdraw");
+        if (withdraw) {
+            withdraw.addEventListener("click", async function(event) {
+
+                event.stopPropagation();
+
+                if (!window.confirm(T("Break off from this battle? Every squad leaves a fifth of its men behind, and the fight disperses."))) { return; }
+
+                withdraw.disabled = true;
+                withdraw.textContent = T("BREAKING OFF");
+
+                const { data, error } = await supabaseClient.rpc("space_break_off", { p_battle: b.id });
+
+                const why = {
+                    not_authenticated: "You are not signed in.",
+                    no_battle: "That battle is gone.",
+                    already_over: "That battle is already over.",
+                    not_in_battle: "Your fleet is not in that battle.",
+                    frozen: "The game is frozen."
+                };
+
+                if (error || !data || data.ok === false) {
+                    withdraw.disabled = false;
+                    withdraw.textContent = T("WITHDRAW");
+                    const code = data && data.code;
+                    announceBreakOff(T(code && why[code] ? why[code] : (error ? error.message : "The fleet could not break off.")));
+                    return;
+                }
+
+                announceBreakOff(
+                    T("The fleet broke off.") + " " +
+                    Math.round(Number(data.lost) || 0).toLocaleString() + " " + T("soldiers left behind.")
+                );
+
+                await loadFleets();
+                await drawBattles();
+
             });
         }
 
@@ -4236,7 +4308,7 @@ setTimeout(pollSpaceBattles, 2500);
             fleetMessage.textContent = fleet.status === "travelling"
                 ? "Fleet is on a planetary route and cannot be redirected."
                 : fleet.status === "engaged"
-                    ? "Fleet is locked in a space battle."
+                    ? "Fleet is locked in a space battle: press its ring on the map to break off."
                     : "Fleet cannot move right now.";
             return;
         }
