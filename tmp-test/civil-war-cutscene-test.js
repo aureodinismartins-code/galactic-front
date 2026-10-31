@@ -93,6 +93,18 @@ console.log("\n== the film");
 ok("it plays the civil war cutscene",
     /const CIVIL_WAR_VIDEO = "assets\/cutscenes\/civil-war\.mp4";/.test(PAGE) &&
     /video\.src = CIVIL_WAR_VIDEO;/.test(PAGE));
+
+const CUTSCENE = path.join(ROOT, "assets/cutscenes/civil-war.mp4");
+const cutscene = fs.existsSync(CUTSCENE) ? fs.readFileSync(CUTSCENE) : null;
+
+ok("the film is really shipped beside the page",
+    !!cutscene && cutscene.length > 1000000,
+    cutscene ? cutscene.length : "missing");
+ok("it is an mp4 the browsers know",
+    !!cutscene && cutscene.slice(4, 8).toString("latin1") === "ftyp");
+ok("its index sits at the front, so it starts without waiting",
+    !!cutscene && cutscene.indexOf("moov") > 0 &&
+    cutscene.indexOf("moov") < cutscene.indexOf("mdat"));
 ok("it plays by itself, sound and all", /video\.autoplay = true;/.test(PAGE) &&
     /video\.playsInline = true;/.test(PAGE));
 ok("a browser that refuses sound still gets to see it",
