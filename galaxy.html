@@ -3098,41 +3098,25 @@ function recruitHere(fleet) {
 ========================================= */
 
 
-/* a Knightmare squad is not raised like a rifleman. The button has always
-   said so in its tooltip - the planet needs the Facility with the Speeder
-   Wheel, the Frame and the Controls - and nothing ever checked it, so a
-   fleet could order squads over a world with no works at all. */
-const KNIGHTMARE_CHAIN = ["knightmare_facility", "speeder_wheel", "frame", "controls"];
-
-
+/* a Knightmare squad is not raised like a rifleman: it is a factory job.
+   The question is answered once, in the database (knightmare_works_on, from
+   sql/2026-11-43), because the same answer has to hold for this panel, for a
+   hand-written insert and for anything else that reaches the queue. */
 async function knightmareHere(fleet) {
 
     const orbit = fleetOrbitName(fleet);
 
     if (!orbit) { return false; }
 
-    const { data: cities, error } = await supabaseClient
-        .from("cities")
-        .select("id")
-        .eq("planet_id", orbit);
+    const { data, error } = await supabaseClient
+        .rpc("knightmare_works_on", { p_planet: orbit });
 
-    /* no cities readable means no works readable: nothing is built here */
-    if (error) { return false; }
+    /* the function arrives with the patch: until it is there the panel stays
+       out of the way instead of refusing every squad on the map. The trigger
+       is the judge once the patch has been run. */
+    if (error) { return true; }
 
-    const ids = (cities || []).map(function(city) { return city.id; });
-
-    if (ids.length === 0) { return false; }
-
-    const { data, error: buildError } = await supabaseClient
-        .from("city_buildings")
-        .select("city_id, building_type")
-        .in("city_id", ids);
-
-    if (buildError) { return false; }
-
-    const built = (data || []).map(function(row) { return row.building_type; });
-
-    return KNIGHTMARE_CHAIN.every(function(type) { return built.indexOf(type) !== -1; });
+    return data === true;
 
 }
 

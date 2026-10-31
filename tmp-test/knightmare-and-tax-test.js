@@ -1,14 +1,10 @@
 /* The Knightmare needs its works, and the Combine's plan is a tax level.
 
-   The fleet panel has always told the player, in the button's own tooltip,
-   that a Knightmare squad needs a complete facility on the planet — Facility,
-   Speeder Wheel, Frame and Controls — and nothing ever checked it, so a fleet
-   over a world with no works could order squads anyway. And the Combine's
-   government page called its tax a quota, while the Freedom Authority shows a
-   tax level.
-
-   This lifts the new gate out of galaxy.html and drives it against a fake
-   database, then reads the labels the player actually sees.
+   The panel used to guess the facility chain itself, from city tables that
+   key planets by id, and guessed wrong; the rule now lives in the database
+   (knightmare_works_on, sql/2026-11-43) where an insert, a stale page and a
+   direct RPC call all meet it. This drives the panel's half against a fake
+   client and reads the labels the player actually sees.
 */
 
 const fs = require("fs");
@@ -18,6 +14,7 @@ const ROOT = path.resolve(__dirname, "..");
 const GALAXY = fs.readFileSync(path.join(ROOT, "galaxy.html"), "utf8");
 const COMBINE = fs.readFileSync(path.join(ROOT, "combine.html"), "utf8");
 const I18N = fs.readFileSync(path.join(ROOT, "i18n.js"), "utf8");
+const PATCH = fs.readFileSync(path.join(ROOT, "sql/2026-11-43_the_mechs_need_their_works.sql"), "utf8");
 
 let pass = 0;
 let fail = 0;
@@ -34,16 +31,15 @@ function ok(name, yes, extra) {
 
 }
 
-console.log("\n== the permission the button promises");
+console.log("\n== the panel asks the database");
 
-ok("the chain is the four buildings",
-    /const KNIGHTMARE_CHAIN = \["knightmare_facility", "speeder_wheel", "frame", "controls"\];/.test(GALAXY));
-ok("the planet's own cities are read",
-    /\.from\("cities"\)[\s\S]{0,120}?\.eq\("planet_id", orbit\)/.test(GALAXY));
-ok("their buildings are read",
-    /\.from\("city_buildings"\)[\s\S]{0,160}?\.in\("city_id", ids\)/.test(GALAXY));
-ok("every building in the chain is required",
-    /KNIGHTMARE_CHAIN\.every\(/.test(GALAXY));
+ok("the panel calls the one function that knows",
+    /\.rpc\("knightmare_works_on", \{ p_planet: orbit \}\)/.test(GALAXY));
+ok("it keeps no list of buildings of its own", GALAXY.indexOf("KNIGHTMARE_CHAIN") === -1);
+ok("a fleet with no planet is refused without asking",
+    /if \(!orbit\) \{ return false; \}/.test(GALAXY));
+ok("a missing function does not stop play",
+    /if \(error\) \{ return true; \}/.test(GALAXY));
 
 const guard = GALAXY.indexOf('type === "Knightmare" &&');
 const hire = GALAXY.indexOf("await knightmareHere(selectedFleet)");
@@ -54,118 +50,98 @@ ok("the panel asks before it orders anything",
 ok("the refusal says what is missing",
     /The Knightmare line is not built here/.test(GALAXY));
 
+console.log("\n== the patch behind it");
+
+ok("the patch ships the question the panel asks",
+    /create or replace function public\.knightmare_works_on\(p_planet text\)/.test(PATCH));
+ok("and the same four works",
+    /knightmare_facility[\s\S]{0,80}speeder_wheel[\s\S]{0,80}frame[\s\S]{0,80}controls/.test(PATCH));
+ok("a trigger sits on the queue",
+    /create trigger knightmare_needs_its_works/.test(PATCH));
+ok("it catches inserts and renames",
+    /before insert or update of fleet_id, squad_type on public\.fleet_recruits/.test(PATCH));
+ok("it demands a docked fleet",
+    /has to be stationed/.test(PATCH));
+
 async function main() {
 
-console.log("\n== the gate, driven against a fake database");
+    console.log("\n== the gate, driven against a fake client");
 
-const { JSDOM } = require("jsdom");
+    const { JSDOM } = require("jsdom");
 
-const dom = new JSDOM("<!doctype html><html><body></body></html>",
-    { url: "https://e.test/galaxy", runScripts: "outside-only" });
+    const dom = new JSDOM("<!doctype html><html><body></body></html>",
+        { url: "https://e.test/galaxy", runScripts: "outside-only" });
 
-const w = dom.window;
+    const w = dom.window;
 
-/* a supabase query builder is a thenable, so the gate can await it */
-function client(tables) {
+    const from = GALAXY.indexOf("async function knightmareHere");
+    const to = GALAXY.indexOf("/* and the sentence under the recruiting office");
 
-    return {
-        from: function(table) {
+    ok("the gate can be lifted out of the page whole",
+        from !== -1 && to > from && /knightmare_works_on/.test(GALAXY.slice(from, to)));
 
-            let rows = (tables[table] || []).slice();
+    w.eval(GALAXY.slice(from, to) + "\nwindow.knightmareHere = knightmareHere;");
 
-            const q = {
-                select: function() { return q; },
-                eq: function(col, value) {
-                    rows = rows.filter(function(r) { return r[col] === value; });
-                    return q;
-                },
-                in: function(col, values) {
-                    rows = rows.filter(function(r) { return values.indexOf(r[col]) !== -1; });
-                    return q;
-                },
-                then: function(res, rej) {
-                    return Promise.resolve({ data: rows, error: null }).then(res, rej);
-                }
-            };
+    let asked = null;
 
-            return q;
+    function client(answer) {
 
-        }
-    };
+        return {
+            rpc: function(name, params) {
+                asked = { name: name, params: params };
+                return Promise.resolve(answer);
+            }
+        };
 
-}
+    }
 
-const from = GALAXY.indexOf("const KNIGHTMARE_CHAIN");
-const to = GALAXY.indexOf("/* and the sentence under the recruiting office");
+    async function ask(answer, planet) {
 
-ok("the gate can be lifted out of the page whole",
-    from !== -1 && to > from && /async function knightmareHere/.test(GALAXY.slice(from, to)));
+        w.supabaseClient = client(answer);
+        w.fleetOrbitName = function() { return planet; };
 
-w.eval(GALAXY.slice(from, to) + "\nwindow.knightmareHere = knightmareHere;");
+        asked = null;
 
-const ULTRAMARS = [
-    { id: "c1", planet_id: "Ultramars" },
-    { id: "c2", planet_id: "Ultramars" }
-];
+        return await w.knightmareHere({ id: "f1", status: "stationed", planet: planet });
 
-const FULL = [
-    { city_id: "c1", building_type: "knightmare_facility" },
-    { city_id: "c1", building_type: "speeder_wheel" },
-    { city_id: "c1", building_type: "frame" },
-    { city_id: "c2", building_type: "controls" }
-];
+    }
 
-async function ask(tables, planet) {
+    ok("the whole chain allows the squad",
+        (await ask({ data: true, error: null }, "Ultramars")) === true);
+    ok("it asks about the fleet's own planet",
+        asked && asked.name === "knightmare_works_on" && asked.params.p_planet === "Ultramars", asked);
+    ok("an incomplete chain refuses it",
+        (await ask({ data: false, error: null }, "Ultramars")) === false);
+    ok("a database that cannot answer does not brick recruiting",
+        (await ask({ data: null, error: { message: "function not found" } }, "Ultramars")) === true);
 
-    w.supabaseClient = client(tables);
-    w.fleetOrbitName = function() { return planet; };
+    const deep = await ask({ data: true, error: null }, "");
 
-    return await w.knightmareHere({ id: "f1", status: "stationed", planet: planet });
+    ok("a fleet in deep space cannot raise one", deep === false && asked === null, { deep: deep, asked: asked });
 
-}
+    console.log("\n== the Combine's tax level");
 
-ok("a planet with the whole chain may raise a squad",
-    (await ask({ cities: ULTRAMARS, city_buildings: FULL }, "Ultramars")) === true);
-ok("the works may be spread over the planet's cities",
-    (await ask({ cities: ULTRAMARS, city_buildings: FULL }, "Ultramars")) === true);
-ok("one missing building is enough to refuse",
-    (await ask({ cities: ULTRAMARS, city_buildings: FULL.slice(0, 3) }, "Ultramars")) === false);
-ok("works on a different planet do not count",
-    (await ask({
-        cities: ULTRAMARS.concat([{ id: "c9", planet_id: "Veyrona" }]),
-        city_buildings: FULL.concat([{ city_id: "c9", building_type: "controls" }])
-    }, "Veyrona")) === false);
-ok("a planet with no cities has nothing built",
-    (await ask({ cities: [], city_buildings: [] }, "Ultramars")) === false);
-ok("a fleet in deep space cannot raise one",
-    (await ask({ cities: ULTRAMARS, city_buildings: FULL }, null)) === false);
+    ok("the top bar calls it a tax level",
+        /<div class="stat">TAX LEVEL<br><b id="st-quota">/.test(COMBINE));
+    ok("no stat still says quota",
+        !/<div class="stat">QUOTA/.test(COMBINE));
+    ok("the number is still the plan's own level",
+        /"st-quota"\)\.textContent = ov\.state\.tax_level \+ " \/ 2"/.test(COMBINE));
+    ok("lowering it still calls cs_quota_cut", /cs_quota_cut/.test(COMBINE));
+    ok("the button says what it lowers",
+        /title="Lower the tax level by one level"/.test(COMBINE));
+    ok("the standing card reads as a tax level",
+        /esc\(T\("TAX LEVEL"\)\) \+ ' ' \+ st\.tax_level/.test(COMBINE));
+    ok("the production-plan wording is gone from the page",
+        COMBINE.indexOf('T("PRODUCTION PLAN")') === -1);
 
-console.log("\n== the Combine's tax level");
+    console.log("\n== in Portuguese");
 
-ok("the top bar calls it a tax level",
-    /<div class="stat">TAX LEVEL<br><b id="st-quota">/.test(COMBINE));
-ok("no stat still says quota",
-    !/<div class="stat">QUOTA/.test(COMBINE));
-ok("the number is still the plan's own level",
-    /"st-quota"\)\.textContent = ov\.state\.tax_level \+ " \/ 2"/.test(COMBINE));
-ok("lowering it still calls cs_quota_cut",
-    /cs_quota_cut/.test(COMBINE));
-ok("the button says what it lowers",
-    /title="Lower the tax level by one level"/.test(COMBINE));
-ok("the standing card reads as a tax level",
-    /esc\(T\("TAX LEVEL"\)\) \+ ' ' \+ st\.tax_level/.test(COMBINE));
-ok("the production-plan wording is gone from the page",
-    COMBINE.indexOf('T("PRODUCTION PLAN")') === -1);
-
-console.log("\n== in Portuguese");
-
-ok("the tax level has a Portuguese name",
-    /"TAX LEVEL": "NÍVEL DE IMPOSTOS"/.test(I18N));
-ok("lowering it is translated",
-    /"The tax level is one level lower\.":\s*"[^"]+"/.test(I18N));
-ok("the refusal is translated",
-    I18N.indexOf('"The Knightmare line is not built here') !== -1 &&
-    /A linha Knightmare não está construída aqui/.test(I18N));
+    ok("the tax level has a Portuguese name", /"TAX LEVEL": "NÍVEL DE IMPOSTOS"/.test(I18N));
+    ok("lowering it is translated", /"The tax level is one level lower\.":\s*"[^"]+"/.test(I18N));
+    ok("the refusal is translated",
+        I18N.indexOf('"The Knightmare line is not built here') !== -1 &&
+        /A linha Knightmare não está construída aqui/.test(I18N));
 
 }
 
@@ -178,7 +154,7 @@ main().then(function() {
 }).catch(function(error) {
 
     fail++;
-    console.log("  FAIL the gate crashed  -> " + error.message);
+    console.log("  FAIL the checks crashed  -> " + (error.message || error));
     console.log("\n" + pass + " passed, " + fail + " failed");
     process.exit(1);
 
