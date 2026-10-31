@@ -243,7 +243,7 @@
         button.textContent = "\uD83D\uDCAC";
         button.title = T("The airwaves");
         button.style.cssText =
-            "position:fixed;right:66px;bottom:18px;z-index:1200;width:40px;height:40px;border-radius:50%;" +
+            "position:fixed;right:114px;bottom:18px;z-index:1200;width:40px;height:40px;border-radius:50%;" +
             "background:rgba(10,18,28,.92);color:#9fdcff;border:1px solid #3f7f9f;font-size:18px;line-height:1;" +
             "cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);";
         document.body.appendChild(button);
@@ -258,7 +258,7 @@
         panel = document.createElement("div");
         panel.id = "gf-chat-panel";
         panel.style.cssText =
-            "position:fixed;right:66px;bottom:68px;z-index:1201;width:344px;max-height:62vh;display:none;" +
+            "position:fixed;right:62px;bottom:68px;z-index:1201;width:344px;max-height:62vh;display:none;" +
             "background:rgba(8,14,22,.98);border:1px solid #3f7f9f;padding:12px;font:12px Arial;" +
             "color:#cfe6f5;box-shadow:0 10px 30px rgba(0,0,0,.6);";
         document.body.appendChild(panel);

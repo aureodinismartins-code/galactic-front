@@ -97,6 +97,8 @@ function boot(remembered) {
         const calls = first.calls;
         const button = w.document.getElementById("gf-chat-button");
         ok("the airwaves have a button", !!button);
+        ok("it sits beside the news button, not under it",
+            /right:\s*114px/.test(button.style.cssText), button.style.cssText);
 
         const badge = w.document.getElementById("gf-chat-badge");
         ok("and a place for a count", !!badge);
@@ -196,7 +198,7 @@ function boot(remembered) {
 
         console.log("\n== the pages carry it");
 
-        ok("every screen loads the airwaves", /<script src="chat.js\?v=2"><\/script>/.test(GALAXY));
+        ok("every screen loads the airwaves", /<script src="chat.js\?v=3"><\/script>/.test(GALAXY));
 
     } catch (error) {
 
