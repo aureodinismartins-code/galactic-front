@@ -49,6 +49,12 @@
     let migrated = false;
     let timer = null;
     let tries = 0;
+    let stations = [];      /* the stations, from assets/music/stations.json */
+    let stationsRead = false;
+    let stationsError = false;
+    let station = -1;       /* the station this player has on, if any */
+    let stationTrack = 0;
+    let refusedStation = {};/* broken files, per station */
 
     /* ---------- small helpers ---------- */
 
@@ -163,8 +169,9 @@
 
     function follow() {
 
-        /* the host listening to a file of their own: the wireless waits */
-        if (localIndex >= 0) { return; }
+        /* the host listening to a file of their own, or this player on a
+           station of their own: the shared wireless waits */
+        if (localIndex >= 0 || station >= 0) { return; }
 
         const a = ensureAudio();
         a.muted = muted;
@@ -209,6 +216,12 @@
 
     function ended() {
 
+        /* a station plays on: the next track, and round again at the end */
+        if (station >= 0) {
+            stepStation(1);
+            return;
+        }
+
         /* a file of the host's own: back to the wireless */
         if (localIndex >= 0) {
             localIndex = -1;
@@ -229,6 +242,7 @@
 
         note(T("That track could not be played."));
 
+        if (station >= 0) { stationSkip(); return; }
         if (localIndex >= 0) { return; }
         if (!playback || !playback.id) { return; }
         if (refused[playback.id]) { return; }
@@ -315,6 +329,18 @@
 
     function toggleWireless() {
 
+        /* a station is this player's own: it stops and starts on this screen */
+        if (station >= 0) {
+            const a = ensureAudio();
+            if (!a.paused) { a.pause(); }
+            else {
+                const started = a.play();
+                if (started && typeof started.catch === "function") { started.catch(function() {}); }
+            }
+            paint();
+            return;
+        }
+
         if (!isHost) { return; }
 
         if (playback && playback.paused === false) { act("music_paused", { p_paused: true }); return; }
@@ -324,6 +350,8 @@
     }
 
     function stepTo(dir) {
+
+        if (station >= 0) { stepStation(dir); return; }
 
         if (!isHost || !tracks.length) { return; }
 
@@ -412,6 +440,153 @@
         follow();
     }
 
+    /* ---------- the stations ---------
+       Each player chooses their own station; the shared wireless is still the
+       host's. The files live in the repository, one folder per station under
+       assets/music, and stations.json lists them.
+    */
+
+    function stationUrl(st, i) {
+
+        const name = st.tracks[i];
+        if (!name) { return ""; }
+        if (/^[a-z]+:\/\//i.test(name)) { return name; }
+
+        const where = "assets/music/" + String(st.folder || st.id).replace(/\/+$/, "") +
+            "/" + String(name).replace(/^\/+/, "");
+
+        try { return new URL(where, document.baseURI).href; }
+        catch (e) { return where; }
+
+    }
+
+    function loadStations() {
+
+        if (stationsRead) { return; }
+        stationsRead = true;
+
+        if (typeof fetch !== "function") { stationsError = true; return; }
+
+        let answer;
+
+        try { answer = fetch("assets/music/stations.json", { cache: "no-cache" }); }
+        catch (e) { stationsError = true; return; }
+
+        Promise.resolve(answer).then(function(res) {
+            return (res && res.ok) ? res.json() : null;
+        }).then(function(data) {
+
+            const list = Array.isArray(data) ? data
+                : (data && Array.isArray(data.stations) ? data.stations : []);
+
+            stations = list.filter(function(s) {
+                return !!(s && (s.id || s.folder));
+            }).map(function(s) {
+                return {
+                    id: String(s.id || s.folder),
+                    label: String(s.label || s.id || s.folder),
+                    folder: String(s.folder || s.id),
+                    tracks: Array.isArray(s.tracks)
+                        ? s.tracks.filter(function(t) { return !!t; }) : []
+                };
+            });
+
+            stationsError = !stations.length;
+
+        }).catch(function() {
+            stations = [];
+            stationsError = true;
+        }).then(function() {
+            if (stations.length) { paint(); }
+        });
+
+    }
+
+    function stationNow() {
+        return (station >= 0 && stations[station]) ? stations[station] : null;
+    }
+
+    function playStationTrack() {
+
+        const st = stationNow();
+        if (!st) { return; }
+
+        const a = ensureAudio();
+
+        a.muted = muted;
+        a.volume = volume;
+        a.src = stationUrl(st, stationTrack);
+        seekTo = null;
+
+        const started = a.play();
+        if (started && typeof started.catch === "function") {
+            started.catch(function() { /* the next click anywhere starts it */ });
+        }
+
+    }
+
+    function playStation(index, which) {
+
+        const st = stations[index];
+        if (!st) { return; }
+
+        station = index;
+        localIndex = -1;
+        appliedKey = "";
+
+        if (!st.tracks.length) {
+            stationTrack = 0;
+            if (audio) { audio.pause(); }
+            note(T("This station has nothing on the air yet: put the files in assets/music and list them in stations.json."));
+            paint();
+            return;
+        }
+
+        const want = Number(which) || 0;
+        stationTrack = ((want % st.tracks.length) + st.tracks.length) % st.tracks.length;
+
+        playStationTrack();
+        paint();
+
+    }
+
+    function stepStation(dir) {
+
+        const st = stationNow();
+        if (!st || !st.tracks.length) { return; }
+
+        stationTrack = (stationTrack + dir + st.tracks.length) % st.tracks.length;
+
+        playStationTrack();
+        paint();
+
+    }
+
+    function stationSkip() {
+
+        const st = stationNow();
+        if (!st) { return; }
+
+        refusedStation[station] = (refusedStation[station] || 0) + 1;
+
+        /* a station of nothing but broken files falls silent rather than
+           skipping over the same broken files for ever */
+        if (refusedStation[station] >= st.tracks.length) {
+            station = -1;
+            if (audio) { audio.pause(); }
+            note(T("This station could not be played."));
+            paint();
+            return;
+        }
+
+        stepStation(1);
+
+    }
+
+    function stationTitle(st) {
+        return titleFrom(st.tracks[stationTrack] || "");
+    }
+
     /* ---------- the panel ---------- */
 
     function known() {
@@ -432,6 +607,7 @@
     function needed() {
         if (!known()) { return false; }
         if (isHost || hostByStatus()) { return true; }
+        if (stations.length) { return true; }
         return tracks.length > 0 || !!(playback && playback.url);
     }
 
@@ -487,11 +663,31 @@
             '<button type="button" data-gf="close" style="background:none;border:none;color:#7b93a6;' +
             'cursor:pointer;font-size:16px">&times;</button></div>';
 
+        if (stations.length) {
+
+            h += '<div style="color:#7fa8c0;letter-spacing:2px;margin-bottom:6px">' + esc(T("STATIONS")) + '</div>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">' +
+                stations.map(function(s, i) {
+                    const on = i === station;
+                    return '<button type="button" data-gf="station" data-i="' + i + '" style="' + BTN +
+                        (on ? ';color:#7dffb0;border-color:#37c98a' : '') + '">' + esc(T(s.label)) + '</button>';
+                }).join("") + '</div>';
+
+        }
+        else if (stationsError) {
+
+            h += '<div style="color:#8a6a3a;margin-bottom:10px;line-height:1.5">' +
+                esc(T("The stations are silent: put the music in assets/music and list it in stations.json.")) +
+                '</div>';
+
+        }
+
         h += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
-            (isHost
+            (isHost || station >= 0
                 ? '<button type="button" data-gf="prev" style="' + BTN + '">&#9198;</button>' +
                   '<button type="button" data-gf="toggle" style="' + BTN + ';min-width:64px">' +
-                      (playback && playback.paused === false ? "&#10074;&#10074;" : "&#9654;") + '</button>' +
+                      ((station >= 0 ? (audio && !audio.paused) : playback && playback.paused === false)
+                          ? "&#10074;&#10074;" : "&#9654;") + '</button>' +
                   '<button type="button" data-gf="next" style="' + BTN + '">&#9197;</button>'
                 : "") +
             '<button type="button" data-gf="mute" style="' + BTN + ';color:' +
@@ -500,8 +696,15 @@
             'style="flex:1;min-width:80px">' +
             '</div>';
 
+        const stNow = stationNow();
+
         let line;
-        if (missing) { line = T("The wireless lives in the database: run sql/2026-11-08_shared_music_playlist.sql, then reload."); }
+        if (stNow) {
+            line = (playing ? T("Playing:") : T("Paused.")) + " " + T(stNow.label) +
+                (stNow.tracks.length ? " — " + stationTitle(stNow)
+                                     : " — " + T("nothing on this station yet"));
+        }
+        else if (missing) { line = T("The wireless lives in the database: run sql/2026-11-08_shared_music_playlist.sql, then reload."); }
         else if (current) { line = (playing ? T("Playing:") : T("Paused.")) + " " + current; }
         else if (isHost && live) { line = T("No music yet: add a track below."); }
         else { line = T("The wireless is silent: nobody has put a track on yet."); }
@@ -549,7 +752,9 @@
         else if (!isHost) {
 
             h += '<div style="color:#6f8ba0;margin-top:8px;line-height:1.5">' +
-                esc(T("The host chooses the music. You can mute it for yourself.")) + '</div>';
+                esc(T(stations.length
+                    ? "Pick a station above: it plays on your screen alone. The host chooses the shared wireless."
+                    : "The host chooses the music. You can mute it for yourself.")) + '</div>';
 
         }
 
@@ -589,6 +794,8 @@
                     return;
                 }
 
+                if (kind === "station") { playStation(Number(el.dataset.i)); return; }
+
                 if (kind === "prev") { stepTo(-1); return; }
                 if (kind === "next") { stepTo(1); return; }
                 if (kind === "toggle") { toggleWireless(); return; }
@@ -625,6 +832,7 @@
         document.addEventListener("pointerdown", unlock);
         document.addEventListener("keydown", unlock);
 
+        loadStations();
         refresh();
         timer = setInterval(refresh, POLL_MS);
 
@@ -681,7 +889,9 @@
             }
         },
         tracks: function() { return tracks.slice(); },
-        playing: function() { return playback; }
+        playing: function() { return playback; },
+        stations: function() { return stations.slice(); },
+        station: function() { return stationNow(); }
     };
 
 })();

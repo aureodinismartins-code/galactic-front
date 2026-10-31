@@ -1,0 +1,34 @@
+{
+    "stations": [
+        {
+            "id": "jazz",
+            "label": "JAZZ",
+            "folder": "jazz",
+            "tracks": []
+        },
+        {
+            "id": "classical",
+            "label": "CLASSICAL",
+            "folder": "classical",
+            "tracks": []
+        },
+        {
+            "id": "aura",
+            "label": "AURA",
+            "folder": "aura",
+            "tracks": []
+        },
+        {
+            "id": "commercials",
+            "label": "RADIO COMMERCIALS",
+            "folder": "commercials",
+            "tracks": []
+        },
+        {
+            "id": "fbc",
+            "label": "FBC NEWS",
+            "folder": "fbc-news",
+            "tracks": []
+        }
+    ]
+}

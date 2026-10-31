@@ -1328,6 +1328,8 @@
         "UNMUTE": "COM SOM",
         "The host chooses the music. You can mute it for yourself.":
             "O anfitrião escolhe a música. Pode silenciá-la para si.",
+        "Pick a station above: it plays on your screen alone. The host chooses the shared wireless.":
+            "Escolha uma estação acima: toca apenas no seu ecrã. O anfitrião escolhe a rádio partilhada.",
         "A file from this computer plays only on your screen: put it online and add its link to share it.":
             "Um ficheiro deste computador toca apenas no seu ecrã: coloque-o online e adicione o link para o partilhar.",
         "The wireless lives in the database: run sql/2026-11-08_shared_music_playlist.sql, then reload.":
@@ -1336,6 +1338,34 @@
         "Adding...": "A adicionar...",
         "The wireless is silent: nobody has put a track on yet.":
             "A rádio está em silêncio: ainda ninguém pôs uma faixa.",
+
+        /* ---------- the stations of the wireless (2026-11-48) ---------- */
+        "STATIONS": "ESTAÇÕES",
+        "CLASSICAL": "CLÁSSICA",
+        "RADIO COMMERCIALS": "ANÚNCIOS DE RÁDIO",
+        "FBC NEWS": "NOTÍCIAS FBC",
+        "nothing on this station yet": "nada nesta estação por enquanto",
+        "This station has nothing on the air yet: put the files in assets/music and list them in stations.json.":
+            "Esta estação ainda não tem nada no ar: coloque os ficheiros em assets/music e liste-os em stations.json.",
+        "This station could not be played.": "Não foi possível tocar esta estação.",
+        "The stations are silent: put the music in assets/music and list it in stations.json.":
+            "As estações estão em silêncio: coloque a música em assets/music e liste-a em stations.json.",
+
+        /* ---------- the admin tab (2026-11-48) ---------- */
+        "ADMIN": "ADMINISTRAÇÃO",
+        "The host's keys: the whole war, and the door every player comes through.":
+            "As chaves do anfitrião: a guerra inteira e a porta por onde todos os jogadores entram.",
+        "The game is": "O jogo está",
+        "UNDER MAINTENANCE": "EM MANUTENÇÃO",
+        "OPEN": "ABERTO",
+        "OPEN THE GAME": "ABRIR O JOGO",
+        "CLOSE THE GAME (MAINTENANCE)": "FECHAR O JOGO (MANUTENÇÃO)",
+        "RESET GAME": "REINICIAR JOGO",
+        "The reset wipes the whole war. Maintenance freezes it for everybody else and loses nothing.":
+            "O reinício apaga a guerra inteira. A manutenção congela-a para todos os outros e nada se perde.",
+
+        /* ---------- a lost fleet leaves its place behind (2026-11-48) ---------- */
+        "REPLACEMENTS": "SUBSTITUIÇÕES",
 
         /* ---------- page titles ---------- */
         "Galactic Front - Galaxy Map": "Galactic Front - Mapa da Galáxia",

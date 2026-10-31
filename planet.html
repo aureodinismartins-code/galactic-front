@@ -21,8 +21,8 @@
 
     <script src="supabase.js"></script>
     <script src="i18n.js?v=38"></script>
-    <script src="gamecontrol.js?v=26"></script>
-    <script src="music.js?v=2"></script>
+    <script src="gamecontrol.js?v=27"></script>
+    <script src="music.js?v=3"></script>
     <script src="news.js?v=1"></script>
     <script src="ships.js"></script>
 
@@ -2248,6 +2248,7 @@ if (createFleetButton) {
                         line.textContent =
                             tr("SOVIET FLEET QUOTA") + ": " + q.fleets + " / " + q.max + "  ·  " +
                             tr("QUOTAS WAITING") + ": " + q.quotas + "  ·  " +
+                            (q.losses > 0 ? tr("REPLACEMENTS") + ": " + q.losses + "  ·  " : "") +
                             tr("NEXT FLEET") + ": " + Number(q.next_price).toLocaleString() + " " + tr("CREDITS") +
                             (q.mine ? "" : "  ·  " + tr("none of the quotas waiting is yours"));
                     }

@@ -80,7 +80,16 @@
             "border:1px solid #8a3030;cursor:pointer;font:bold 11px Arial;letter-spacing:2px;display:none;";
         document.body.appendChild(resetButton);
 
-        resetButton.addEventListener("click", async function() {
+        resetButton.addEventListener("click", runReset);
+
+        return resetButton;
+
+    }
+
+    /* the reset itself, shared by the host's own button and the admin tab */
+    async function runReset() {
+
+        {
 
             const answer = window.prompt(
                 "This puts the ENTIRE game back to the start:\n" +
@@ -127,15 +136,16 @@
             try { await supabaseClient.rpc("committees_and_ministers_reset"); } catch (e) { /* older database */ }
             try { await supabaseClient.rpc("tusken_world_reset"); } catch (e) { /* older database */ }
 
+            /* a new war starts with no fleets lost, so no place to replace */
+            try { await supabaseClient.rpc("fleet_replacements_reset"); } catch (e) { /* older database */ }
+
             if (data && data.warnings && data.warnings.length) {
                 alert("The reset finished, but some parts could not be done:\n\n- " + data.warnings.join("\n- "));
             }
 
             location.reload();
 
-        });
-
-        return resetButton;
+        }
 
     }
 
@@ -178,7 +188,16 @@
             "font:bold 11px Arial;letter-spacing:2px;display:none;";
         document.body.appendChild(maintButton);
 
-        maintButton.addEventListener("click", async function() {
+        maintButton.addEventListener("click", toggleMaintenance);
+
+        return maintButton;
+
+    }
+
+    /* the maintenance keys, shared by the host's button and the admin tab */
+    async function toggleMaintenance() {
+
+        {
 
             const on = !(window.gameStatus && window.gameStatus.maintenance);
             let message = null;
@@ -199,9 +218,7 @@
 
             location.reload();
 
-        });
-
-        return maintButton;
+        }
 
     }
 
@@ -229,6 +246,102 @@
         }
 
     }
+
+    /* ---------- the admin tab (the host's account alone) ---------- */
+    let adminTab = null;
+    let adminPanel = null;
+
+    function T_GC(text) {
+        try { return (typeof window.T === "function") ? window.T(text) : text; }
+        catch (e) { return text; }
+    }
+
+    function ensureAdmin() {
+
+        if (adminTab) { return; }
+
+        adminTab = document.createElement("button");
+        adminTab.type = "button";
+        adminTab.id = "gc-admin-tab";
+        adminTab.textContent = "\u2699 ADMIN";
+        adminTab.title = "Host only: the reset and the maintenance keys";
+        adminTab.style.cssText =
+            "position:fixed;left:25px;bottom:214px;z-index:100000;padding:7px 12px;background:#101c28;" +
+            "color:#9fdcff;border:1px solid #3f7f9f;cursor:pointer;font:bold 11px Arial;letter-spacing:2px;display:none;";
+        document.body.appendChild(adminTab);
+
+        adminPanel = document.createElement("div");
+        adminPanel.id = "gc-admin-panel";
+        adminPanel.style.cssText =
+            "position:fixed;left:25px;bottom:258px;z-index:100001;width:300px;display:none;padding:14px;" +
+            "background:rgba(8,14,22,.98);border:1px solid #3f7f9f;color:#cfe6f5;font:12px Arial;" +
+            "box-shadow:0 10px 30px rgba(0,0,0,.6);";
+        document.body.appendChild(adminPanel);
+
+        adminTab.addEventListener("click", function() {
+            if (adminPanel.style.display === "block") { adminPanel.style.display = "none"; }
+            else { paintAdmin(); adminPanel.style.display = "block"; }
+        });
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape" && adminPanel.style.display === "block") {
+                adminPanel.style.display = "none";
+            }
+        });
+
+        paintAdmin();
+
+    }
+
+    function paintAdmin() {
+
+        if (!adminPanel) { return; }
+
+        const on = !!(window.gameStatus && window.gameStatus.maintenance);
+        const btn = "width:100%;padding:9px;margin-top:8px;cursor:pointer;font:bold 11px Arial;letter-spacing:2px;";
+
+        adminPanel.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center">' +
+                '<b style="letter-spacing:3px;color:#9fdcff">' + T_GC("ADMIN") + '</b>' +
+                '<button type="button" data-gc="close" style="background:none;border:none;color:#7b93a6;' +
+                'cursor:pointer;font-size:16px">&times;</button></div>' +
+            '<div style="color:#6f8ba0;margin-top:4px;line-height:1.5">' +
+                T_GC("The host's keys: the whole war, and the door every player comes through.") + '</div>' +
+            '<div style="margin-top:10px;color:#9fb8c9">' + T_GC("The game is") + ': <b style="color:' +
+                (on ? "#ffb04a" : "#7dff9b") + '">' +
+                (on ? T_GC("UNDER MAINTENANCE") : T_GC("OPEN")) + '</b></div>' +
+            '<button type="button" data-gc="maint" style="' + btn + 'background:' +
+                (on ? "#1c3016" : "#3a2f10") + ';color:' + (on ? "#9dff9d" : "#ffd98a") +
+                ';border:1px solid ' + (on ? "#4c8a3a" : "#b08a2c") + ';">' +
+                (on ? T_GC("OPEN THE GAME") : T_GC("CLOSE THE GAME (MAINTENANCE)")) + '</button>' +
+            '<button type="button" data-gc="reset" style="' + btn + 'background:#2a0f0f;color:#ff9b9b;' +
+                'border:1px solid #8a3030;">' + T_GC("RESET GAME") + '</button>' +
+            '<div style="color:#6f8ba0;margin-top:9px;line-height:1.5">' +
+                T_GC("The reset wipes the whole war. Maintenance freezes it for everybody else and loses nothing.") +
+                '</div>';
+
+        adminPanel.querySelector('[data-gc="close"]').addEventListener("click", function() {
+            adminPanel.style.display = "none";
+        });
+
+        adminPanel.querySelector('[data-gc="maint"]').addEventListener("click", toggleMaintenance);
+        adminPanel.querySelector('[data-gc="reset"]').addEventListener("click", runReset);
+
+    }
+
+    function applyAdmin(status) {
+
+        if (!status || !status.is_host) { return; }
+
+        ensureAdmin();
+
+        adminTab.style.display = "block";
+
+        /* the label follows the door: open or closed */
+        if (adminPanel.style.display === "block") { paintAdmin(); }
+
+    }
+
 
     /* ---------- the economy, as the server reads it ---------- */
     let economyBadge = null;
@@ -281,6 +394,7 @@
         window.gameStatus = status;
 
         applyMaintenance(status);
+        applyAdmin(status);
         applyEconomy(status);
 
         if (lastStarted === null) { lastStarted = status.started; }
@@ -307,6 +421,8 @@
         if (window.GC_RESET && status.is_host) {
             ensureResetButton().style.display = "block";
         }
+
+        applyAdmin(status);
 
     }
 
