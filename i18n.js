@@ -776,13 +776,17 @@
         "Fully integrated into the Union: the plan collects this world, the Party has its confidence and the world has sent the Soviet one more commissar.":
             "Totalmente integrado à União: o plano recolhe deste mundo, o Partido ganha confiança e o mundo enviou mais um comissário ao Soviete.",
         "GRANT RELIEF (+10 stability)": "CONCEDER AJUDA (+10 estabilidade)",
+        "PUT RELIEF TO THE SOVIET (+10 if it passes)": "LEVAR AJUDA AO SOVIETE (+10 se for aprovada)",
+        "Relief for": "Ajuda para",
+        "is before the Supreme Soviet: it takes effect if the vote passes.":
+            "está perante o Soviete Supremo: produz efeito se a votação passar.",
+        "The Combine holds no occupied world. When Combine fleets take every city of a planet, it comes under Soviet administration and moves through four stages — occupied, military administration, collectivised and finally incorporated into the Union. Each stage takes time and enough stability (relief is a directive the Soviet votes on), and every world incorporated sends the Soviet one more commissar from that planet.":
+            "A Combine não tem nenhum mundo ocupado. Quando as frotas da Combine tomam todas as cidades de um planeta, ele passa a administração soviética e atravessa quatro fases — ocupado, administração militar, coletivizado e por fim incorporado à União. Cada fase leva tempo e estabilidade suficiente (a ajuda é uma diretiva que o Soviete vota), e cada mundo incorporado envia ao Soviete mais um comissário desse planeta.",
         "sent again in": "enviada de novo em",
         "Relief sent to": "Ajuda enviada a",
         "stability": "estabilidade",
         "Relief is sent straight to a world under Combine administration — no directive, no vote — for +10 stability, one world every five minutes. The Freedom Authority has to put the same relief before Congress first.":
             "A ajuda é enviada diretamente a um mundo sob administração do Combine — sem diretiva, sem votação — para +10 de estabilidade, um mundo a cada cinco minutos. A Autoridade da Liberdade tem de levar a mesma ajuda primeiro ao Congresso.",
-        "The Combine holds no occupied world. When Combine fleets take every city of a planet, it comes under Soviet administration and moves through four stages — occupied, military administration, collectivised and finally incorporated into the Union. Each stage takes time and enough stability (relief is sent straight to the world), and every world incorporated sends the Soviet one more commissar from that planet.":
-            "O Combine não tem nenhum mundo ocupado. Quando as frotas do Combine tomam todas as cidades de um planeta, ele entra na administração soviética e passa por quatro estágios — ocupado, administração militar, coletivizado e por fim incorporado à União. Cada estágio leva tempo e exige estabilidade suficiente (a ajuda é enviada diretamente ao mundo), e cada mundo incorporado envia ao Soviete mais um comissário daquele planeta.",
         "WHOLE": "INTEIRO",
         "CONTESTED": "DISPUTADO",
         "cities held": "cidades em mãos",

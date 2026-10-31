@@ -1465,7 +1465,7 @@ function worldsHtml() {
     /* nothing taken yet: the ministry carries the same note the Authority's
        occupied worlds tab carries, and no blank grid behind it */
     if (!worlds.length) {
-        return '<div class="sub">' + esc(T("The Combine holds no occupied world. When Combine fleets take every city of a planet, it comes under Soviet administration and moves through four stages — occupied, military administration, collectivised and finally incorporated into the Union. Each stage takes time and enough stability (relief is sent straight to the world), and every world incorporated sends the Soviet one more commissar from that planet.")) + '</div>';
+        return '<div class="sub">' + esc(T("The Combine holds no occupied world. When Combine fleets take every city of a planet, it comes under Soviet administration and moves through four stages — occupied, military administration, collectivised and finally incorporated into the Union. Each stage takes time and enough stability (relief is a directive the Soviet votes on), and every world incorporated sends the Soviet one more commissar from that planet.")) + '</div>';
     }
 
     /* the shape the Authority's occupied tab has: one map, then one card per
@@ -1486,17 +1486,10 @@ function worldsHtml() {
                 actions = '<div class="sub" style="color:#7dff9d">' + esc(T("Fully integrated into the Union: the plan collects this world, the Party has its confidence and the world has sent the Soviet one more commissar.")) + '</div>';
             }
             else {
-                /* the Authority puts relief before Congress; here it is sent
-                   straight away, once every five minutes */
-                const wait = Number(w.relief_wait) || 0;
-                const until = new Date(Date.now() + wait * 1000).toISOString();
-
-                actions = '<div style="margin-top:8px"><button class="btn small relief-btn" data-p="' + esc(w.planet) + '"' + (wait > 0 ? " disabled" : "") + '>' +
-                    esc(T("GRANT RELIEF (+10 stability)")) + '</button>' +
-                    (wait > 0
-                        ? ' <span class="sub" style="color:#ffd37a">' + esc(T("sent again in")) +
-                          ' <b class="relief-cd" data-until="' + esc(until) + '">' + mmss(wait) + '</b></span>'
-                        : "") + '</div>' +
+                /* relief is a directive now: it goes before the Soviet and
+                   waits for the vote, the way the Authority's does in Congress */
+                actions = '<div style="margin-top:8px"><button class="btn small relief-btn" data-p="' + esc(w.planet) + '">' +
+                    esc(T("PUT RELIEF TO THE SOVIET (+10 if it passes)")) + '</button></div>' +
                     '<div class="sub" style="margin-top:4px">' +
                     esc(T(Number(w.stability) >= need
                         ? "Stability is enough: the administration advances one turn every five minutes."
@@ -1580,9 +1573,9 @@ function wireWorlds() {
         const planet = el.dataset.p;
         if (!planet) { return; }
         el.disabled = true;
-        const { data, error } = await supabaseClient.rpc("cs_relief", { p_planet: planet });
+        const { error } = await supabaseClient.rpc("cs_submit", { p_type: "consolidation", p_planet: planet });
         if (error) { toast(error.message, true); el.disabled = false; return; }
-        toast(T("Relief sent to") + " " + planet + ": " + T("stability") + " " + data.stability + " / " + data.threshold + ".");
+        toast(T("Relief for") + " " + planet + " " + T("is before the Supreme Soviet: it takes effect if the vote passes."));
         await load();
     }));
 }
