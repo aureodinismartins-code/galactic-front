@@ -4,7 +4,9 @@
             "id": "pop",
             "label": "POP",
             "folder": "pop",
-            "tracks": ["Barry Manilow - Copacabana.mp3]
+            "tracks": [
+                "Barry Manilow - Copacabana.mp3"
+            ]
         },
         {
             "id": "classical",
