@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
-<script src="i18n.js?v=36"></script>
+<script src="i18n.js?v=37"></script>
 <script>window.GC_NO_BANNER = false;</script>
 <script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
@@ -92,7 +92,7 @@ hr.rule { border: 0; border-top: 1px solid #5a1d20; margin: 10px 0; }
     <div class="stat">HIGH COMMISSAR<br><b id="st-pres">-</b></div>
     <div class="stat">CREDITS<br><b id="st-credits">-</b></div>
     <div class="stat">CONFIDENCE<br><b id="st-pop">-</b></div>
-    <div class="stat">QUOTA<br><b id="st-quota">-</b><br><button id="quota-down" type="button" title="Lower the plan by one level">LOWER &minus;1</button></div>
+    <div class="stat">TAX LEVEL<br><b id="st-quota">-</b><br><button id="quota-down" type="button" title="Lower the tax level by one level">LOWER &minus;1</button></div>
     <div class="stat">FLEETS<br><b id="st-fleets">-</b></div>
     <div class="stat">SEATS<br><b id="st-seats">-</b></div>
     <div class="stat">NEEDED<br><b id="st-need">-</b></div>
@@ -244,7 +244,7 @@ function render() {
             down.disabled = true;
             const { error } = await supabaseClient.rpc("cs_quota_cut");
             if (error) { toast(error.message, true); return; }
-            toast(T("The plan is one level lower."));
+            toast(T("The tax level is one level lower."));
             await load();
         });
     }
@@ -1634,7 +1634,7 @@ function authorityHtml() {
     h += '<div class="card"><h3>' + esc(T("Standing")) + '</h3><div class="sub">' + esc(T("CONFIDENCE")) + ' ' + Math.round(st.popularity) + '% ' +
         esc(T("(it shifts every vote by up to \u00b110 points: a confident Party gets its way more often)")) + '</div>' +
         '<div class="bar"><i style="width:' + st.popularity + '%;background:#b32424"></i></div>' +
-        '<div class="sub" style="margin-top:8px">' + esc(T("PRODUCTION PLAN")) + ' ' + st.tax_level + ' ' + esc(T("of")) + ' 2 &middot; ' +
+        '<div class="sub" style="margin-top:8px">' + esc(T("TAX LEVEL")) + ' ' + st.tax_level + ' ' + esc(T("of")) + ' 2 &middot; ' +
         esc(T("300-500 credits every 15 minutes per level")) + '</div>' +
         '<div class="sub" style="margin-top:4px">' +        esc(T("relations:")) + ' Freedom Authority ' + (rel["Freedom Authority"] || 0) + ' / 100</div></div>';
 

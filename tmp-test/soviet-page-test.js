@@ -202,7 +202,7 @@ const deadline = setTimeout(function() { console.log("TIMEOUT: the page test did
     console.log("the screen in Portuguese");
     check("the title", text().indexOf("SOVIETE SUPREMO DO COMBINE") !== -1, text().slice(0, 120));
     check("the plenum heading", text().indexOf("O PLENO") !== -1);
-    check("the header stats", text().indexOf("CONFIANÇA") !== -1 && text().indexOf("COTA") !== -1 && text().indexOf("ALTO COMISSÁRIO") !== -1);
+    check("the header stats", text().indexOf("CONFIANÇA") !== -1 && text().indexOf("NÍVEL DE IMPOSTOS") !== -1 && text().indexOf("ALTO COMISSÁRIO") !== -1);
 
     const tabs = [...doc.querySelectorAll(".tab")].map(el => el.textContent);
     check("the eleven tabs", tabs.join(" / ") === "DIRETIVAS / ALTO COMISSÁRIO / PARTIDO / NOVA DIRETIVA / AGITPROP / MUNDOS OCUPADOS / COMISSÕES / PODER SOVIÉTICO / NOTÍCIAS / PRIMEIRA PÁGINA / GUIA", tabs.join(" / "));
@@ -404,7 +404,7 @@ const deadline = setTimeout(function() { console.log("TIMEOUT: the page test did
         authority.slice(-200));
     check("the war room lists the fronts", authority.indexOf("Sala de guerra") !== -1 &&
         authority.indexOf("Veyrona") !== -1 && authority.indexOf("APROVADA") !== -1, authority.slice(400, 900));
-    check("the standing of the Party", authority.indexOf("PLANO DE PRODUÇÃO") !== -1 &&
+    check("the standing of the Party", authority.indexOf("NÍVEL DE IMPOSTOS") !== -1 &&
         authority.indexOf("As três correntes") !== -1 && authority.indexOf("Vanguarda Proletária") !== -1, authority.slice(-500));
 
     const warMap = doc.querySelector("#tabbody svg.minimap");

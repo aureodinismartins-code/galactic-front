@@ -1429,6 +1429,10 @@
         "Every world we hold resents the top tax level: two more points of unrest a turn.": "Todo mundo que mantemos ressente o imposto máximo: dois pontos de inquietação a mais por turno.",
         "The tax is one level lower.": "Os impostos caíram um nível.",
         "The plan is one level lower.": "O plano caiu um nível.",
+        "The tax level is one level lower.": "O nível de impostos caiu um nível.",
+        "Lower the tax level by one level": "Baixar o nível de impostos em um nível",
+        "The Knightmare line is not built here: this planet needs the Knightmare Facility with the Speeder Wheel, the Frame and the Controls before a squad can be raised.":
+            "A linha Knightmare não está construída aqui: este planeta precisa da Instalação Knightmare com a Roda Speeder, o Chassi e os Controles antes que um esquadrão possa ser formado.",
         "trouble already planted:": "problema já plantado:",
         "WHAT FEEDS IT": "O QUE A ALIMENTA",
         "the occupation itself": "a própria ocupação",

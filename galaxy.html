@@ -22,7 +22,7 @@
     ></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=36"></script>
+    <script src="i18n.js?v=37"></script>
         <script>window.GC_RESET = true; window.GC_HOST_TOOLS = true;</script>
     <script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
@@ -3093,6 +3093,50 @@ function recruitHere(fleet) {
 }
 
 
+/* =========================================
+   THE KNIGHTMARE LINE
+========================================= */
+
+
+/* a Knightmare squad is not raised like a rifleman. The button has always
+   said so in its tooltip - the planet needs the Facility with the Speeder
+   Wheel, the Frame and the Controls - and nothing ever checked it, so a
+   fleet could order squads over a world with no works at all. */
+const KNIGHTMARE_CHAIN = ["knightmare_facility", "speeder_wheel", "frame", "controls"];
+
+
+async function knightmareHere(fleet) {
+
+    const orbit = fleetOrbitName(fleet);
+
+    if (!orbit) { return false; }
+
+    const { data: cities, error } = await supabaseClient
+        .from("cities")
+        .select("id")
+        .eq("planet_id", orbit);
+
+    /* no cities readable means no works readable: nothing is built here */
+    if (error) { return false; }
+
+    const ids = (cities || []).map(function(city) { return city.id; });
+
+    if (ids.length === 0) { return false; }
+
+    const { data, error: buildError } = await supabaseClient
+        .from("city_buildings")
+        .select("city_id, building_type")
+        .in("city_id", ids);
+
+    if (buildError) { return false; }
+
+    const built = (data || []).map(function(row) { return row.building_type; });
+
+    return KNIGHTMARE_CHAIN.every(function(type) { return built.indexOf(type) !== -1; });
+
+}
+
+
 /* and the sentence under the recruiting office when the answer is no */
 function showRecruitHint(fleet) {
 
@@ -3649,6 +3693,20 @@ recruitButtons.forEach(
 
                 const type =
                     button.dataset.unit;
+
+
+                /* the mech line is a factory job before it is a recruit job */
+                if (
+                    type === "Knightmare" &&
+                    !(await knightmareHere(selectedFleet))
+                ) {
+
+                    fleetMessage.textContent =
+                        T("The Knightmare line is not built here: this planet needs the Knightmare Facility with the Speeder Wheel, the Frame and the Controls before a squad can be raised.");
+
+                    return;
+
+                }
 
 
                 const amount =
