@@ -4,7 +4,7 @@
             "id": "jazz",
             "label": "JAZZ",
             "folder": "jazz",
-            "tracks": [Succession (Main Title Theme) - Nicholas Britell _ Succession (HBO Original Series Soundtrack).mp3]
+            "tracks": []
         },
         {
             "id": "classical",
@@ -16,7 +16,7 @@
             "id": "aura",
             "label": "AURA",
             "folder": "aura",
-            "tracks": []
+            "tracks": [Succession (Main Title Theme) - Nicholas Britell _ Succession (HBO Original Series Soundtrack).mp3]
         },
         {
             "id": "commercials",
