@@ -1353,6 +1353,21 @@
         "GFNN PT": "GFNN PT",
         "GALACTIC FRONT NEWS NETWORK": "REDE DE NOTÍCIAS DA FRENTE GALÁCTICA",
         "nothing on this station yet": "nada nesta estação por enquanto",
+
+        /* ---------- the airwaves (2026-11-53) ---------- */
+        "The airwaves": "As comunicações",
+        "THE AIRWAVES": "AS COMUNICAÇÕES",
+        "GLOBAL": "GLOBAL",
+        "TEAM": "EQUIPA",
+        "PRIVATE": "PRIVADO",
+        "SEND": "ENVIAR",
+        "Write a message": "Escrever uma mensagem",
+        "Nothing has been said here yet.": "Ainda ninguém disse nada aqui.",
+        "Choose a commander first": "Escolha primeiro um comandante",
+        "Nobody else is at the table yet.": "Ainda não há mais ninguém à mesa.",
+        "You": "Você",
+        "Commander": "Comandante",
+        "online": "em linha",
         "This station has nothing on the air yet: put the files in assets/music and list them in stations.json.":
             "Esta estação ainda não tem nada no ar: coloque os ficheiros em assets/music e liste-os em stations.json.",
         "This station could not be played.": "Não foi possível tocar esta estação.",
