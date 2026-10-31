@@ -1,7 +1,9 @@
 -- =========================================================
 -- GALACTIC FRONT — the Soviet is told as well
 --
--- Run in the Supabase SQL editor after 2026-11-55. Safe to run more than once.
+-- Run in the Supabase SQL editor after 2026-11-55. Safe to run more than once,
+-- and safe to run on a database where 55 was never applied: this patch creates
+-- the pair and the name helper it needs.
 --
 -- 2026-11-55 gave the Freedom Authority its pair: once the President and the
 -- Speaker of the Congress are both in their chairs, the pair is written down
@@ -26,7 +28,77 @@
 
 
 -- ---------------------------------------------------------
--- 1. the Soviet's chair joins the pair
+-- 1. the pair, written down once for each war
+--    (2026-11-55 makes this too; running either first is harmless)
+-- ---------------------------------------------------------
+
+create table if not exists public.cg_election_pair (
+    id bigserial primary key,
+    war text not null,
+    president_player uuid,
+    president_name text not null default '',
+    speaker_player uuid,
+    speaker_name text not null default '',
+    created_at timestamptz not null default now(),
+    unique (war)
+);
+
+alter table public.cg_election_pair enable row level security;
+
+/* a pair from an older patch may be missing a chair */
+alter table public.cg_election_pair add column if not exists president_player uuid;
+alter table public.cg_election_pair add column if not exists president_name text not null default '';
+alter table public.cg_election_pair add column if not exists speaker_player uuid;
+alter table public.cg_election_pair add column if not exists speaker_name text not null default '';
+alter table public.cg_election_pair add column if not exists created_at timestamptz not null default now();
+
+
+-- ---------------------------------------------------------
+-- 2. what a commander is called
+-- ---------------------------------------------------------
+
+create or replace function public.cg_election_name(p_player uuid)
+returns text
+language plpgsql
+stable
+security definer
+set search_path to ''
+as $function$
+declare
+    v text;
+    v_col text;
+begin
+
+    if p_player is null then return ''; end if;
+
+    /* the players table carries the name under one of two names */
+    select c.column_name into v_col
+    from information_schema.columns as c
+    where c.table_schema = 'public' and c.table_name = 'players'
+      and c.column_name in ('username', 'name')
+    order by (c.column_name = 'username') desc
+    limit 1;
+
+    if v_col is not null then
+        begin
+            execute format('select %I from public.players as p where p.id = $1', v_col)
+            into v using p_player;
+        exception when others then v := null;
+        end;
+    end if;
+
+    if coalesce(v, '') = '' then
+        v := 'Commander ' || left(p_player::text, 4);
+    end if;
+
+    return v;
+
+end;
+$function$;
+
+
+-- ---------------------------------------------------------
+-- 3. the Soviet's chair joins the pair
 -- ---------------------------------------------------------
 
 alter table public.cg_election_pair add column if not exists commissar_player uuid;
@@ -34,7 +106,7 @@ alter table public.cg_election_pair add column if not exists commissar_name text
 
 
 -- ---------------------------------------------------------
--- 2. one answer for both factions
+-- 4. one answer for both factions
 -- ---------------------------------------------------------
 
 create or replace function public.cg_elections_pair()
@@ -74,7 +146,10 @@ begin
     select * into st from public.cg_state as s where s.id = 1;
 
     if to_regclass('public.cg_speaker_state') is not null then
-        perform public.cg_speaker_seed();
+        begin
+            perform public.cg_speaker_seed();
+        exception when undefined_function then null;
+        end;
         select * into sp from public.cg_speaker_state as s where s.id = 1;
     end if;
 

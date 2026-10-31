@@ -6,8 +6,9 @@
 
        Freedom Authority   the President of the Freedom Authority and the
                            Speaker of the Congress
-       Combine             the President and the High Commissar of the
-                           Supreme Soviet
+       Combine             the High Commissar of the Supreme Soviet, and no
+                           other chair: the Soviet's card speaks only of the
+                           Soviet's own office
 
    Who won is decided by the database (sql/2026-11-55 and 2026-11-56), so
    every screen reads the same names; a browser only remembers that it has
@@ -38,8 +39,8 @@
             key: "gf.combine-elections",
             heading: "THE SUPREME SOVIET ELECTIONS",
             lead: "The Soviet has been convened:",
-            race: "won the presidential race, with",
-            seat: "taking the High Commissariat of the Soviet.",
+            seat: "takes the High Commissariat of the Soviet.",
+            single: true,
             video: "assets/cutscenes/the-combine-takes-the-congress.mp4",
             accent: "#b32424",
             gold: "#e8c46a",
@@ -162,8 +163,13 @@
 
         const result = document.createElement("p");
         result.style.cssText = "margin:0 0 22px;color:#dff1ff;line-height:1.8;";
-        result.appendChild(winner(data.president, side.gold));
-        result.appendChild(document.createTextNode(" " + T(side.race) + " "));
+
+        /* a side with one office of its own is told only of that office */
+        if (!side.single) {
+            result.appendChild(winner(data.president, side.gold));
+            result.appendChild(document.createTextNode(" " + T(side.race) + " "));
+        }
+
         result.appendChild(winner(pick.seat, side.gold));
         result.appendChild(document.createTextNode(" " + T(side.seat)));
 
@@ -299,7 +305,7 @@
             const pick = sideFor(data);
 
             if (!pick || !pick.ready) { return; }
-            if (!data.president && !pick.seat) { return; }
+            if (!pick.seat) { return; }
             if (seen(pick.side.key, data.stamp)) { return; }
 
             show(pick, data);

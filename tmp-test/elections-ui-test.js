@@ -128,9 +128,11 @@ function boot(pair, remembered) {
 
         ok("a Combine commander is told", !!sCard);
         ok("in the Soviet's voice", !!sCard && /THE SUPREME SOVIET ELECTIONS/.test(sCard.textContent), sCard && sCard.textContent);
-        ok("with the President's name", !!sCard && /Aureo/.test(sCard.textContent));
-        ok("and the High Commissar's", !!sCard && /Boris/.test(sCard.textContent));
+        ok("and the High Commissar's name", !!sCard && /Boris/.test(sCard.textContent));
         ok("naming the office", !!sCard && /High Commissariat of the Soviet/.test(sCard.textContent));
+        ok("the Soviet is not told of the presidential race",
+            !!sCard && !/president/i.test(sCard.textContent) && !/Aureo/.test(sCard.textContent),
+            sCard && sCard.textContent);
 
         if (sCard) {
             sCard.querySelector('[data-gf="proceed"]')
@@ -174,7 +176,7 @@ function boot(pair, remembered) {
 
         console.log("\n== the pages carry it");
 
-        ok("every screen loads the event", /<script src="elections.js\?v=2"><\/script>/.test(GALAXY));
+        ok("every screen loads the event", /<script src="elections.js\?v=3"><\/script>/.test(GALAXY));
 
     } catch (error) {
 
