@@ -120,9 +120,35 @@
         try {
             const clean = String(url).split(/[?#]/)[0];
             const last = clean.split("/").filter(Boolean).pop() || clean;
-            return decodeURIComponent(last).replace(/\.[a-z0-9]{2,5}$/i, "");
+            return decodeURIComponent(last).replace(/\.[a-z0-9]{2,5}$/i, "")
+                .replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
         }
         catch (e) { return String(url); }
+    }
+
+    /*
+       The host brings a song in by its link: the list lives in the database,
+       so the address is what every other screen fetches. A file committed
+       under assets/music can be pasted as well; it is made absolute here,
+       because a relative address would only mean something on this page.
+    */
+    function addTrack() {
+
+        const input = panel && panel.querySelector('[data-gf="link"]');
+        const raw = input ? String(input.value || "").trim() : "";
+
+        if (!raw) { return; }
+
+        let url = raw;
+
+        try { url = new URL(raw, document.baseURI).href; }
+        catch (e) { /* keep what was typed; the server says no */ }
+
+        act("music_add", { p_url: url, p_title: titleFrom(url) }).then(function() {
+            if (input) { input.value = ""; }
+            paint();
+        });
+
     }
 
     /* ---------- the player ---------- */
@@ -689,6 +715,12 @@
 
         if (isHost && !missing) {
 
+            h += '<div style="display:flex;gap:6px;margin-bottom:8px">' +
+                '<input type="text" data-gf="link" placeholder="' + esc(T("Paste a link to a track")) + '" ' +
+                'style="flex:1;min-width:0;padding:5px;background:#0b1622;border:1px solid #2b4b61;color:#dff1ff">' +
+                '<button type="button" data-gf="add" style="' + BTN + '">' + esc(T("ADD")) + '</button>' +
+                '</div>';
+
             h += tracks.map(function(t) {
                 const on = playback && String(playback.id) === String(t.id);
                 return '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid #183044">' +
@@ -722,6 +754,13 @@
 
             const kind = el.dataset.gf;
 
+            if (kind === "link") {
+                el.addEventListener("keydown", function(e) {
+                    if (e.key === "Enter") { e.preventDefault(); addTrack(); }
+                });
+                return;
+            }
+
             if (kind === "volume") {
                 el.addEventListener("input", function() {
                     volume = Math.max(0, Math.min(1, Number(el.value) / 100));
@@ -744,6 +783,7 @@
                     return;
                 }
 
+                if (kind === "add") { addTrack(); return; }
                 if (kind === "station") { playStation(Number(el.dataset.i)); return; }
 
                 if (kind === "prev") { stepTo(-1); return; }
