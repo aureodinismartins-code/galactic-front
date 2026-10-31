@@ -6,7 +6,7 @@ they belong to, then write their names into `stations.json`.
 ```
 assets/music/
     stations.json
-    jazz/            ← jazz
+    pop/             ← pop
     classical/       ← classical
     aura/            ← aura
     commercials/     ← radio commercials
@@ -16,15 +16,15 @@ assets/music/
 
 ## Adding a track
 
-1. Copy the file into the folder of its station, e.g. `assets/music/jazz/blue-hour.mp3`.
+1. Copy the file into the folder of its station, e.g. `assets/music/pop/blue-hour.mp3`.
 2. Add its **file name** (not the folder, not the whole path) to that station's
    `tracks` list in `stations.json`:
 
 ```json
 {
-    "id": "jazz",
-    "label": "JAZZ",
-    "folder": "jazz",
+    "id": "pop",
+    "label": "POP",
+    "folder": "pop",
     "tracks": ["blue-hour.mp3", "night-train.mp3"]
 }
 ```

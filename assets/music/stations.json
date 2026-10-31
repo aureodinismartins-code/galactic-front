@@ -1,9 +1,9 @@
 {
     "stations": [
         {
-            "id": "jazz",
-            "label": "JAZZ",
-            "folder": "jazz",
+            "id": "pop",
+            "label": "POP",
+            "folder": "pop",
             "tracks": []
         },
         {

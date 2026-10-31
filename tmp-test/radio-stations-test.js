@@ -34,8 +34,8 @@ ok("stations.json is there and is valid", !!manifest);
 ok("there are six stations", manifest && Array.isArray(manifest.stations) && manifest.stations.length === 6);
 
 const ids = (manifest && manifest.stations || []).map(s => s.id);
-ok("jazz, classical, aura, commercials, GFNN and its Portuguese desk",
-    ["jazz", "classical", "aura", "commercials", "gfnn", "gfnn-pt"].every(id => ids.indexOf(id) !== -1), ids);
+ok("pop, classical, aura, commercials, GFNN and its Portuguese desk",
+    ["pop", "classical", "aura", "commercials", "gfnn", "gfnn-pt"].every(id => ids.indexOf(id) !== -1), ids);
 
 ok("every station has a folder", (manifest && manifest.stations || []).every(s => !!s.folder));
 ok("every station folder is in the repository",
@@ -62,7 +62,7 @@ class FakeAudio {
 
 const STATIONS = JSON.stringify({
     stations: [
-        { id: "jazz", label: "JAZZ", folder: "jazz", tracks: ["one.mp3", "two.mp3"] },
+        { id: "pop", label: "POP", folder: "pop", tracks: ["one.mp3", "two.mp3"] },
         { id: "classical", label: "CLASSICAL", folder: "classical", tracks: [] },
         { id: "gfnn", label: "GFNN", folder: "gfnn", tracks: ["bulletin.mp3"] }
     ]
@@ -122,37 +122,37 @@ async function player(withStations, hand) {
         await tick();
 
         const panel = w.document.getElementById("gf-music-panel");
-        const jazz = panel.querySelector('[data-gf="station"][data-i="0"]');
+        const pop = panel.querySelector('[data-gf="station"][data-i="0"]');
 
-        ok("the stations are in the panel", !!jazz && /JAZZ/.test(panel.textContent), panel.textContent.slice(0, 120));
+        ok("the stations are in the panel", !!pop && /POP/.test(panel.textContent), panel.textContent.slice(0, 120));
 
-        jazz.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+        pop.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
         await tick();
 
         let heard = audios[audios.length - 1];
 
         ok("picking one plays its first file",
-            !!heard && heard.src === "https://example.test/assets/music/jazz/one.mp3", heard && heard.src);
+            !!heard && heard.src === "https://example.test/assets/music/pop/one.mp3", heard && heard.src);
         ok("and it is heard, not paused", !!heard && heard.paused === false);
         ok("the panel says which station and which track",
-            /JAZZ/.test(panel.textContent) && /one/.test(panel.textContent), panel.textContent.slice(0, 200));
+            /POP/.test(panel.textContent) && /one/.test(panel.textContent), panel.textContent.slice(0, 200));
 
         heard.fire("ended");
         await tick();
 
-        ok("the station moves on when a track ends", heard.src === "https://example.test/assets/music/jazz/two.mp3", heard.src);
+        ok("the station moves on when a track ends", heard.src === "https://example.test/assets/music/pop/two.mp3", heard.src);
 
         heard.fire("ended");
         await tick();
 
-        ok("and loops back to the top", heard.src === "https://example.test/assets/music/jazz/one.mp3", heard.src);
+        ok("and loops back to the top", heard.src === "https://example.test/assets/music/pop/one.mp3", heard.src);
 
         /* the shared wireless must not pull the needle back */
         await w.GFMusic.refresh();
         await tick();
 
         ok("the host's wireless does not take the station's place",
-            heard.src === "https://example.test/assets/music/jazz/one.mp3" && heard.paused === false, heard.src);
+            heard.src === "https://example.test/assets/music/pop/one.mp3" && heard.paused === false, heard.src);
 
         const next = panel.querySelector('[data-gf="next"]');
 
@@ -161,13 +161,13 @@ async function player(withStations, hand) {
         next.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
         await tick();
 
-        ok("and may skip", heard.src === "https://example.test/assets/music/jazz/two.mp3", heard.src);
+        ok("and may skip", heard.src === "https://example.test/assets/music/pop/two.mp3", heard.src);
 
         /* a file that will not play is passed over */
         heard.fire("error");
         await tick();
 
-        ok("a broken file is skipped", heard.src === "https://example.test/assets/music/jazz/one.mp3", heard.src);
+        ok("a broken file is skipped", heard.src === "https://example.test/assets/music/pop/one.mp3", heard.src);
 
         /* a station with nothing in it says so */
         const classical = panel.querySelector('[data-gf="station"][data-i="1"]');
@@ -212,9 +212,9 @@ async function player(withStations, hand) {
         const HAND = `{
     "stations": [
         {
-            "id": "jazz",
-            "label": "JAZZ",
-            "folder": "jazz",
+            "id": "pop",
+            "label": "POP",
+            "folder": "pop",
             "tracks": []
         },
         {
