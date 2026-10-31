@@ -3004,40 +3004,69 @@ async function startAttack(city) {
      * A world nobody holds is still a decision for the chamber - the Freedom
      * Authority needs a declaration of war from Congress, the Combine an
      * approved military campaign from the Soviet.
+     *
+     * The database answers the whole question in one call, so this page and
+     * the rules can never disagree about it. The older pair of questions is
+     * kept as a fallback for a database still without 2026-11-47.
      */
-    const rival = playerFaction === "Combine" ? "Freedom Authority" : "Combine";
+    const gate = await supabaseClient.rpc("can_attack_planet", { p_planet: planetName });
 
-    const rivalHeld = planetCities.some(function(city) {
-        return String(city.faction || "").trim() === rival;
-    });
+    if (!gate.error && gate.data) {
 
-    if (rivalHeld) {
+        if (gate.data.ok === false) {
 
-        const peace = await supabaseClient.rpc("ceasefire_active");
+            if (gate.data.reason === "ceasefire") {
+                gameNotice(tr("A ceasefire stands between the two authorities: no attack can be made until it lapses."));
+            }
+            else if (gate.data.reason === "campaign") {
+                gameNotice("The Supreme Soviet has not authorised a campaign against " + planetName + ". Put a military campaign before it first.");
+            }
+            else {
+                gameNotice("Congress has not declared war on " + planetName + ". Put a Declaration of War before Congress first.");
+            }
 
-        if (!peace.error && peace.data === true) {
-            gameNotice(tr("A ceasefire stands between the two authorities: no attack can be made until it lapses."));
             return;
-        }
 
-    }
-    else if (playerFaction === "Combine") {
-
-        const campaign = await supabaseClient.rpc("cs_can_attack", { p_planet: planetName });
-
-        if (!campaign.error && campaign.data === false) {
-            gameNotice("The Supreme Soviet has not authorised a campaign against " + planetName + ". Put a military campaign before it first.");
-            return;
         }
 
     }
     else {
 
-        const war = await supabaseClient.rpc("congress_can_attack", { p_planet: planetName });
+        const rival = playerFaction === "Combine" ? "Freedom Authority" : "Combine";
 
-        if (!war.error && war.data === false) {
-            gameNotice("Congress has not declared war on " + planetName + ". Put a Declaration of War before Congress first.");
-            return;
+        const rivalHeld = planetCities.some(function(city) {
+            return String(city.faction || "").trim() === rival;
+        });
+
+        if (rivalHeld) {
+
+            const peace = await supabaseClient.rpc("ceasefire_active");
+
+            if (!peace.error && peace.data === true) {
+                gameNotice(tr("A ceasefire stands between the two authorities: no attack can be made until it lapses."));
+                return;
+            }
+
+        }
+        else if (playerFaction === "Combine") {
+
+            const campaign = await supabaseClient.rpc("cs_can_attack", { p_planet: planetName });
+
+            if (!campaign.error && campaign.data === false) {
+                gameNotice("The Supreme Soviet has not authorised a campaign against " + planetName + ". Put a military campaign before it first.");
+                return;
+            }
+
+        }
+        else {
+
+            const war = await supabaseClient.rpc("congress_can_attack", { p_planet: planetName });
+
+            if (!war.error && war.data === false) {
+                gameNotice("Congress has not declared war on " + planetName + ". Put a Declaration of War before Congress first.");
+                return;
+            }
+
         }
 
     }
