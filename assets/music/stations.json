@@ -32,7 +32,7 @@
             "id": "gfnn",
             "label": "GFNN",
             "folder": "gfnn",
-            "tracks": [GFNN_Galactic_Report_EN_v2.mp3]
+            "tracks": ["GFNN_Galactic_Report_EN_v2.mp3"]
         },
         {
             "id": "gfnn-pt",
