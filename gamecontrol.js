@@ -244,6 +244,51 @@
 
     }
 
+    /* how long this war has been running, in the shortest useful form */
+    function gcElapsed(ms) {
+
+        const mins = Math.floor(Math.max(0, ms) / 60000);
+
+        if (mins < 1) { return T_GC("under a minute"); }
+        if (mins < 60) { return mins + "m"; }
+
+        const hours = Math.floor(mins / 60);
+        const rest = mins % 60;
+
+        return hours + "h" + (rest ? " " + rest + "m" : "");
+
+    }
+
+    /* the war's clock, and who is at the table */
+    function adminClock() {
+
+        const st = window.gameStatus || {};
+        const raw = st.started_at !== undefined ? st.started_at : st.started;
+
+        let line;
+
+        if (raw === null || raw === undefined || raw === false) {
+            line = T_GC("The war has not begun");
+        }
+        else if (typeof raw === "string" && isFinite(new Date(raw).getTime())) {
+            line = T_GC("The war") + ": " + gcElapsed(Date.now() - new Date(raw).getTime());
+        }
+        else {
+            line = T_GC("The war is under way");
+        }
+
+        const online = Number(st.online);
+
+        if (isFinite(online) && online >= 0) {
+            line += " \u00b7 " + (online === 1
+                ? T_GC("1 player online")
+                : online + " " + T_GC("players online"));
+        }
+
+        return line;
+
+    }
+
     function paintAdmin() {
 
         if (!adminPanel) { return; }
@@ -261,6 +306,7 @@
             '<div style="margin-top:10px;color:#9fb8c9">' + T_GC("The game is") + ': <b style="color:' +
                 (on ? "#ffb04a" : "#7dff9b") + '">' +
                 (on ? T_GC("UNDER MAINTENANCE") : T_GC("OPEN")) + '</b></div>' +
+            '<div data-gc="clock" style="margin-top:6px;color:#9fb8c9">' + adminClock() + '</div>' +
             '<button type="button" data-gc="maint" style="' + btn + 'background:' +
                 (on ? "#1c3016" : "#3a2f10") + ';color:' + (on ? "#9dff9d" : "#ffd98a") +
                 ';border:1px solid ' + (on ? "#4c8a3a" : "#b08a2c") + ';">' +

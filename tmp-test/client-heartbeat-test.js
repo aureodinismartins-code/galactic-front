@@ -129,6 +129,12 @@ const lastHeartbeat = () => heartbeats()[heartbeats().length - 1];
     const reset = adminPanel && adminPanel.querySelector('[data-gc="reset"]');
     check("the reset sits in the admin panel", !!reset);
 
+    const clock = adminPanel && adminPanel.querySelector('[data-gc="clock"]');
+    check("the panel carries the war's clock", !!clock && /under way/.test(clock.textContent),
+        clock && clock.textContent);
+    check("and says who is at the table", !!clock && /1 player online/.test(clock.textContent),
+        clock && clock.textContent);
+
     reset.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
     await new Promise(r => setTimeout(r, 60));
 

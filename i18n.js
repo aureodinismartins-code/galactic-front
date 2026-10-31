@@ -1364,6 +1364,12 @@
         "The host's keys: the whole war, and the door every player comes through.":
             "As chaves do anfitrião: a guerra inteira e a porta por onde todos os jogadores entram.",
         "The game is": "O jogo está",
+        "The war": "A guerra",
+        "The war has not begun": "A guerra ainda não começou",
+        "The war is under way": "A guerra está em curso",
+        "under a minute": "menos de um minuto",
+        "1 player online": "1 jogador em linha",
+        "players online": "jogadores em linha",
         "UNDER MAINTENANCE": "EM MANUTENÇÃO",
         "OPEN": "ABERTO",
         "OPEN THE GAME": "ABRIR O JOGO",
