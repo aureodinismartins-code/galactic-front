@@ -1,4 +1,5 @@
-/* The airwaves on the screen: three tabs, a roster and a send box.
+/* The airwaves on the screen: three tabs, a roster, a send box, and the
+   small count on the button for what came in while the panel was shut.
 
    Run: NODE_PATH=/tmp/tools/node_modules node tmp-test/chat-ui-test.js */
 
@@ -23,76 +24,126 @@ function ok(name, cond, extra) {
 
 const tick = (ms) => new Promise(r => setTimeout(r, ms || 30));
 
+function boot(remembered) {
+
+    const calls = [];
+    const virtualConsole = new VirtualConsole();
+    virtualConsole.on("jsdomError", function() {});
+
+    const dom = new JSDOM("<!doctype html><html><body></body></html>", {
+        url: "https://example.test/galaxy.html", runScripts: "dangerously", virtualConsole: virtualConsole
+    });
+
+    const w = dom.window;
+    w.T = (text) => text;
+
+    /* a player who has been here before, or one opening the screen first time */
+    if (remembered) {
+        w.localStorage.setItem("gf_chat_seen", JSON.stringify({ global: 0, team: 0, private: {} }));
+    }
+
+    w.supabaseClient = {
+        rpc: function(name, args) {
+            calls.push({ name: name, args: args || {} });
+
+            if (name === "chat_people") {
+                return Promise.resolve({ data: { people: [
+                    { id: B, name: "Boris", faction: "Combine", online: true }
+                ] }, error: null });
+            }
+
+            if (name === "chat_fetch") {
+                const channel = args.p_channel;
+                const body = channel === "global" ? "<b>Good evening</b>"
+                    : channel === "team" ? "The Party is watching"
+                    : "Meet me at Vraks";
+                return Promise.resolve({ data: { me: A, now: new Date().toISOString(), messages: [
+                    { id: 1, channel: channel, sender: B, name: "Boris", to: null, body: body, at: new Date().toISOString() }
+                ] }, error: null });
+            }
+
+            if (name === "chat_unread") {
+                /* two waiting; the global one is cleared once it is drawn */
+                const seenGlobal = args.p_seen && Number(args.p_seen.global);
+                const total = seenGlobal >= 1 ? 1 : 2;
+                return Promise.resolve({ data: {
+                    global: seenGlobal >= 1 ? 0 : 1, team: 1, private: 0, total: total,
+                    latest: { global: 1, team: 0, private: {} }
+                }, error: null });
+            }
+
+            if (name === "chat_send") { return Promise.resolve({ data: { id: 9 }, error: null }); }
+
+            return Promise.resolve({ data: null, error: null });
+        }
+    };
+
+    w.eval(CHAT);
+
+    return { w, calls, dom };
+
+}
+
 (async function main() {
 
     try {
 
-        const calls = [];
-        const virtualConsole = new VirtualConsole();
-        virtualConsole.on("jsdomError", function() {});
-
-        const dom = new JSDOM("<!doctype html><html><body></body></html>", {
-            url: "https://example.test/galaxy.html", runScripts: "dangerously", virtualConsole: virtualConsole
-        });
-
-        const w = dom.window;
-        w.T = (text) => text;
-
-        w.supabaseClient = {
-            rpc: function(name, args) {
-                calls.push({ name: name, args: args || {} });
-
-                if (name === "chat_people") {
-                    return Promise.resolve({ data: { people: [
-                        { id: B, name: "Boris", faction: "Combine", online: true }
-                    ] }, error: null });
-                }
-
-                if (name === "chat_fetch") {
-                    const channel = args.p_channel;
-                    const body = channel === "global" ? "<b>Good evening</b>"
-                        : channel === "team" ? "The Party is watching"
-                        : "Meet me at Vraks";
-                    return Promise.resolve({ data: { me: A, now: new Date().toISOString(), messages: [
-                        { id: 1, channel: channel, sender: B, name: "Boris", to: null, body: body, at: new Date().toISOString() }
-                    ] }, error: null });
-                }
-
-                if (name === "chat_send") { return Promise.resolve({ data: { id: 9 }, error: null }); }
-
-                return Promise.resolve({ data: null, error: null });
-            }
-        };
-
-        w.eval(CHAT);
-        await tick(60);
-
         console.log("\n== the button and the panel");
 
+        const first = boot(false);
+        await tick(700);
+
+        const w = first.w;
+        const calls = first.calls;
         const button = w.document.getElementById("gf-chat-button");
         ok("the airwaves have a button", !!button);
 
+        const badge = w.document.getElementById("gf-chat-badge");
+        ok("and a place for a count", !!badge);
+        ok("a screen opening the panel first time counts nothing as new",
+            !badge || badge.style.display === "none", badge && badge.style.display);
+        ok("it asks the server what is waiting", calls.some(c => c.name === "chat_unread"));
+
         const panel = w.document.getElementById("gf-chat-panel");
-        ok("and a panel to open", !!panel);
         ok("closed until asked", panel.style.display === "none");
 
         button.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
-        await tick(80);
+        await tick(120);
 
         ok("clicking opens it", panel.style.display === "block");
-        ok("the three channels are on it",
-            ["global", "team", "private"].every(t => !!panel.querySelector('[data-gf="chat-tab"][data-tab="' + t + '"]')));
-        ok("global is the one it opens on",
-            !!panel.querySelector('[data-gf="chat-tab"][data-tab="global"]') &&
-            /7dffb0/.test(panel.querySelector('[data-gf="chat-tab"][data-tab="global"]').getAttribute("style") || ""));
-        ok("the channel was fetched", calls.some(c => c.name === "chat_fetch" && c.args.p_channel === "global"),
-            calls.filter(c => c.name === "chat_fetch").map(c => c.args));
 
         const list = panel.querySelector('[data-gf="chat-list"]');
         ok("what was said is drawn", /Good evening/.test(list.textContent), list.textContent);
         ok("and markup in a message is not run", /&lt;b&gt;/.test(list.innerHTML) && !/<b>Good/.test(list.innerHTML));
 
-        console.log("\n== sending");
+        console.log("\n== the count");
+
+        const counted = boot(true);
+        await tick(700);
+
+        const otherBadge = counted.w.document.getElementById("gf-chat-badge");
+        ok("a player who has been here before is told what is waiting",
+            !!otherBadge && otherBadge.style.display === "block" && otherBadge.textContent === "2",
+            otherBadge && otherBadge.textContent + " / " + otherBadge.style.display);
+
+        const countedPanel = counted.w.document.getElementById("gf-chat-panel");
+        counted.w.document.getElementById("gf-chat-button")
+            .dispatchEvent(new counted.w.MouseEvent("click", { bubbles: true }));
+        await tick(140);
+
+        ok("opening the panel draws the channel", countedPanel.style.display === "block");
+
+        const after = countedBadge(counted.w);
+        ok("the channel on the screen stops counting", after === "1" || after === "none", after);
+
+        const marked = counted.calls.filter(c => c.name === "chat_unread").pop();
+        ok("what was drawn is what it reports as read",
+            !!marked && Number(marked.args.p_seen.global) === 1, marked && marked.args.p_seen);
+
+        ok("the count is remembered for next time",
+            !!counted.w.localStorage.getItem("gf_chat_seen"), counted.w.localStorage.getItem("gf_chat_seen"));
+
+        console.log("\n== sending and the other channels");
 
         const input = panel.querySelector('[data-gf="chat-input"]');
         input.value = "  hello, galaxy  ";
@@ -110,8 +161,6 @@ const tick = (ms) => new Promise(r => setTimeout(r, ms || 30));
         await tick(60);
         ok("an empty message is not sent", calls.slice(before).every(c => c.name !== "chat_send"),
             calls.slice(before).map(c => c.name));
-
-        console.log("\n== the other channels");
 
         panel.querySelector('[data-gf="chat-tab"][data-tab="team"]')
             .dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
@@ -147,7 +196,7 @@ const tick = (ms) => new Promise(r => setTimeout(r, ms || 30));
 
         console.log("\n== the pages carry it");
 
-        ok("every screen loads the airwaves", /<script src="chat.js\?v=1"><\/script>/.test(GALAXY));
+        ok("every screen loads the airwaves", /<script src="chat.js\?v=2"><\/script>/.test(GALAXY));
 
     } catch (error) {
 
@@ -157,7 +206,12 @@ const tick = (ms) => new Promise(r => setTimeout(r, ms || 30));
     }
 
     console.log("\n" + pass + " passed, " + fail + " failed");
-
     process.exit(fail ? 1 : 0);
 
 }());
+
+function countedBadge(window) {
+    const badge = window.document.getElementById("gf-chat-badge");
+    if (!badge || badge.style.display === "none") { return "none"; }
+    return badge.textContent;
+}

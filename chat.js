@@ -18,6 +18,8 @@
     "use strict";
 
     const POLL_MS = 6000;
+    const SEEN_KEY = "gf_chat_seen";   /* what this browser has already been shown */
+    const UNREAD_MS = 20000;           /* how often the count is refreshed while shut */
 
     const BTN = "background:#0e2233;color:#bfe4ff;border:1px solid #2f6280;padding:4px 8px;" +
                 "font:11px Arial;cursor:pointer;";
@@ -32,6 +34,11 @@
     let error = null;          /* the server's answer, when it refuses */
     let timer = null;
     let tries = 0;
+    let seen = { global: 0, team: 0, private: {} };   /* the newest id drawn per channel */
+    let remembered = false;                           /* this browser has been here before */
+    let unread = 0;                                   /* what arrived while the panel was shut */
+    let badge = null;
+    let unreadTimer = null;
 
     /* ---------- small helpers ---------- */
 
@@ -84,6 +91,146 @@
 
     }
 
+    /* ---------- the count ---------- */
+
+    function readSeen() {
+
+        try {
+            const raw = localStorage.getItem(SEEN_KEY);
+            if (raw === null) { return; }
+
+            remembered = true;
+
+            const got = JSON.parse(raw) || {};
+
+            ["global", "team"].forEach(function(k) {
+                const n = Number(got[k]);
+                if (isFinite(n) && n > 0) { seen[k] = n; }
+            });
+
+            if (got.private && typeof got.private === "object") {
+                Object.keys(got.private).forEach(function(k) {
+                    const n = Number(got.private[k]);
+                    if (isFinite(n) && n > 0) { seen.private[k] = n; }
+                });
+            }
+        }
+        catch (e) { /* nothing remembered: the first count starts from what is on the air */ }
+
+    }
+
+    function writeSeen() {
+        try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); }
+        catch (e) { /* private mode: the count starts fresh next time */ }
+    }
+
+    /* the first time on this screen, what is already there is not news */
+    function adopt(latest) {
+
+        if (!latest) { return; }
+
+        ["global", "team"].forEach(function(k) {
+            const n = Number(latest[k]);
+            if (isFinite(n) && n > (Number(seen[k]) || 0)) { seen[k] = n; }
+        });
+
+        if (latest.private && typeof latest.private === "object") {
+            Object.keys(latest.private).forEach(function(k) {
+                const n = Number(latest.private[k]);
+                if (isFinite(n) && n > (Number(seen.private[k]) || 0)) { seen.private[k] = n; }
+            });
+        }
+
+    }
+
+    /* a channel that has just been drawn has been read */
+    function markRead(channel) {
+
+        if (channel === "private" && !me) { return; }
+
+        let newest = 0;
+
+        messages.forEach(function(m) {
+
+            const id = Number(m.id);
+            if (!isFinite(id)) { return; }
+
+            if (channel === "private") {
+                const other = (String(m.sender) === String(me)) ? m.to : m.sender;
+                if (!other) { return; }
+                const had = Number(seen.private[String(other)]) || 0;
+                seen.private[String(other)] = Math.max(had, id);
+            }
+            else {
+                newest = Math.max(newest, id);
+            }
+
+        });
+
+        if (channel !== "private") { seen[channel] = Math.max(Number(seen[channel]) || 0, newest); }
+
+        writeSeen();
+
+    }
+
+    function showBadge(n) {
+
+        if (!badge) { return; }
+
+        if (n > 0) {
+            badge.textContent = (n > 9) ? "9+" : String(n);
+            badge.style.display = "block";
+            button.title = T("New messages") + " (" + n + ")";
+        }
+        else {
+            badge.style.display = "none";
+            button.title = T("The airwaves");
+        }
+
+    }
+
+    function pollUnread() {
+
+        if (!client()) { return Promise.resolve(0); }
+
+        return call("chat_unread", { p_seen: seen }).then(function(res) {
+
+            /* a database without this patch simply has no count */
+            if (res.error) {
+                unread = 0;
+                showBadge(0);
+                return 0;
+            }
+
+            const data = res.data || {};
+
+            if (!remembered) {
+                remembered = true;
+                adopt(data.latest);
+                writeSeen();
+                unread = 0;
+                showBadge(0);
+                return 0;
+            }
+
+            unread = Number(data.total) || 0;
+            showBadge(unread);
+            return unread;
+
+        });
+
+    }
+
+    /* the count runs whether the panel is open or shut */
+    function beginCounting() {
+
+        readSeen();
+        pollUnread();
+
+        if (!unreadTimer) { unreadTimer = setInterval(pollUnread, UNREAD_MS); }
+
+    }
+
     /* ---------- the panel ---------- */
 
     function build() {
@@ -100,6 +247,13 @@
             "background:rgba(10,18,28,.92);color:#9fdcff;border:1px solid #3f7f9f;font-size:18px;line-height:1;" +
             "cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);";
         document.body.appendChild(button);
+
+        badge = document.createElement("span");
+        badge.id = "gf-chat-badge";
+        badge.style.cssText =
+            "position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;" +
+            "background:#e2483f;color:#fff;font:bold 10px/16px Arial;text-align:center;display:none;";
+        button.appendChild(badge);
 
         panel = document.createElement("div");
         panel.id = "gf-chat-panel";
@@ -183,6 +337,10 @@
             }
 
             paintMessages();
+
+            /* what is on the screen has been read, so the count moves on */
+            markRead(tab);
+            pollUnread();
 
         });
 
@@ -394,6 +552,7 @@
                 clearInterval(waiter);
                 if (!client()) { return; }
                 button.style.display = "block";
+                beginCounting();
             }
         }, 500);
 
@@ -410,7 +569,7 @@
     window.GFChat = {
         open: open,
         close: close,
-        unread: function() { return 0; }
+        unread: function() { return unread; }
     };
 
 })();
