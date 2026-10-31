@@ -12,3 +12,16 @@ the game never depends on it being present.
 To use a different file name or format, change CIVIL_WAR_VIDEO in
 planet.html; to let every such attack play it, drop the civilWarSeen()
 check in civilWarBegins().
+
+--------------------------------------------------------------------
+
+The Freedom Authority election film, played by every screen from
+elections.js once both chairs are decided in a war: the event says who
+won the presidency and who won the speakership, and PROCEED plays it.
+Only Freedom Authority players see it.
+
+    president-arrives-at-congress.mp4    the President arriving at
+                                         the Congress
+
+The file is looked for at that exact path. If it is missing the event
+still appears and the film is simply skipped, so nothing blocks the map.

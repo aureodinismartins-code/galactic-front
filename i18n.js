@@ -1369,6 +1369,10 @@
         "Commander": "Comandante",
         "online": "em linha",
         "New messages": "Mensagens novas",
+        "THE FREEDOM AUTHORITY ELECTIONS": "AS ELEIÇÕES DA FREEDOM AUTHORITY",
+        "The elections have been held:": "As eleições foram realizadas:",
+        "won the presidential race, with": "venceu a corrida presidencial, com",
+        "winning for Speaker of Congress.": "a vencer para Presidente do Congresso.",
         "This station has nothing on the air yet: put the files in assets/music and list them in stations.json.":
             "Esta estação ainda não tem nada no ar: coloque os ficheiros em assets/music e liste-os em stations.json.",
         "This station could not be played.": "Não foi possível tocar esta estação.",

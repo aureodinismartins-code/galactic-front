@@ -11,6 +11,7 @@
 <script src="gamecontrol.js?v=29"></script>
     <script src="music.js?v=5"></script>
     <script src="chat.js?v=3"></script>
+    <script src="elections.js?v=1"></script>
     <script src="news.js?v=1"></script>
 <style>
 * { box-sizing: border-box; }
@@ -288,8 +289,16 @@ async function load() {
     const bandBase = await supabaseClient.rpc("rebel_band_size");
     rebelBase = bandBase && !bandBase.error && bandBase.data != null ? Number(bandBase.data) : 0;
 
-    /* the chamber's president: its own book, its own election */
-    const spk = await supabaseClient.rpc("cg_speaker_state");
+    /* the chamber's president: its own book, its own election. When a
+       presidential race is on the air the two are held on one clock: the
+       Speaker's election opens on the same window, so both are decided at
+       the same moment (sql/2026-11-55_the_elections_stand_together.sql). */
+    const race = ov && ov.election ? ov.election : null;
+    let spk = await supabaseClient.rpc("cg_speaker_follow", {
+        p_campaign_end: race ? race.campaign_end : null,
+        p_vote_end: race ? race.vote_end : null
+    });
+    if (spk.error) { spk = await supabaseClient.rpc("cg_speaker_state"); }
     speaker = spk.error ? null : spk.data;
 
     /* the propaganda offices also carry the fleet count, which decides the
