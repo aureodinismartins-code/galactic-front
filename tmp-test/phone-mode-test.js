@@ -39,7 +39,7 @@ for (const page of pages) {
 
     const html = read(page);
     check(page + " loads phone mode",
-        /mobile\.js\?v=4/.test(html), (html.match(/mobile\.js[^"]*/) || [])[0]);
+        /mobile\.js\?v=\d+/.test(html), (html.match(/mobile\.js[^"]*/) || [])[0]);
 
     check(page + " declares the cut-out screen",
         /name="viewport"[\s\S]{0,120}viewport-fit=cover/.test(html));

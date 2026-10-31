@@ -26,7 +26,7 @@
 (function () {
 
     const KEY = "gf_phone";
-    const VERSION = 3;
+    const VERSION = 4;
 
     const root = document.documentElement;
 
@@ -118,8 +118,10 @@
 
     #gf-phone-button {
         position: fixed;
-        top: calc(env(safe-area-inset-top, 0px) + 6px);
-        right: 6px;
+        left: calc(env(safe-area-inset-left, 0px) + 8px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+        top: auto;
+        right: auto;
         z-index: 9999;
         min-width: 52px;
         height: 32px;
@@ -137,8 +139,18 @@
 
     #gf-phone-button:hover { opacity: 1; }
 
-    /* on a desk the menu button already owns that corner */
-    html.gf-menu:not(.gf-phone) #gf-phone-button { top: calc(env(safe-area-inset-top, 0px) + 78px); }
+    /* The corner it left held the map's own menu stack on the galaxy and
+       the language switch on the index, and the two overlapped. The foot
+       of the page is empty on every screen: the galaxy's sensor line and a
+       phone's dock are the only things there, so the switch stands above
+       whichever one this screen has. */
+    html.gf-docked:not(.gf-phone) #gf-phone-button {
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+    }
+
+    html.gf-phone.gf-docked #gf-phone-button {
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 62px);
+    }
 
     /* =========================================================
        THE CONGRESS AND THE SOVIET
