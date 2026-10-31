@@ -7,7 +7,9 @@ const path = require("path");
 const { PGlite } = require("@electric-sql/pglite");
 
 const ROOT = path.join(__dirname, "..");
-const PATCH = fs.readFileSync(path.join(ROOT, "sql/2026-11-55_the_elections_stand_together.sql"), "utf8");
+const PATCHES = ["sql/2026-11-55_the_elections_stand_together.sql",
+                 "sql/2026-11-56_the_soviet_is_told.sql"]
+    .map(f => fs.readFileSync(path.join(ROOT, f), "utf8"));
 
 let pass = 0;
 let fail = 0;
@@ -45,9 +47,13 @@ create table public.cg_speaker_state (id integer primary key, speaker_player uui
 create table public.cg_speaker_election (id serial primary key, phase text, campaign_end timestamptz,
                                          vote_end timestamptz, note text, winner_id uuid, winner_name text);
 
+create table public.cs_state (id integer primary key, secretary_player uuid, secretary_name text,
+                              term_no integer default 0, term_end timestamptz);
+
 insert into public.game_control (id) values (1);
 insert into public.cg_state (id) values (1);
 insert into public.cg_speaker_state (id) values (1);
+insert into public.cs_state (id) values (1);
 
 create or replace function public.cg_log(p_text text) returns void language sql as $$ select 1 $$;
 create or replace function public.cg_speaker_seed() returns void language sql
@@ -99,8 +105,9 @@ async function races(db) {
 
         const db = new PGlite();
         await db.exec(SCHEMA);
-        await db.exec(PATCH);
-        await db.exec(PATCH);
+
+        for (const patch of PATCHES) { await db.exec(patch); }
+        for (const patch of PATCHES) { await db.exec(patch); }
 
         await login(db, A);
 
@@ -160,6 +167,22 @@ async function races(db) {
         got = await pair(db);
         ok("a Combine commander is not", got.freedom === false, got.freedom);
         ok("though the pair is the same one", String(got.stamp) === String(stamp));
+        ok("a Combine commander is told the pair is his", got.combine === true, got.combine);
+        ok("but the Soviet's chair is still empty", got.soviet_ready === false, got.soviet_ready);
+
+        console.log("\n== the Soviet is decided");
+
+        await db.query("update public.cs_state set secretary_player = $1, secretary_name = 'Boris', term_no = 1", [B]);
+
+        got = await pair(db);
+        ok("once the High Commissar is chosen the Soviet is told", got.soviet_ready === true, got.soviet_ready);
+        ok("with the Commissar's name", got.commissar === "Boris", got.commissar);
+        ok("the President was already known", got.president === "Aureo", got.president);
+        ok("under the same war's stamp", String(got.stamp) === String(stamp), [stamp, got.stamp]);
+
+        await login(db, A);
+        got = await pair(db);
+        ok("a Freedom Authority member is not the Soviet's", got.combine === false, got.combine);
 
         console.log("\n== a new war");
 

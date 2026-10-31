@@ -1,12 +1,13 @@
 # The stations of the ship's wireless
 
-Six stations, six folders. Put the audio files in the folder of the station
+Seven stations, seven folders. Put the audio files in the folder of the station
 they belong to, then write their names into `stations.json`.
 
 ```
 assets/music/
     stations.json
     pop/             ← pop
+    jazz/            ← jazz
     classical/       ← classical
     aura/            ← aura
     commercials/     ← radio commercials

@@ -9,6 +9,12 @@
             ]
         },
         {
+            "id": "jazz",
+            "label": "JAZZ",
+            "folder": "jazz",
+            "tracks": []
+        },
+        {
             "id": "classical",
             "label": "CLASSICAL",
             "folder": "classical",

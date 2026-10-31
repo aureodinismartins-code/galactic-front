@@ -1348,6 +1348,7 @@
         /* ---------- the stations of the wireless (2026-11-48) ---------- */
         "STATIONS": "ESTAÇÕES",
         "CLASSICAL": "CLÁSSICA",
+        "JAZZ": "JAZZ",
         "RADIO COMMERCIALS": "ANÚNCIOS DE RÁDIO",
         "GFNN": "GFNN",
         "GFNN PT": "GFNN PT",
@@ -1373,6 +1374,9 @@
         "The elections have been held:": "As eleições foram realizadas:",
         "won the presidential race, with": "venceu a corrida presidencial, com",
         "winning for Speaker of Congress.": "a vencer para Presidente do Congresso.",
+        "THE SUPREME SOVIET ELECTIONS": "AS ELEIÇÕES DO SOVIETE SUPREMO",
+        "The Soviet has been convened:": "O Soviete foi convocado:",
+        "taking the High Commissariat of the Soviet.": "a assumir o Alto Comissariado do Soviete.",
         "This station has nothing on the air yet: put the files in assets/music and list them in stations.json.":
             "Esta estação ainda não tem nada no ar: coloque os ficheiros em assets/music e liste-os em stations.json.",
         "This station could not be played.": "Não foi possível tocar esta estação.",

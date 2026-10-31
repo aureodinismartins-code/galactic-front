@@ -25,3 +25,15 @@ Only Freedom Authority players see it.
 
 The file is looked for at that exact path. If it is missing the event
 still appears and the film is simply skipped, so nothing blocks the map.
+
+--- and the Combine's answer ---
+
+The Soviet's election film, played by every screen from elections.js once
+the President and the High Commissar are both decided in a war. Only
+Combine players see it.
+
+    the-combine-takes-the-congress.mp4   the High Commissar taking the
+                                         Supreme Soviet
+
+Missing, it is skipped exactly as above: the event still appears, the
+map comes back.
