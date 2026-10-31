@@ -357,28 +357,6 @@
 
     }
 
-    function addLink() {
-
-        if (!isHost || !panel) { return; }
-
-        const input = panel.querySelector('[data-gf="url"]');
-        let url = input ? input.value.trim() : "";
-
-        if (!url) { note(T("Paste a link to an audio file first.")); return; }
-
-        /* a bare file name is taken from the folder the game is served from */
-        if (!/^[a-z]+:\/\//i.test(url) && /\.(mp3|ogg|wav|m4a|aac|flac|opus|webm)$/i.test(url)) {
-            try { url = new URL(url, location.href).href; }
-            catch (e) { /* leave it as it was typed */ }
-        }
-
-        note(T("Adding..."));
-        act("music_add", { p_url: url, p_title: titleFrom(url) }).then(function(state) {
-            if (state && input) { input.value = ""; }
-        });
-
-    }
-
     /* ---------- the stations ---------
        Each player chooses their own station; the shared wireless is still the
        host's. The files live in the repository, one folder per station under
@@ -704,7 +682,6 @@
         }
         else if (missing) { line = T("The wireless lives in the database: run sql/2026-11-08_shared_music_playlist.sql, then reload."); }
         else if (current) { line = (playing ? T("Playing:") : T("Paused.")) + " " + current; }
-        else if (isHost && live) { line = T("No music yet: add a track below."); }
         else { line = T("The wireless is silent: nobody has put a track on yet."); }
 
         h += '<div class="gf-music-status" style="color:#7fa8c0;min-height:16px;margin-bottom:8px">' +
@@ -722,14 +699,6 @@
                     '<button type="button" data-gf="remove" data-id="' + esc(t.id) + '" style="' + BTN + '">&times;</button>' +
                     '</div>';
             }).join("");
-
-            h += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #183044">' +
-                '<input type="text" data-gf="url" placeholder="' + esc(T("paste a link to an audio file")) + '" ' +
-                'style="width:100%;box-sizing:border-box;padding:6px;background:#0b1622;border:1px solid #2b4b61;' +
-                'color:#dff1ff;margin-bottom:6px">' +
-                '<div style="display:flex;gap:6px">' +
-                '<button type="button" data-gf="add" style="' + BTN + ';flex:1">' + esc(T("ADD BY LINK")) + '</button>' +
-                '</div></div>';
 
         }
         else if (!isHost) {
@@ -752,8 +721,6 @@
         panel.querySelectorAll("[data-gf]").forEach(function(el) {
 
             const kind = el.dataset.gf;
-
-            if (kind === "url") { return; }
 
             if (kind === "volume") {
                 el.addEventListener("input", function() {
@@ -782,7 +749,6 @@
                 if (kind === "prev") { stepTo(-1); return; }
                 if (kind === "next") { stepTo(1); return; }
                 if (kind === "toggle") { toggleWireless(); return; }
-                if (kind === "add") { addLink(); return; }
 
                 if (kind === "play") { act("music_play", { p_id: el.dataset.id }); return; }
                 if (kind === "remove") { act("music_remove", { p_id: el.dataset.id }); return; }

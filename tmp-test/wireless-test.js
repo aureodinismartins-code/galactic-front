@@ -358,35 +358,19 @@ async function widgetHalf() {
 
     const hostPanel = () => host.w.document.getElementById("gf-music-panel");
 
-    check("the host is offered the link box, and no file picker",
-        !!hostPanel().querySelector('[data-gf="url"]') && !hostPanel().querySelector('[data-gf="file"]') &&
+    check("no way to paste a link: the box and its button are gone",
+        !hostPanel().querySelector('[data-gf="url"]') &&
+        !hostPanel().querySelector('[data-gf="add"]') &&
+        !/ADD BY LINK/.test(hostPanel().textContent) &&
         !/PICK A FILE/.test(hostPanel().textContent),
-        hostPanel().textContent.slice(0, 160));
-
-    const box = hostPanel().querySelector('[data-gf="url"]');
-    box.value = "https://example.test/three.mp3";
-    [...hostPanel().querySelectorAll("button")].find(b => /ADD BY LINK/.test(b.textContent))
-        .dispatchEvent(new host.w.MouseEvent("click", { bubbles: true }));
-    await tick();
-
-    check("adding by link asks the server to put it on",
-        !!last(host.calls, "music_add") &&
-        last(host.calls, "music_add").args.p_url === "https://example.test/three.mp3",
-        JSON.stringify(host.calls.filter(c => c.name === "music_add").map(c => c.args)));
-    check("and the box is emptied for the next one", box.value === "", box.value);
-    check("the track appears on the host's list", /three/.test(hostPanel().textContent),
         hostPanel().textContent.slice(0, 200));
 
-    /* a file name is taken from the folder the game is served from. The
-       panel is redrawn after every answer, so the box is found again. */
-    hostPanel().querySelector('[data-gf="url"]').value = "four.mp3";
-    [...hostPanel().querySelectorAll("button")].find(b => /ADD BY LINK/.test(b.textContent))
-        .dispatchEvent(new host.w.MouseEvent("click", { bubbles: true }));
-    await tick();
-
-    check("and a bare file name is resolved against the game's own folder",
-        last(host.calls, "music_add").args.p_url === "https://example.test/four.mp3",
-        last(host.calls, "music_add").args.p_url);
+    check("the transport and the mute are what is left",
+        !!hostPanel().querySelector('[data-gf="toggle"]') &&
+        !!hostPanel().querySelector('[data-gf="mute"]') &&
+        !!hostPanel().querySelector('[data-gf="next"]') &&
+        !!hostPanel().querySelector('[data-gf="prev"]'),
+        hostPanel().textContent.slice(0, 200));
 
     /* now with music on the list, and the needle on it */
     hostState = Object.assign({}, hostState, {

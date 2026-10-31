@@ -272,7 +272,9 @@ async function player(withStations, hand) {
         console.log("\n== the panel is left as it was");
 
         ok("the shared wireless is untouched by the stations",
-            /music_state/.test(MUSIC) && /data-gf="url"/.test(MUSIC));
+            /music_state/.test(MUSIC) && /music_play/.test(MUSIC));
+        ok("and there is nothing left to paste a link into",
+            !/data-gf="url"/.test(MUSIC) && !/ADD BY LINK/.test(MUSIC) && !/PICK A FILE/.test(MUSIC));
 
     } catch (error) {
 
