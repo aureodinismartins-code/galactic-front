@@ -1344,6 +1344,7 @@
         "CLASSICAL": "CLÁSSICA",
         "RADIO COMMERCIALS": "ANÚNCIOS DE RÁDIO",
         "FBC NEWS": "NOTÍCIAS FBC",
+        "FBC NEWS PT": "NOTÍCIAS FBC PT",
         "nothing on this station yet": "nada nesta estação por enquanto",
         "This station has nothing on the air yet: put the files in assets/music and list them in stations.json.":
             "Esta estação ainda não tem nada no ar: coloque os ficheiros em assets/music e liste-os em stations.json.",

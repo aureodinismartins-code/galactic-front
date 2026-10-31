@@ -31,11 +31,11 @@ let manifest = null;
 try { manifest = JSON.parse(MANIFEST); } catch (e) { /* reported below */ }
 
 ok("stations.json is there and is valid", !!manifest);
-ok("there are five stations", manifest && Array.isArray(manifest.stations) && manifest.stations.length === 5);
+ok("there are six stations", manifest && Array.isArray(manifest.stations) && manifest.stations.length === 6);
 
 const ids = (manifest && manifest.stations || []).map(s => s.id);
-ok("jazz, classical, aura, commercials and the FBC",
-    ["jazz", "classical", "aura", "commercials", "fbc"].every(id => ids.indexOf(id) !== -1), ids);
+ok("jazz, classical, aura, commercials, the FBC and its Portuguese desk",
+    ["jazz", "classical", "aura", "commercials", "fbc", "fbc-pt"].every(id => ids.indexOf(id) !== -1), ids);
 
 ok("every station has a folder", (manifest && manifest.stations || []).every(s => !!s.folder));
 ok("every station folder is in the repository",

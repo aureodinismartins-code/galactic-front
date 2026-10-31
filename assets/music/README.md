@@ -1,6 +1,6 @@
 # The stations of the ship's wireless
 
-Five stations, five folders. Put the audio files in the folder of the station
+Six stations, six folders. Put the audio files in the folder of the station
 they belong to, then write their names into `stations.json`.
 
 ```
@@ -10,7 +10,8 @@ assets/music/
     classical/       ← classical
     aura/            ← aura
     commercials/     ← radio commercials
-    fbc-news/        ← FBC news bulletins
+    fbc-news/        ← FBC news bulletins, in English
+    fbc-news-pt/     ← FBC news bulletins, in Portuguese
 ```
 
 ## Adding a track

@@ -31,6 +31,12 @@
             "label": "FBC NEWS",
             "folder": "fbc-news",
             "tracks": []
+        },
+        {
+            "id": "fbc-pt",
+            "label": "FBC NEWS PT",
+            "folder": "fbc-news-pt",
+            "tracks": []
         }
     ]
 }
