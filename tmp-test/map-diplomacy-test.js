@@ -62,6 +62,29 @@ const OPTS = {
               locked: 0, armed: 120, couped: 0, tinder: 15, gate: true }
         ]
     },
+    worlds: {
+        faction: "Freedom Authority",
+        other: "Combine",
+        cap: 100,
+        pass: 60,
+        turn: 300,
+        prices: { rebel: 800, coup: 1500 },
+        waits: { rebel: 600, coup: 1200 },
+        planets: [
+            { planet: "Surtis", owner: "Combine", mine: false, theirs: true, capital: false,
+              unrest: 72, cap: 100, mood: "RIOTING", delta: 3, revolts: 1, bands: 2, men: 3000,
+              soldiers: 4000, fleets: 1, armed: 0, couped: 0 },
+            { planet: "Ossun", owner: "Combine", mine: false, theirs: true, capital: false,
+              unrest: 40, cap: 100, mood: "RESTLESS", delta: 2, revolts: 0, bands: 0, men: 0,
+              soldiers: 900, fleets: 0, armed: 420, couped: 0 },
+            { planet: "Corinth", owner: "Freedom Authority", mine: true, theirs: false, capital: false,
+              unrest: 25, cap: 100, mood: "CALM", delta: 4, revolts: 0, bands: 0, men: 0,
+              soldiers: 2500, fleets: 2, armed: 0, couped: 0 },
+            { planet: "Vhal", owner: "Combine", mine: false, theirs: true, capital: true,
+              unrest: 0, cap: 100, mood: "CALM", delta: 0, revolts: 0, bands: 0, men: 0,
+              soldiers: 9000, fleets: 3, armed: 0, couped: 0 }
+        ]
+    },
     ceasefire_none: {
         now: new Date().toISOString(), me: "Freedom Authority", mine: true,
         min_minutes: 5, max_minutes: 60, answer_window: 600, waiting: 0,
@@ -115,11 +138,12 @@ async function mount(faction, ceasefireKey, options) {
             }
             if (name === "diplomacy_state") { return Promise.resolve({ data: OPTS.embassies, error: null }); }
             if (name === "ceasefire_state") { return Promise.resolve({ data: OPTS[ceasefireKey], error: null }); }
+            if (name === "planetary_state") { return Promise.resolve({ data: OPTS.worlds, error: null }); }
             if (name === "ceasefire_offer") { return Promise.resolve({ data: OPTS.ceasefire_offer_mine, error: null }); }
             if (name === "ceasefire_answer") { return Promise.resolve({ data: OPTS.ceasefire_active, error: null }); }
             if (name === "send_envoy") { return Promise.resolve({ data: { planet: args.p_planet, relation: 50, level: "allied", annexed: false }, error: null }); }
-            if (name === "arm_rebels") { return Promise.resolve({ data: { planet: args.p_planet, action: "arm_rebels", tinder: 15, relation: 10, theirs: 35, cost: 800 }, error: null }); }
-            if (name === "overthrow_government") { return Promise.resolve({ data: { planet: args.p_planet, action: "overthrow_government", tinder: 50, relation: 10, theirs: 35, cost: 1500, locked: 1800 }, error: null }); }
+            if (name === "arm_rebels") { return Promise.resolve({ data: { planet: args.p_planet, action: "arm_rebels", unrest: 87, cap: 100, owner: "Combine", cost: 800 }, error: null }); }
+            if (name === "overthrow_government") { return Promise.resolve({ data: { planet: args.p_planet, action: "overthrow_government", unrest: 100, cap: 100, owner: "Combine", cost: 1500 }, error: null }); }
             return Promise.resolve({ data: null, error: null });
         }
     };
@@ -210,42 +234,61 @@ async function run() {
         check("sending envoys calls send_envoy with the world", !!envoy && envoy.args.p_planet === "Veyrona",
             envoy ? JSON.stringify(envoy.args) : "not called");
 
-        console.log("\nthe dirty tricks are on the table");
+        console.log("\nthe dirty tricks belong to worlds the other faction commands");
+
+        check("the embassy card no longer quotes the strike prices",
+            !/ARM THE REBELS/.test(text.slice(0, text.indexOf("THE WORLDS AND THEIR UNREST"))));
+
+        console.log("\nthe worlds and their unrest");
+
+        check("the planetary view is there", /THE WORLDS AND THEIR UNREST/.test(text));
+        check("a world the Combine holds is named, with its bar",
+            /Surtis/.test(text) && /unrest 72 \/ 100/.test(text),
+            text.slice(text.indexOf("Surtis"), text.indexOf("Surtis") + 220));
+        check("and its mood", /RIOTING/.test(text));
+        check("what feeds it, per turn", /\+3 a turn/.test(text));
+        check("the men in the streets and the garrison facing them",
+            /rebels 2 bands/.test(text) && /garrison 4,000/.test(text));
+        check("a world of our own is marked as such", /Your world: the bar is calmed/.test(text));
+        check("a capital is marked and offers nothing", /CAPITAL/.test(text) &&
+            !Array.from(tab.querySelectorAll(".dip-arm")).some(el => el.dataset.p === "Vhal"));
 
         const arms = Array.from(tab.querySelectorAll(".dip-arm"));
         const coups = Array.from(tab.querySelectorAll(".dip-coup"));
 
-        check("every world offers its rebels", arms.length === 2, arms.length);
-        check("a world already turning to the other side may be overthrown",
-            coups.find(el => el.dataset.p === "Kharos").disabled === false);
-        check("but one that is not turning yet may not",
-            coups.find(el => el.dataset.p === "Veyrona").disabled === true);
-        check("the price is shown, and no odds are rolled any more",
-            /ARM THE REBELS \(800\)/.test(text) && !/%\)/.test(text),
-            text.slice(text.indexOf("ARM THE REBELS") - 20, text.indexOf("ARM THE REBELS") + 60));
-        check("the trouble already planted is named", /trouble already planted: 15/.test(text),
-            text.slice(0, 260));
-        check("a world whose rebels were armed an hour ago is on cooldown",
-            arms.find(el => el.dataset.p === "Kharos").disabled === true);
-        check("and a world that is not turning has its rifles turned down",
-            arms.find(el => el.dataset.p === "Veyrona").disabled === true);
+        check("only the enemy's two worlds offer their rebels",
+            arms.length === 2 && arms.every(el => el.dataset.p === "Surtis" || el.dataset.p === "Ossun"),
+            arms.map(el => el.dataset.p).join(","));
+        check("the one that is free is not disabled",
+            arms.find(el => el.dataset.p === "Surtis").disabled === false);
+        check("a world whose rebels were armed minutes ago waits",
+            arms.find(el => el.dataset.p === "Ossun").disabled === true);
+        check("and says so with a clock, not a dead button",
+            /their rebels will take rifles again in/.test(text) &&
+            tab.querySelector("[data-dip-arm][data-dip-arm]") &&
+            tab.querySelector("[data-dip-arm]").textContent === "7:00",
+            tab.querySelector("[data-dip-arm]") ? tab.querySelector("[data-dip-arm]").textContent : "no clock");
+        check("the price is shown", /ARM THE REBELS \(800\)/.test(text) && /OVERTHROW THE GOVERNMENT \(1500\)/.test(text));
 
         calls.length = 0;
-        tab.querySelector('.dip-arm[data-p="Veyrona"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+        tab.querySelector('.dip-arm[data-p="Surtis"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
         await new Promise(r => setTimeout(r, 40));
         const arm = calls.find(c => c.name === "arm_rebels");
-        check("arming the rebels calls arm_rebels", !!arm && arm.args.p_planet === "Veyrona",
+        check("arming the rebels of an enemy world calls arm_rebels", !!arm && arm.args.p_planet === "Surtis",
             arm ? JSON.stringify(arm.args) : "not called");
-        check("and the result is reported", /the rebels are armed/.test(msgText(tab)), msgText(tab));
+        check("and the new bar is reported", /the rebels are armed/.test(msgText(tab)) &&
+            /unrest 87 \/ 100/.test(msgText(tab)), msgText(tab));
 
         calls.length = 0;
-        tab.querySelector('.dip-coup[data-p="Kharos"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+        tab.querySelector('.dip-coup[data-p="Surtis"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
         await new Promise(r => setTimeout(r, 40));
         const coup = calls.find(c => c.name === "overthrow_government");
-        check("a coup asks first, then calls overthrow_government", !!coup && coup.args.p_planet === "Kharos",
+        check("a coup asks first, then calls overthrow_government", !!coup && coup.args.p_planet === "Surtis",
             coup ? JSON.stringify(coup.args) : "not called");
-        check("and says the government is tottering and unrest was planted",
-            /the government is tottering/.test(msgText(tab)) && /unrest 50/.test(msgText(tab)), msgText(tab));
+        check("and says the government is tottering on a full bar",
+            /the government is tottering/.test(msgText(tab)) && /unrest 100 \/ 100/.test(msgText(tab)), msgText(tab));
+
+
 
         w.close();
     }
@@ -323,7 +366,7 @@ async function run() {
     {
         const { w, tab, calls } = await mount("Freedom Authority", "ceasefire_none", { confirm: false });
         calls.length = 0;
-        tab.querySelector('.dip-coup[data-p="Kharos"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+        tab.querySelector('.dip-coup[data-p="Surtis"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
         await new Promise(r => setTimeout(r, 40));
         check("nothing is sent when the player says no", !calls.some(c => c.name === "overthrow_government"),
             calls.map(c => c.name).join(","));
@@ -336,6 +379,7 @@ async function run() {
         const text = tab.textContent.replace(/\s+/g, " ");
         check("the ceasefire card names its file", /2026-11-02_temporary_ceasefire\.sql/.test(text), text.slice(0, 200));
         check("the embassy card names its file", /2026-10-31_leaders_parties_and_diplomacy\.sql/.test(text));
+        check("the planetary view names its file", /2026-11-57_the_tinder_burns_where_it_is_planted\.sql/.test(text));
         w.close();
     }
 
@@ -351,6 +395,7 @@ async function run() {
         check("the embassies", /MUNDOS INDEPENDENTES/.test(text));
         check("sending envoys", /ENVIAR EMISSÁRIOS/.test(text));
         check("the stages are in Portuguese", /AMIGÁVEL/.test(text) && /NEUTRO/.test(text), text.slice(0, 400));
+        check("the planetary view", /OS MUNDOS E A SUA INQUIETA\u00c7\u00c3O/.test(text), text.slice(-200));
         check("the dirty tricks too", /ARMAR OS REBELDES/.test(text) && /DERRUBAR O GOVERNO/.test(text));
         check("and which way a world leans", /inclina-se para o seu lado/.test(text));
         check("and the way back", /VOLTAR AO MAPA/.test(text));

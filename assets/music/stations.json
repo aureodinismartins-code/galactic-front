@@ -32,7 +32,10 @@
             "id": "commercials",
             "label": "RADIO COMMERCIALS",
             "folder": "commercials",
-            "tracks": "[Adele - Skyfall (Official Lyric Video).mp3" , "Eminem - Without Me (Official Music Video).mp3]"
+            "tracks": [
+                "Adele - Skyfall (Official Lyric Video).mp3",
+                "Eminem - Without Me (Official Music Video).mp3"
+            ]
         },
         {
             "id": "gfnn",

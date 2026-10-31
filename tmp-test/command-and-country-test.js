@@ -39,6 +39,9 @@ const FILES = [
     "sql/2026-11-10_pacified_worlds_and_the_opening_quota.sql",
     "sql/2026-11-13_the_occupation_has_a_policy.sql",
     "sql/2026-11-14_the_blockade_reaches_the_capital.sql",
+    "sql/2026-11-13_the_occupation_has_a_policy.sql",
+    "sql/2026-11-14_the_blockade_reaches_the_capital.sql",
+    "sql/2026-11-15_committees_and_ministers.sql",
     "sql/2026-11-15_committees_and_ministers.sql",
     "sql/2026-11-12_the_speakers_chair.sql"
 ];
