@@ -104,12 +104,30 @@ const lastHeartbeat = () => heartbeats()[heartbeats().length - 1];
     check("a move of the mouse puts the player back", lastHeartbeat().args.p_active === true, JSON.stringify(lastHeartbeat().args));
     check("and the note goes away", badge.style.display === "none", badge.style.display);
 
-    console.log("the reset button clears the newer systems too");
+    console.log("the host's keys live on the admin tab, and nowhere else");
 
     w.prompt = function() { return "RESET"; };
 
-    const reset = [...w.document.querySelectorAll("button")].find(b => /RESET GAME/.test(b.textContent));
-    check("the host's reset button is on the page", !!reset);
+    const tab = w.document.getElementById("gc-admin-tab");
+    check("the admin tab is on the page", !!tab);
+
+    if (tab) {
+        tab.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+        await new Promise(r => setTimeout(r, 20));
+    }
+
+    const adminPanel = w.document.getElementById("gc-admin-panel");
+
+    const floating = [...w.document.querySelectorAll("button")].filter(function (b) {
+        return /RESET GAME|CLOSE THE GAME|MAINTENANCE IS ON/.test(b.textContent) &&
+            !(adminPanel && adminPanel.contains(b));
+    });
+
+    check("no reset or maintenance button is left floating over the map", floating.length === 0,
+        floating.map(b => b.textContent).join(" | "));
+
+    const reset = adminPanel && adminPanel.querySelector('[data-gc="reset"]');
+    check("the reset sits in the admin panel", !!reset);
 
     reset.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
     await new Promise(r => setTimeout(r, 60));

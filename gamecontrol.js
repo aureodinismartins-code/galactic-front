@@ -3,13 +3,12 @@
    - heartbeat: tells the server somebody is here, so the world
      is paused while nobody is online
    - freeze overlay until the host presses START
-   - host-only RESET button (set window.GC_RESET = true on a page)
+   - the host's own ADMIN tab: the reset and the maintenance keys in one place
    Needs supabase.js and stage10.sql.
 ========================================================= */
 (function() {
 
     let overlay = null;
-    let resetButton = null;
     let lastStarted = null;
 
     /* ---------- what counts as playing ----------
@@ -64,25 +63,6 @@
         });
 
         return overlay;
-
-    }
-
-    function ensureResetButton() {
-
-        if (resetButton) { return resetButton; }
-
-        resetButton = document.createElement("button");
-        resetButton.type = "button";
-        resetButton.textContent = "\u27f2 RESET GAME";
-        resetButton.title = "Host only: puts the whole game back to the start";
-        resetButton.style.cssText =
-            "position:fixed;left:25px;bottom:78px;z-index:9000;padding:7px 12px;background:#2a0f0f;color:#ff9b9b;" +
-            "border:1px solid #8a3030;cursor:pointer;font:bold 11px Arial;letter-spacing:2px;display:none;";
-        document.body.appendChild(resetButton);
-
-        resetButton.addEventListener("click", runReset);
-
-        return resetButton;
 
     }
 
@@ -152,7 +132,6 @@
 
     /* ---------- maintenance mode (host closes the game for everybody else) ---------- */
     let maintOverlay = null;
-    let maintButton = null;
     let lastMaintenance = null;
 
     function ensureMaintOverlay() {
@@ -174,23 +153,6 @@
         document.body.appendChild(maintOverlay);
 
         return maintOverlay;
-
-    }
-
-    function ensureMaintButton() {
-
-        if (maintButton) { return maintButton; }
-
-        maintButton = document.createElement("button");
-        maintButton.type = "button";
-        maintButton.style.cssText =
-            "position:fixed;left:25px;bottom:120px;z-index:99999;padding:7px 12px;color:#fff;cursor:pointer;" +
-            "font:bold 11px Arial;letter-spacing:2px;display:none;";
-        document.body.appendChild(maintButton);
-
-        maintButton.addEventListener("click", toggleMaintenance);
-
-        return maintButton;
 
     }
 
@@ -233,17 +195,6 @@
 
         o.style.display = status.maintenance && !status.is_host ? "flex" : "none";
         o.querySelector("#gc-maint-msg").textContent = status.maintenance_message || "";
-
-        if (status.is_host && window.GC_HOST_TOOLS) {
-
-            const b = ensureMaintButton();
-
-            b.style.display = "block";
-            b.textContent = status.maintenance ? "\ud83d\udd27 MAINTENANCE IS ON - OPEN THE GAME" : "\ud83d\udd27 CLOSE THE GAME (MAINTENANCE)";
-            b.style.background = status.maintenance ? "#6a1212" : "#3a2f10";
-            b.style.border = status.maintenance ? "2px solid #ff6a6a" : "1px solid #b08a2c";
-
-        }
 
     }
 
@@ -416,10 +367,6 @@
                 ? "You are the host. Everything stays frozen until you press START."
                 : "Everything is frozen. Waiting for the host to begin the war.";
 
-        }
-
-        if (window.GC_RESET && status.is_host) {
-            ensureResetButton().style.display = "block";
         }
 
         applyAdmin(status);
