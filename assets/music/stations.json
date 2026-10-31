@@ -4,7 +4,9 @@
             "id": "pop",
             "label": "POP",
             "folder": "pop",
-            "tracks": [barry-manilow-copacabana-at-the-copa.mp3]
+            "tracks": [
+                "barry-manilow-copacabana-at-the-copa.mp3"
+            ]
         },
         {
             "id": "classical",
