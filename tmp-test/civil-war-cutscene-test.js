@@ -128,9 +128,14 @@ ok("the rule is asked before anything is shown",
 
 console.log("\n== once per player");
 
-ok("the browser remembers it", /const CIVIL_WAR_SEEN = "gf\.civil-war-cutscene";/.test(PAGE) &&
+ok("the browser remembers it, with the stamp of the war it saw",
+    /const CIVIL_WAR_SEEN = "gf\.civil-war-cutscene";/.test(PAGE) &&
     /window\.localStorage\.getItem\(CIVIL_WAR_SEEN\)/.test(PAGE) &&
-    /window\.localStorage\.setItem\(CIVIL_WAR_SEEN, "1"\)/.test(PAGE));
+    /window\.localStorage\.setItem\(CIVIL_WAR_SEEN,/.test(PAGE) &&
+    /stamp: civilWarStamp\(\)/.test(PAGE));
+ok("the stamp is the host's reset clock, so a reset brings the cutscene back",
+    /function civilWarStamp\(\)/.test(PAGE) && /status\.started/.test(PAGE) &&
+    /String\(said\.stamp\) === civilWarStamp\(\)/.test(PAGE));
 ok("a browser without storage simply sees it again",
     /catch \(e\) \{ return false; \}/.test(PAGE) && /catch \(e\) \{ \/\*/.test(PAGE));
 
@@ -218,6 +223,47 @@ async function flow() {
     await second;
 
     ok("the war only resumes once for a player", !again);
+
+    /* the host resets the game: the new stamp arms the cutscene again */
+    w.gameStatus = { started: 100 };
+
+    const afterReset = w.civilWarBegins("Freedom Authority", "Combine");
+    await pause();
+
+    const resetCard = w.document.getElementById("civil-war-event");
+    ok("the host's reset brings the cutscene back", !!resetCard);
+
+    if (resetCard) {
+        resetCard.querySelector("button").click();
+        await pause();
+        w.document.querySelector("#civil-war-cutscene video").dispatchEvent(new w.Event("ended"));
+    }
+    await afterReset;
+
+    /* and it is once per war, not once per attack */
+    const sameWar = w.civilWarBegins("Combine", "Freedom Authority");
+    await pause();
+
+    const twice = !!w.document.getElementById("civil-war-event");
+    await sameWar;
+
+    ok("the same war is not filmed twice", !twice);
+
+    /* a second reset arms it once more */
+    w.gameStatus = { started: 200 };
+
+    const resetAgain = w.civilWarBegins("Combine", "Freedom Authority");
+    await pause();
+
+    const thirdCard = w.document.getElementById("civil-war-event");
+    ok("every reset brings it back", !!thirdCard);
+
+    if (thirdCard) {
+        thirdCard.querySelector("button").click();
+        await pause();
+        w.document.querySelector("#civil-war-cutscene video").dispatchEvent(new w.Event("ended"));
+    }
+    await resetAgain;
 
     /* a city of the other side, or of nobody, is not this event */
     const third = w.civilWarBegins("Freedom Authority", "Independents");

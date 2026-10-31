@@ -358,8 +358,9 @@ async function widgetHalf() {
 
     const hostPanel = () => host.w.document.getElementById("gf-music-panel");
 
-    check("the host is offered the link box and the file picker",
-        !!hostPanel().querySelector('[data-gf="url"]') && !!hostPanel().querySelector('[data-gf="file"]'),
+    check("the host is offered the link box, and no file picker",
+        !!hostPanel().querySelector('[data-gf="url"]') && !hostPanel().querySelector('[data-gf="file"]') &&
+        !/PICK A FILE/.test(hostPanel().textContent),
         hostPanel().textContent.slice(0, 160));
 
     const box = hostPanel().querySelector('[data-gf="url"]');

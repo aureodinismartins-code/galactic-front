@@ -68,7 +68,7 @@ const STATIONS = JSON.stringify({
     ]
 });
 
-async function player(withStations) {
+async function player(withStations, hand) {
 
     audios = [];
 
@@ -88,7 +88,11 @@ async function player(withStations) {
     w.supabaseClient = { rpc: function() { return Promise.resolve({ data: { now: new Date().toISOString(), is_host: false, tracks: [], playback: null }, error: null }); } };
 
     w.fetch = function(url) {
+
         if (!withStations) { return Promise.resolve({ ok: false, json: function() { return Promise.resolve(null); } }); }
+
+        if (hand) { return Promise.resolve({ ok: true, text: function() { return Promise.resolve(hand); } }); }
+
         return Promise.resolve({ ok: true, json: function() { return Promise.resolve(JSON.parse(STATIONS)); } });
     };
 
@@ -200,6 +204,70 @@ async function player(withStations) {
             !bare.document.getElementById("gf-music-button"));
 
         const host = bare.document.createElement("div");
+
+        console.log("\n== a manifest written by hand");
+
+        /* the file a player edits in the GitHub box, with the track name left
+           without its quotes: not valid JSON, but the stations still play */
+        const HAND = `{
+    "stations": [
+        {
+            "id": "jazz",
+            "label": "JAZZ",
+            "folder": "jazz",
+            "tracks": []
+        },
+        {
+            "id": "classical",
+            "label": "CLASSICAL",
+            "folder": "classical",
+            "tracks": []
+        },
+        {
+            "id": "aura",
+            "label": "AURA",
+            "folder": "aura",
+            "tracks": [Succession (Main Title Theme) - Nicholas Britell _ Succession (HBO Original Series Soundtrack).mp3]
+        },
+        {
+            "id": "commercials",
+            "label": "RADIO COMMERCIALS",
+            "folder": "commercials",
+            "tracks": []
+        },
+        {
+            "id": "fbc",
+            "label": "FBC NEWS",
+            "folder": "fbc-news",
+            "tracks": []
+        }
+    ]
+}`;
+
+        const hw = await player(true, HAND);
+
+        ok("the stations are read even though the file is not valid JSON",
+            hw.GFMusic.stations().length === 5, hw.GFMusic.stations().length);
+
+        const aura = hw.GFMusic.stations()[2];
+
+        ok("the name written without quotes is still read",
+            aura && aura.tracks.length === 1 && /^Succession/.test(aura.tracks[0]), aura && aura.tracks);
+
+        hw.document.getElementById("gf-music-button")
+            .dispatchEvent(new hw.MouseEvent("click", { bubbles: true }));
+        await tick();
+
+        hw.document.querySelector('[data-gf="station"][data-i="2"]')
+            .dispatchEvent(new hw.MouseEvent("click", { bubbles: true }));
+        await tick();
+
+        const handAudio = audios[audios.length - 1];
+
+        ok("and it plays from the aura folder, spaces and all",
+            !!handAudio && handAudio.src ===
+                "https://example.test/assets/music/aura/Succession%20(Main%20Title%20Theme)%20-%20Nicholas%20Britell%20_%20Succession%20(HBO%20Original%20Series%20Soundtrack).mp3",
+            handAudio && handAudio.src);
 
         console.log("\n== the panel is left as it was");
 

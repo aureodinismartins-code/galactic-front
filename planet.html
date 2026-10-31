@@ -22,7 +22,7 @@
     <script src="supabase.js"></script>
     <script src="i18n.js?v=38"></script>
     <script src="gamecontrol.js?v=27"></script>
-    <script src="music.js?v=3"></script>
+    <script src="music.js?v=4"></script>
     <script src="news.js?v=1"></script>
     <script src="ships.js"></script>
 
@@ -2580,9 +2580,34 @@ function resumesTheCivilWar(attacker, defender) {
 }
 
 
+/* which war this is: the host's reset stamps a new one, and a new stamp
+   alone arms the cutscene again on every screen */
+function civilWarStamp() {
+
+    const status = window.gameStatus;
+
+    if (!status || status.started === undefined || status.started === null) { return ""; }
+
+    return String(status.started);
+
+}
+
+
 function civilWarSeen() {
 
-    try { return window.localStorage.getItem(CIVIL_WAR_SEEN) === "1"; }
+    try {
+
+        const raw = window.localStorage.getItem(CIVIL_WAR_SEEN);
+        if (!raw) { return false; }
+
+        const said = JSON.parse(raw);
+
+        /* a note from before the stamp existed, or from the war before the
+           last reset: this war has not been seen */
+        return !!said && typeof said === "object" && "stamp" in said &&
+            String(said.stamp) === civilWarStamp();
+
+    }
     catch (e) { return false; }
 
 }
@@ -2590,7 +2615,10 @@ function civilWarSeen() {
 
 function civilWarRemember() {
 
-    try { window.localStorage.setItem(CIVIL_WAR_SEEN, "1"); }
+    try {
+        window.localStorage.setItem(CIVIL_WAR_SEEN,
+            JSON.stringify({ stamp: civilWarStamp(), at: Date.now() }));
+    }
     catch (e) { /* a browser that refuses storage simply sees it again */ }
 
 }

@@ -12,9 +12,10 @@
    Everybody else gets one control of their own: MUTE. It belongs to that
    player, is kept in their browser, and never leaves it.
 
-   A file picked from the host's own computer has nowhere to go, so it
-   plays on the host's screen only. Put a track online and add its link to
-   let the other players hear it.
+   The wireless also carries the ship's stations: the files committed under
+   assets/music and listed in assets/music/stations.json. A station belongs
+   to whoever picks it and plays on their screen alone. The host puts the
+   shared playlist together by link, so every screen can hear that one.
 
    No dependencies: this file is included by every screen.
 ========================================================= */
@@ -43,8 +44,6 @@
     let appliedKey = "";    /* the playback already loaded into the audio element */
     let seekTo = null;
     let skew = 0;           /* the server's clock minus this browser's */
-    let local = [];         /* the host's own files: this screen only */
-    let localIndex = -1;
     let refused = {};       /* tracks that would not play */
     let migrated = false;
     let timer = null;
@@ -169,9 +168,8 @@
 
     function follow() {
 
-        /* the host listening to a file of their own, or this player on a
-           station of their own: the shared wireless waits */
-        if (localIndex >= 0 || station >= 0) { return; }
+        /* this player is on a station of their own: the shared wireless waits */
+        if (station >= 0) { return; }
 
         const a = ensureAudio();
         a.muted = muted;
@@ -222,13 +220,6 @@
             return;
         }
 
-        /* a file of the host's own: back to the wireless */
-        if (localIndex >= 0) {
-            localIndex = -1;
-            follow();
-            return;
-        }
-
         if (!playback || !playback.id) { return; }
 
         /* the track is over for everybody: whichever screen hears the end
@@ -243,7 +234,6 @@
         note(T("That track could not be played."));
 
         if (station >= 0) { stationSkip(); return; }
-        if (localIndex >= 0) { return; }
         if (!playback || !playback.id) { return; }
         if (refused[playback.id]) { return; }
 
@@ -363,7 +353,6 @@
 
         i = (i < 0) ? (dir > 0 ? 0 : tracks.length - 1) : ((i + dir + tracks.length) % tracks.length);
 
-        stopLocal();
         act("music_play", { p_id: tracks[i].id });
 
     }
@@ -390,56 +379,6 @@
 
     }
 
-    function addFile(file) {
-
-        if (!isHost || !file) { return; }
-
-        let url;
-        try { url = URL.createObjectURL(file); }
-        catch (e) { return; }
-
-        local.push({ title: String(file.name || "track").replace(/\.[a-z0-9]{2,5}$/i, ""), url: url });
-
-        note(T("A file from this computer plays only on your screen: put it online and add its link to share it."));
-
-        localIndex = local.length - 1;
-        playLocal();
-
-    }
-
-    function playLocal() {
-
-        if (localIndex < 0 || !local[localIndex]) { return; }
-
-        const a = ensureAudio();
-
-        /* the needle leaves the shared track while this file plays */
-        appliedKey = "";
-
-        if (a.src !== local[localIndex].url) {
-            a.src = local[localIndex].url;
-            seekTo = null;
-        }
-
-        a.muted = muted;
-        a.volume = volume;
-
-        const started = a.play();
-        if (started && typeof started.catch === "function") {
-            started.catch(function() { /* the next click anywhere starts it */ });
-        }
-
-        paint();
-
-    }
-
-    function stopLocal() {
-        if (localIndex < 0) { return; }
-        localIndex = -1;
-        appliedKey = "";
-        follow();
-    }
-
     /* ---------- the stations ---------
        Each player chooses their own station; the shared wireless is still the
        host's. The files live in the repository, one folder per station under
@@ -452,11 +391,67 @@
         if (!name) { return ""; }
         if (/^[a-z]+:\/\//i.test(name)) { return name; }
 
-        const where = "assets/music/" + String(st.folder || st.id).replace(/\/+$/, "") +
-            "/" + String(name).replace(/^\/+/, "");
+        const file = String(name).replace(/^\/+/, "").replace(/#/g, "%23").replace(/\?/g, "%3F");
+
+        const where = "assets/music/" + String(st.folder || st.id).replace(/\/+$/, "") + "/" + file;
 
         try { return new URL(where, document.baseURI).href; }
         catch (e) { return where; }
+
+    }
+
+    /* the manifest, read kindly: a file written by hand often leaves the
+       names in the tracks list without their quotes, and that one missing
+       quote used to take every station off the air */
+    function stationsByHand(text) {
+
+        const out = [];
+        const blocks = String(text || "").match(/\{[^{}]*\}/g) || [];
+
+        blocks.forEach(function(block) {
+
+            const field = function(key) {
+                const m = block.match(new RegExp('"' + key + '"\\s*:\\s*"([^"]*)"'));
+                return m ? m[1] : "";
+            };
+
+            const id = field("id") || field("folder");
+            if (!id) { return; }
+
+            const list = block.match(/"tracks"\s*:\s*\[([\s\S]*?)\]/);
+            const tracks = [];
+
+            if (list) {
+                list[1].split(",").forEach(function(piece) {
+                    const name = piece.trim().replace(/^["']/, "").replace(/["']$/, "").trim();
+                    if (name) { tracks.push(name); }
+                });
+            }
+
+            out.push({
+                id: id,
+                label: field("label") || id,
+                folder: field("folder") || id,
+                tracks: tracks
+            });
+
+        });
+
+        return out;
+
+    }
+
+    function stationsFrom(text) {
+
+        try {
+            const data = JSON.parse(text);
+            const list = Array.isArray(data) ? data
+                : (data && Array.isArray(data.stations) ? data.stations : []);
+            if (list.length) { return list; }
+        }
+        catch (e) { /* a hand-written file: read it below */ }
+
+        return stationsByHand(text);
 
     }
 
@@ -473,11 +468,16 @@
         catch (e) { stationsError = true; return; }
 
         Promise.resolve(answer).then(function(res) {
-            return (res && res.ok) ? res.json() : null;
-        }).then(function(data) {
 
-            const list = Array.isArray(data) ? data
-                : (data && Array.isArray(data.stations) ? data.stations : []);
+            if (!res || !res.ok) { return ""; }
+
+            if (typeof res.text === "function") { return res.text(); }
+
+            return Promise.resolve(res.json()).then(function(data) { return JSON.stringify(data || {}); });
+
+        }).then(function(text) {
+
+            const list = stationsFrom(text);
 
             stations = list.filter(function(s) {
                 return !!(s && (s.id || s.folder));
@@ -487,7 +487,7 @@
                     label: String(s.label || s.id || s.folder),
                     folder: String(s.folder || s.id),
                     tracks: Array.isArray(s.tracks)
-                        ? s.tracks.filter(function(t) { return !!t; }) : []
+                        ? s.tracks.filter(function(t) { return !!t; }).map(String) : []
                 };
             });
 
@@ -531,7 +531,6 @@
         if (!st) { return; }
 
         station = index;
-        localIndex = -1;
         appliedKey = "";
 
         if (!st.tracks.length) {
@@ -652,8 +651,7 @@
         if (!panel || !button) { return; }
 
         const playing = !!(audio && !audio.paused);
-        const own = localIndex >= 0 ? local[localIndex] : null;
-        const current = own ? own.title : (playback && playback.url ? playback.title : "");
+        const current = playback && playback.url ? playback.title : "";
 
         button.style.color = muted ? "#6f8ba0" : (playing ? "#7dffb0" : "#9fdcff");
         button.style.borderColor = muted ? "#3f5f7f" : (playing ? "#37c98a" : "#3f7f9f");
@@ -725,27 +723,12 @@
                     '</div>';
             }).join("");
 
-            h += local.map(function(t, i) {
-                const on = i === localIndex;
-                return '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid #183044">' +
-                    '<button type="button" data-gf="local" data-i="' + i + '" style="' + BTN + ';min-width:26px">' +
-                        (on ? "&#9654;" : "&#8226;") + '</button>' +
-                    '<span style="flex:1;color:' + (on ? "#fff" : "#a9c4d6") + ';overflow:hidden;' +
-                        'text-overflow:ellipsis;white-space:nowrap">' + esc(t.title) + '</span>' +
-                    '<span style="color:#6f8ba0">' + esc(T("ON YOUR SCREEN ONLY")) + '</span></div>';
-            }).join("");
-
             h += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #183044">' +
                 '<input type="text" data-gf="url" placeholder="' + esc(T("paste a link to an audio file")) + '" ' +
                 'style="width:100%;box-sizing:border-box;padding:6px;background:#0b1622;border:1px solid #2b4b61;' +
                 'color:#dff1ff;margin-bottom:6px">' +
                 '<div style="display:flex;gap:6px">' +
                 '<button type="button" data-gf="add" style="' + BTN + ';flex:1">' + esc(T("ADD BY LINK")) + '</button>' +
-                '<label style="' + BTN + ';flex:1;text-align:center">' + esc(T("PICK A FILE")) +
-                '<input type="file" accept="audio/*" data-gf="file" style="display:none"></label>' +
-                '</div>' +
-                '<div style="color:#6f8ba0;margin-top:8px;line-height:1.5">' +
-                esc(T("A file from this computer plays only on your screen: put it online and add its link to share it.")) +
                 '</div></div>';
 
         }
@@ -770,7 +753,7 @@
 
             const kind = el.dataset.gf;
 
-            if (kind === "url" || kind === "file") { return; }
+            if (kind === "url") { return; }
 
             if (kind === "volume") {
                 el.addEventListener("input", function() {
@@ -801,25 +784,12 @@
                 if (kind === "toggle") { toggleWireless(); return; }
                 if (kind === "add") { addLink(); return; }
 
-                if (kind === "play") { stopLocal(); act("music_play", { p_id: el.dataset.id }); return; }
+                if (kind === "play") { act("music_play", { p_id: el.dataset.id }); return; }
                 if (kind === "remove") { act("music_remove", { p_id: el.dataset.id }); return; }
-
-                if (kind === "local") {
-                    localIndex = Number(el.dataset.i);
-                    playLocal();
-                }
 
             });
 
         });
-
-        const file = panel.querySelector('[data-gf="file"]');
-        if (file) {
-            file.addEventListener("change", function() {
-                const picked = file.files && file.files[0];
-                if (picked) { addFile(picked); }
-            });
-        }
 
     }
 
