@@ -1164,8 +1164,10 @@
         "No minister": "Sem ministro",
         "APPOINT": "NOMEAR",
         "DISMISS": "EXONERAR",
-        "The President of the Freedom Authority names the ministers; the High Commissar of the Combine does the same in the Soviet. Each ministry may act once a term: the war ministry authorises one campaign without a bill, the treasury takes one extraordinary levy (300-500 credits, and the people are told), and the interior sends one load of relief (+10 stability).":
-            "O Presidente da Freedom Authority nomeia os ministros; o Alto Comissário do Combine faz o mesmo no Soviete. Cada ministério pode agir uma vez por mandato: a guerra autoriza uma campanha sem proposta, o tesouro lança um imposto extraordinário (300-500 créditos, e o povo sabe quem o cobrou), e o interior envia um carregamento de alívio (+10 estabilidade).",
+        "The President of the Freedom Authority names the ministers; the High Commissar of the Combine does the same in the Soviet. Each ministry may act once a term: the war ministry authorises one campaign without a bill, the treasury takes one extraordinary levy (120-200 credits, and the people are told), and the interior sends one load of relief (+10 stability).":
+            "O Presidente da Freedom Authority nomeia os ministros; o Alto Comissário do Combine faz o mesmo no Soviete. Cada ministério pode agir uma vez por mandato: a guerra autoriza uma campanha sem proposta, o tesouro lança um imposto extraordinário (120-200 créditos, e o povo sabe quem o cobrou), e o interior envia um carregamento de alívio (+10 estabilidade).",
+        "an extraordinary levy": "um imposto extraordinário",
+        "and the party pays for it": "e o partido paga por isso",
         "AUTHORISE CAMPAIGN": "AUTORIZAR CAMPANHA",
         "EXTRAORDINARY LEVY": "IMPOSTO EXTRAORDINÁRIO",
         "SEND RELIEF": "ENVIAR ALÍVIO",
