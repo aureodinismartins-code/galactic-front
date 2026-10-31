@@ -466,6 +466,8 @@
         "⟲ RESET GAME": "⟲ REINICIAR JOGO",
         "⚔ SPACE BATTLE": "⚔ BATALHA ESPACIAL",
         "Congress has not declared war on": "O Congresso não declarou guerra contra",
+        "A ceasefire stands between the two authorities: no attack can be made until it lapses.":
+            "Um cessar-fogo está em vigor entre as duas autoridades: nenhum ataque pode ser feito até que ele termine.",
         "Your session expired.": "Sua sessão expirou.",
         "This fleet belongs to the": "Esta frota pertence à",
         "The reset finished, but some parts could not be done:":

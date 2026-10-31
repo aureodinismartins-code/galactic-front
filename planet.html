@@ -20,7 +20,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="supabase.js"></script>
-    <script src="i18n.js?v=37"></script>
+    <script src="i18n.js?v=38"></script>
     <script src="gamecontrol.js?v=26"></script>
     <script src="music.js?v=2"></script>
     <script src="news.js?v=1"></script>
@@ -2998,11 +2998,30 @@ async function startAttack(city) {
 
     
     /*
-     * The freedom to attack depends on the chamber of your faction:
-     * the Freedom Authority needs a declaration of war from Congress,
-     * the Combine needs an approved military campaign from the Soviet.
+     * The two authorities have been at war since the front opened, so their
+     * worlds are enemy ground already: no fresh declaration is asked for, and
+     * the one thing that stops an attack is a ceasefire both sides signed.
+     * A world nobody holds is still a decision for the chamber - the Freedom
+     * Authority needs a declaration of war from Congress, the Combine an
+     * approved military campaign from the Soviet.
      */
-    if (playerFaction === "Combine") {
+    const rival = playerFaction === "Combine" ? "Freedom Authority" : "Combine";
+
+    const rivalHeld = planetCities.some(function(city) {
+        return String(city.faction || "").trim() === rival;
+    });
+
+    if (rivalHeld) {
+
+        const peace = await supabaseClient.rpc("ceasefire_active");
+
+        if (!peace.error && peace.data === true) {
+            gameNotice(tr("A ceasefire stands between the two authorities: no attack can be made until it lapses."));
+            return;
+        }
+
+    }
+    else if (playerFaction === "Combine") {
 
         const campaign = await supabaseClient.rpc("cs_can_attack", { p_planet: planetName });
 
