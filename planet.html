@@ -2551,6 +2551,206 @@ async function finalizeFleetIfReady(
 
 
 /* =========================================================
+   THE CIVIL WAR RESUMES
+   A Freedom city taken by the Combine, or a Combine city taken
+   by the Freedom Authority, is not a border raid: it is the war
+   the old Republic never survived starting again. The event card
+   comes first, and the film plays when the player proceeds.
+========================================================= */
+
+const CIVIL_WAR_VIDEO = "assets/cutscenes/civil-war.mp4";
+
+/* remembered per browser: the war only resumes once for a player */
+const CIVIL_WAR_SEEN = "gf.civil-war-cutscene";
+
+const CIVIL_WAR_FACTIONS = ["Freedom Authority", "Combine"];
+
+
+/* the only attack this event speaks for: one authority on the other */
+function resumesTheCivilWar(attacker, defender) {
+
+    const a = String(attacker || "").trim();
+    const d = String(defender || "").trim();
+
+    return CIVIL_WAR_FACTIONS.indexOf(a) !== -1 &&
+        CIVIL_WAR_FACTIONS.indexOf(d) !== -1 &&
+        a !== d;
+
+}
+
+
+function civilWarSeen() {
+
+    try { return window.localStorage.getItem(CIVIL_WAR_SEEN) === "1"; }
+    catch (e) { return false; }
+
+}
+
+
+function civilWarRemember() {
+
+    try { window.localStorage.setItem(CIVIL_WAR_SEEN, "1"); }
+    catch (e) { /* a browser that refuses storage simply sees it again */ }
+
+}
+
+
+/* the card: what is about to happen, and the one way forward */
+function civilWarCard(title, body, action) {
+
+    const overlay = document.createElement("div");
+    overlay.id = "civil-war-event";
+    overlay.style.cssText =
+        "position:fixed;inset:0;z-index:6000;display:flex;align-items:center;justify-content:center;" +
+        "padding:20px;background:radial-gradient(circle at 50% 40%,rgba(74,12,6,.6),rgba(0,0,0,.88));";
+
+    const card = document.createElement("div");
+    card.style.cssText =
+        "width:min(560px,94vw);background:rgba(10,6,5,.97);border:1px solid #d8622f;" +
+        "box-shadow:0 0 40px rgba(216,98,47,.35);padding:26px 30px;text-align:center;" +
+        "color:#f2e6dd;font:14px/1.6 Arial,sans-serif;";
+
+    const kicker = document.createElement("div");
+    kicker.style.cssText = "font:bold 11px Arial;letter-spacing:4px;color:#d8622f;margin-bottom:10px;";
+    kicker.textContent = tr("GALACTIC EVENT");
+
+    const heading = document.createElement("h2");
+    heading.style.cssText = "margin:0 0 14px;font-size:23px;letter-spacing:3px;color:#fff;line-height:1.3;";
+    heading.textContent = tr(title);
+
+    const line = document.createElement("p");
+    line.style.cssText = "margin:0 0 22px;color:#d9c9bd;";
+    line.textContent = tr(body);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = tr(action);
+    button.style.cssText =
+        "padding:10px 34px;background:#23100a;color:#fff;border:1px solid #d8622f;" +
+        "font:bold 12px Arial;letter-spacing:3px;cursor:pointer;";
+    button.addEventListener("mouseenter", function() { button.style.background = "#3a1a10"; });
+    button.addEventListener("mouseleave", function() { button.style.background = "#23100a"; });
+
+    card.appendChild(kicker);
+    card.appendChild(heading);
+    card.appendChild(line);
+    card.appendChild(button);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    return { overlay: overlay, button: button };
+
+}
+
+
+function civilWarEvent() {
+
+    return new Promise(function(resolve) {
+
+        const card = civilWarCard(
+            "RESUMING THE GALACTIC CIVIL WAR",
+            "The Freedom Authority and the Combine have not marched on each other's cities since the Republic fell. That is about to end: the old war was never finished, only postponed.",
+            "PROCEED"
+        );
+
+        card.button.addEventListener("click", function() {
+            card.overlay.remove();
+            resolve();
+        });
+
+        card.button.focus();
+
+    });
+
+}
+
+
+/* the film; a missing or blocked file must not strand the player in the dark */
+function civilWarFilm() {
+
+    return new Promise(function(resolve) {
+
+        const overlay = document.createElement("div");
+        overlay.id = "civil-war-cutscene";
+        overlay.style.cssText =
+            "position:fixed;inset:0;z-index:6100;background:#000;display:flex;" +
+            "align-items:center;justify-content:center;";
+
+        const video = document.createElement("video");
+        video.src = CIVIL_WAR_VIDEO;
+        video.autoplay = true;
+        video.playsInline = true;
+        video.preload = "auto";
+        video.style.cssText = "width:100%;height:100%;object-fit:contain;background:#000;";
+
+        const skip = document.createElement("button");
+        skip.type = "button";
+        skip.textContent = tr("SKIP");
+        skip.style.cssText =
+            "position:absolute;bottom:24px;right:24px;padding:9px 22px;background:rgba(12,8,6,.9);" +
+            "color:#f2e6dd;border:1px solid #d8622f;font:bold 11px Arial;letter-spacing:2px;cursor:pointer;";
+
+        let done = false;
+
+        const finish = function() {
+
+            if (done) { return; }
+            done = true;
+
+            try { video.pause(); } catch (e) { }
+
+            overlay.remove();
+            resolve();
+
+        };
+
+        video.addEventListener("ended", finish);
+        video.addEventListener("error", finish);
+        skip.addEventListener("click", finish);
+
+        overlay.appendChild(video);
+        overlay.appendChild(skip);
+        document.body.appendChild(overlay);
+
+        const started = video.play();
+
+        if (started && typeof started.catch === "function") {
+
+            started.catch(function() {
+
+                /* a browser that refuses sound still gets to see it */
+                video.muted = true;
+
+                const again = video.play();
+
+                if (again && typeof again.catch === "function") {
+                    again.catch(function() { video.controls = true; });
+                }
+
+            });
+
+        }
+
+    });
+
+}
+
+
+/* the attack waits here, and goes on once the player has seen it */
+async function civilWarBegins(attacker, defender) {
+
+    if (!resumesTheCivilWar(attacker, defender)) { return; }
+    if (civilWarSeen()) { return; }
+
+    await civilWarEvent();
+    civilWarRemember();
+
+    await civilWarFilm();
+
+}
+
+
+/* =========================================================
    ATTACK
 ========================================================= */
 
@@ -2843,6 +3043,12 @@ async function startAttack(city) {
             return;
         }
     }
+
+    /*
+     * The two authorities are a border apart: the first time one
+     * marches on a city of the other, the civil war starts again.
+     */
+    await civilWarBegins(playerFaction, city.faction);
 
     window.location.href =
         "battle.html" +

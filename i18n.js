@@ -1124,6 +1124,12 @@
         /* ---------- how a world is administered (2026-11-13) ---------- */
         "POLICY": "POLÍTICA",
         "CIVIL RULE": "ADMINISTRAÇÃO CIVIL",
+        "GALACTIC EVENT": "EVENTO GALÁCTICO",
+        "RESUMING THE GALACTIC CIVIL WAR": "RETOMANDO A GUERRA CIVIL GALÁCTICA",
+        "The Freedom Authority and the Combine have not marched on each other's cities since the Republic fell. That is about to end: the old war was never finished, only postponed.":
+            "A Freedom Authority e a Combine não marcham sobre as cidades uma da outra desde a queda da República. Isso está prestes a acabar: a velha guerra nunca terminou, só foi adiada.",
+        "PROCEED": "PROSSEGUIR",
+        "SKIP": "PULAR",
         "REPRISALS": "REPRESÁLIAS",
         "AMNESTY": "AMNISTIA",
         "GARRISON": "GUARNIÇÃO",
