@@ -10,8 +10,8 @@ assets/music/
     classical/       ← classical
     aura/            ← aura
     commercials/     ← radio commercials
-    fbc-news/        ← FBC news bulletins, in English
-    fbc-news-pt/     ← FBC news bulletins, in Portuguese
+    gfnn/            ← GFNN bulletins, in English
+    gfnn-pt/         ← GFNN bulletins, in Portuguese
 ```
 
 ## Adding a track

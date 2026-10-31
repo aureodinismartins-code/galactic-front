@@ -27,15 +27,15 @@
             "tracks": []
         },
         {
-            "id": "fbc",
-            "label": "FBC NEWS",
-            "folder": "fbc-news",
+            "id": "gfnn",
+            "label": "GFNN",
+            "folder": "gfnn",
             "tracks": []
         },
         {
-            "id": "fbc-pt",
-            "label": "FBC NEWS PT",
-            "folder": "fbc-news-pt",
+            "id": "gfnn-pt",
+            "label": "GFNN PT",
+            "folder": "gfnn-pt",
             "tracks": []
         }
     ]

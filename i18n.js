@@ -1349,8 +1349,9 @@
         "STATIONS": "ESTAÇÕES",
         "CLASSICAL": "CLÁSSICA",
         "RADIO COMMERCIALS": "ANÚNCIOS DE RÁDIO",
-        "FBC NEWS": "NOTÍCIAS FBC",
-        "FBC NEWS PT": "NOTÍCIAS FBC PT",
+        "GFNN": "GFNN",
+        "GFNN PT": "GFNN PT",
+        "GALACTIC FRONT NEWS NETWORK": "REDE DE NOTÍCIAS DA FRENTE GALÁCTICA",
         "nothing on this station yet": "nada nesta estação por enquanto",
         "This station has nothing on the air yet: put the files in assets/music and list them in stations.json.":
             "Esta estação ainda não tem nada no ar: coloque os ficheiros em assets/music e liste-os em stations.json.",

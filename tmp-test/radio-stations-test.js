@@ -34,8 +34,8 @@ ok("stations.json is there and is valid", !!manifest);
 ok("there are six stations", manifest && Array.isArray(manifest.stations) && manifest.stations.length === 6);
 
 const ids = (manifest && manifest.stations || []).map(s => s.id);
-ok("jazz, classical, aura, commercials, the FBC and its Portuguese desk",
-    ["jazz", "classical", "aura", "commercials", "fbc", "fbc-pt"].every(id => ids.indexOf(id) !== -1), ids);
+ok("jazz, classical, aura, commercials, GFNN and its Portuguese desk",
+    ["jazz", "classical", "aura", "commercials", "gfnn", "gfnn-pt"].every(id => ids.indexOf(id) !== -1), ids);
 
 ok("every station has a folder", (manifest && manifest.stations || []).every(s => !!s.folder));
 ok("every station folder is in the repository",
@@ -64,7 +64,7 @@ const STATIONS = JSON.stringify({
     stations: [
         { id: "jazz", label: "JAZZ", folder: "jazz", tracks: ["one.mp3", "two.mp3"] },
         { id: "classical", label: "CLASSICAL", folder: "classical", tracks: [] },
-        { id: "fbc", label: "FBC NEWS", folder: "fbc-news", tracks: ["bulletin.mp3"] }
+        { id: "gfnn", label: "GFNN", folder: "gfnn", tracks: ["bulletin.mp3"] }
     ]
 });
 
@@ -178,12 +178,12 @@ async function player(withStations, hand) {
             /nothing|no ar|empty/i.test(panel.textContent) && /CLASSICAL/.test(panel.textContent),
             panel.textContent.slice(0, 200));
 
-        const fbc = panel.querySelector('[data-gf="station"][data-i="2"]');
-        fbc.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+        const gfnn = panel.querySelector('[data-gf="station"][data-i="2"]');
+        gfnn.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
         await tick();
 
         ok("another station plays its own folder",
-            heard.src === "https://example.test/assets/music/fbc-news/bulletin.mp3", heard.src);
+            heard.src === "https://example.test/assets/music/gfnn/bulletin.mp3", heard.src);
 
         /* muting silences the station too */
         muted: {
@@ -236,9 +236,9 @@ async function player(withStations, hand) {
             "tracks": []
         },
         {
-            "id": "fbc",
-            "label": "FBC NEWS",
-            "folder": "fbc-news",
+            "id": "gfnn",
+            "label": "GFNN",
+            "folder": "gfnn",
             "tracks": []
         }
     ]
